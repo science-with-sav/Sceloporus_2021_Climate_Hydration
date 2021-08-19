@@ -1,0 +1,24 @@
+trial,serial,humidity_tmt,temp_tmt,notes,in google drive?
+1,20785311,dry,hot,might actually be cool dry idk,Y
+1,20932042,humid,hot,,Y
+1,20785317,dry,cool,,Y
+1,20785309,humid,hot,,Y
+1,20793609,humid,cool,,Y
+2,20785311,humid,cool,,Y
+2,20785308,humid,cool,,Y
+2,20785317,humid,hot,,Y
+2,20785309,dry,cool,,Y
+2,20793609,dry,hot,,Y
+3,20785309,dry,hot,,Y
+3,20793609,dry,cool,,Y
+3,20785308,humid,hot,,Y
+3,20785317,humid,cool,,Y
+3,20785311,dry,cool,,Y
+3,20932041,humid,hot,,Y
+4,20793609,dry,cool,,Y
+4,20932041,humid,cool,,Y
+4,20785311,humid,hot,,Y
+4,20932042,dry,hot,,Y
+4,20785309,humid,cool,,Y
+4,20785317,dry,hot,,Y
+4,20785308,humid,hot,,Y

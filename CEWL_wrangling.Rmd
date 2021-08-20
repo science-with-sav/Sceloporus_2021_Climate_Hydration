@@ -281,7 +281,7 @@ summary(clean_CEWL)
 ```
 
 
-# Check Data
+# Re-Check Data
 
 ## Number of Measurements
 

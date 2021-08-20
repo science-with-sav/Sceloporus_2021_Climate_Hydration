@@ -1,7 +1,7 @@
 ---
-title: "Cal Poly Herpetology CURE - Capture Data Analyses"
+title: "Climate Water Loss Experiment - Capture Hydration Analysis"
 author: "Savannah Weaver"
-date: "June 2021"
+date: "August 2021"
 output: 
   pdf_document:
     toc: TRUE
@@ -21,8 +21,6 @@ if (!require("PerformanceAnalytics")) install.packages("PerformanceAnalytics")
 library("PerformanceAnalytics") # pretty multicollinearity plots
 if (!require("UsingR")) install.packages("UsingR")
 library("UsingR")
-if (!require("MASS")) install.packages("MASS")
-library("MASS") # model selection & box-cox
 if (!require("lme4")) install.packages("lme4")
 library("lme4") # for LMMs
 if (!require("lmerTest")) install.packages("lmerTest")
@@ -30,98 +28,95 @@ library("lmerTest") # for p-values
 if (!require("onewaytests")) install.packages("onewaytests")
 library("onewaytests") # for Brown-Forsythe test
 if (!require("ggpubr")) install.packages("ggpubr")
-library("ggpubr") # for Brown-Forsythe test
+library("ggpubr") # for multi-ggplot figs
 if (!require("broom")) install.packages("broom")
 library("broom") # lmer model export
+if (!require("broom.mixed")) install.packages("broom.mixed")
+library("broom.mixed") # lmer model export
 ```
 
 
 # Background and Goals
 
-This data was collected April - May 2021 during a course-based undergraduate research experience (CURE) in Herpetology, taught by Emily Taylor at Cal Poly, San Luis Obispo. This part of the study was conducted to describe the variation in hydrophysiology in *Sceloporus occidentalis* and to investigate what drives that variation. Please refer to **doi:** for full details.
-
-In this document, we investigate differences in cutaneous evaporative water loss (CEWL) across body regions and dependent on environment, body size, condition, and hydration. 
+This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Robin Bedard, Tess McIntyre, and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus and and in Poly Canyon. This R file analyzes hydrophysiological variation at the time of capture. Please refer to **doi:** for the published scientific journal article and full details.
 
 
 # Data
 
-### Morphometrics and Blood Data
+## Mass and Hematocrit
 
 This data was collected upon capture of each lizard.
 
 Variables in this dataframe:
-- date
+- measurement_date = date the measurements were taken, including capture day
 - collection/capture time for each lizard
+- type = whether measurements were during experiment (exp) or after rehydration (post-rehab). For this R script/analysis, I'm only going to use capture day data.
 - individual ID for each lizard
-- sock ID used to capture each lizard (removed, not relevant to analyses)
-- SVL = snout-vent length
-- mass in grams
-- sex
-- if female, whether or not gravid (with eggs)
 - which eye the blood sample was taken from
-- percent hematocrit = percent of blood that's red blood cells
-- osmolality = a proxy of hydration, should be inversely related to water content of a lizard (this is the average of 1-3 replicates)
-- cloacal temperature at the time of CEWL measurement
-- processing time for each lizard, when all measurements were finished
+- mass in grams
+- time_processed = when mass and blood draw were recorded
+- hematocrit_percent = percent of blood that's red blood cells (measured in CRITOCAP microhematocrit capillary tubes)
 - hemolyzed = whether or not red blood cells burst and contaminated plasma
+- any notes (will remove to keep dataframe clean)
 
-Before loading in this data, some incorrectly-measured hematocrit and osmolality were omitted:
-- hematocrit for individuals 1-16, due to observer error
-- osmolality for individual 19, due to instrumental error
-
-```{r morpho blood data}
-# load and format data
-morpho_blood_dat <- read.csv("./data/Herpetology_Data.csv", # filename
+```{r}
+# load data, format, and select only capture data
+mass_hct_dat <- read.csv("./data/mass_hct.csv", # filename
                              na.strings=c("","NA") # fix empty cells
                              ) %>%
-  dplyr::mutate(# put date and time together
-                collect_date_time = (paste(date, collect_time)), 
+  mutate(# put date and time together
+                #collect_date_time = (paste(date, collect_time)), 
                 # replace some date-time values that have missing times
-                collect_date_time = replace(collect_date_time, 
-                                            collect_date_time == "4/5/21 NA", NA),
+                #collect_date_time = replace(collect_date_time, 
+                               #collect_date_time == "4/5/21 NA", NA),
                 # correctly format date-time variable
-                collect_date_time = as.POSIXct(collect_date_time, 
-                                               format = "%m/%d/%y %H:%M"),
+                #collect_date_time = as.POSIXct(collect_date_time, 
+                 #                              format = "%m/%d/%y %H:%M"),
                 # correctly format date-only variable
-                date = as.Date(date, format = "%m/%d/%y"),
+                measurement_date = as.Date(measurement_date, 
+                                          format = "%m/%d/%y"),
                 # correctly format collection time variable
                 # format extracts just time after posix adds arbitrary date
-                collect_time = (as.POSIXct(collect_time, format = "%H:%M")),
+                time_captured = (as.POSIXct(time_captured, 
+                                           format = "%H:%M")),
                 # correctly format processing time variable
-                processing_time = (as.POSIXct(processing_time, format = "%H:%M")),
+                time_processed = (as.POSIXct(time_processed, 
+                                              format = "%H:%M")),
                 # set individual_ID variable as a factor, not numeric
                 individual_ID = as.factor(individual_ID),
-                # set sex variable as a factor, not character
-                sex_M_F = as.factor(sex_M_F),
-                # set gravidity variable as a factor, not character
-                gravid_Y_N = as.factor(gravid_Y_N),
                 # set blood sample eye variable as a factor, not character
                 blood_sample_eye = as.factor(blood_sample_eye),
                 # set hemolyzed variable as a factor, not character
                 hemolyzed = as.factor(hemolyzed),
-                # compute holding time as capture time - cloacal measurement time:
-                hold_time = as.numeric(processing_time - collect_time)
+                # make sure numeric measurements are numeric
+                mass_g = as.numeric(mass_g),
+                hematocrit_percent = as.numeric(hematocrit_percent)
                 ) %>%
-  # remove two columns not relevant for statistics
-  dplyr::select(-sock_ID, -notes)
+  group_by(individual_ID) %>%
+  mutate(capture_date = min(measurement_date),
+         day = as.numeric(measurement_date - capture_date)) %>%
+  dplyr::filter(day == 0) %>%
+  dplyr::filter(complete.cases(individual_ID)) %>%
+  dplyr::select(-notes)
 
 # check
-summary(morpho_blood_dat)
-unique(morpho_blood_dat$date)
+summary(mass_hct_dat)
 
-# export
-#write.csv(morpho_blood_dat, "exported_data/capture_hydration.csv")
+# these two should be the same
+unique(mass_hct_dat$capture_date)
+unique(mass_hct_dat$measurement_date)
 ```
 
 I want to test if any IDs are missing, and which ones if so.
 
 ```{r}
-test <- c(seq(1, 150, by = 1))
-lost <- test[test %nin% morpho_blood_dat$individual_ID]
+`%nin%` = Negate(`%in%`)
+test <- (c(seq(201, 321, by = 1)))
+lost <- test[test %nin% mass_hct_dat$individual_ID]
 lost
 ```
 
-Individuals 23 and 56 actually both do not exist because those numbers were skipped when assigning IDs, so we have all the individuals measured in the dataframe.
+We have capture data for all individual_ID's.
 
 
 

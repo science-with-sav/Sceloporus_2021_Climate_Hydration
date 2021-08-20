@@ -41,11 +41,95 @@ library("broom.mixed") # lmer model export
 This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Robin Bedard, Tess McIntyre, and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus and and in Poly Canyon. This R file analyzes hydrophysiological variation at the time of capture. Please refer to **doi:** for the published scientific journal article and full details.
 
 
-# Load Data
+# Data
+
+## Load
+
+Read-in and attach all data. Details described in the sub-sections below.
+
+```{r}
+full_dat <- read.csv("./data/mass_hct.csv", # filename
+                             na.strings=c("","NA") # fix empty cells
+                             ) %>%
+  mutate(measurement_date = as.character(as.Date(measurement_date, 
+                                          format = "%m/%d/%y"))
+         ) %>%
+  left_join(read.csv("./data/osml_means_clean.csv", # filename
+                             na.strings=c("","NA") # fix empty cells
+            ), by = c("individual_ID", 
+                      "measurement_date" = "date_blood_drawn")
+            ) %>%
+  left_join(read.csv("./data/CEWL_dat_all_clean.csv", # filename
+                             na.strings=c("","NA") # fix empty cells
+            ), by = c("individual_ID", 
+                      "measurement_date" = "date")
+            ) %>%
+  dplyr::select(measurement_date,
+                time_captured,
+                time_processed,
+                time_c_temp = temp_time, # will be different
+                type, day, 
+                individual_ID,
+                mass_g, 
+                blood_sample_eye, hemolyzed,
+                hematocrit_percent, 
+                osmolality_mmol_kg,
+                CEWL_g_m2h,
+                cloacal_temp_C
+                ) %>%
+  mutate(# put date and time together
+                #collect_date_time = (paste(date, collect_time)), 
+                # replace some date-time values that have missing times
+                #collect_date_time = replace(collect_date_time, 
+                               #collect_date_time == "4/5/21 NA", NA),
+                # correctly format date-time variable
+                #collect_date_time = as.POSIXct(collect_date_time, 
+                 #                              format = "%m/%d/%y %H:%M"),
+                # correctly format date-only variable
+                measurement_date = as.Date(measurement_date, 
+                                          format = "%Y-%m-%d"),
+                # correctly format time variables
+                # format extracts just time after posix adds arbitrary date
+                time_captured = (as.POSIXct(time_captured, 
+                                           format = "%H:%M")),
+                time_processed = (as.POSIXct(time_processed, 
+                                              format = "%H:%M")),
+                time_c_temp = (as.POSIXct(time_c_temp, 
+                               format = "%Y-%m-%d %H:%M:%S")),
+                # set categorical variables as factors
+                type = as.factor(type),
+                day = as.factor(day),
+                individual_ID = as.factor(individual_ID),
+                blood_sample_eye = as.factor(blood_sample_eye),
+                hemolyzed = as.factor(hemolyzed),
+                # set numeric measurements as numeric
+                mass_g = as.numeric(mass_g),
+                hematocrit_percent = as.numeric(hematocrit_percent),
+                osmolality_mmol_kg = as.numeric(osmolality_mmol_kg),
+                CEWL_g_m2h = as.numeric(CEWL_g_m2h),
+                cloacal_temp_C = as.numeric(cloacal_temp_C)
+                ) %>%
+  group_by(individual_ID) %>%
+  mutate(capture_date = min(measurement_date),
+         day_n = as.numeric(measurement_date - capture_date))# %>%
+  #dplyr::filter(day == 0) %>%
+  #dplyr::filter(complete.cases(individual_ID)) %>%
+  #dplyr::select(-notes)
+
+summary(full_dat)
+```
+
+
+## Export
+
+Export full_dat to be used in 'experiment_analysis'.
+
+```{r}
+write.csv(full_dat, "./data/full_exp_data.csv")
+```
+
 
 ## Mass & Hematocrit
-
-This data was collected upon capture of each lizard.
 
 Variables in this dataframe:
 - measurement_date = date the measurements were taken, including capture day
@@ -61,46 +145,6 @@ Variables in this dataframe:
 
 ```{r}
 # load data, format, and select only capture data
-mass_hct_dat <- read.csv("./data/mass_hct.csv", # filename
-                             na.strings=c("","NA") # fix empty cells
-                             ) %>%
-  mutate(# put date and time together
-                #collect_date_time = (paste(date, collect_time)), 
-                # replace some date-time values that have missing times
-                #collect_date_time = replace(collect_date_time, 
-                               #collect_date_time == "4/5/21 NA", NA),
-                # correctly format date-time variable
-                #collect_date_time = as.POSIXct(collect_date_time, 
-                 #                              format = "%m/%d/%y %H:%M"),
-                # correctly format date-only variable
-                measurement_date = as.Date(measurement_date, 
-                                          format = "%m/%d/%y"),
-                # correctly format collection time variable
-                # format extracts just time after posix adds arbitrary date
-                time_captured = (as.POSIXct(time_captured, 
-                                           format = "%H:%M")),
-                # correctly format processing time variable
-                time_processed = (as.POSIXct(time_processed, 
-                                              format = "%H:%M")),
-                # set individual_ID variable as a factor, not numeric
-                individual_ID = as.factor(individual_ID),
-                # set blood sample eye variable as a factor, not character
-                blood_sample_eye = as.factor(blood_sample_eye),
-                # set hemolyzed variable as a factor, not character
-                hemolyzed = as.factor(hemolyzed),
-                # make sure numeric measurements are numeric
-                mass_g = as.numeric(mass_g),
-                hematocrit_percent = as.numeric(hematocrit_percent)
-                ) %>%
-  group_by(individual_ID) %>%
-  mutate(capture_date = min(measurement_date),
-         day = as.numeric(measurement_date - capture_date)) %>%
-  dplyr::filter(day == 0) %>%
-  dplyr::filter(complete.cases(individual_ID)) %>%
-  dplyr::select(-notes)
-
-# check
-summary(mass_hct_dat)
 
 # these two should be the same
 unique(mass_hct_dat$capture_date)
@@ -184,89 +228,8 @@ CEWL_capture <- read.csv("./data/CEWL_dat_all_clean.csv",
 summary(CEWL)
 ```
 
-## Weather Data
 
-This data was obtained from http://www.itrc.org/databases/precip/ (Adcon Server Data) to test the effect of ambient conditions on CEWL. This is different from the ambient conditions already measured with CEWL, which are the temperature and humidity around the measurement device at the time of measurement. We think that the temperature, humidity, wind speed, and solar radiation the lizard was exposed to prior to capture may also affect CEWL.
-
-We didn't have a daylight savings time switchover during this study, so we don't need to worry about incorporating. 
-
-```{r}
-# load in csvs and put all in one dataframe
-weather <- read.csv("./data/weather/4_5Weather.csv", sep = ';') %>%
-  rbind(read.csv("./data/weather/4_19Weather.csv", sep = ';')) %>%
-  rbind(read.csv("./data/weather/5_3Weather.csv", sep = ';')) %>%
-  rbind(read.csv("./data/weather/5_10Weather.csv", sep = ';')) %>%
-  rbind(read.csv("./data/weather/5_17Weather.csv", sep = ';')) %>%
-  # add a variable for combined date-time
-  mutate(collect_date_time = as.POSIXct(paste(Date, Time),
-                                format = "%m/%d/%y %I:%M:%S %p")) %>%
-  # remove lonely date and time
-  dplyr::select(-Date, -Time)
-```
-
-The weather data is only every 15 minutes, but I want to match it to any minute measurement, so I need to interpolate the values for each minute.
-
-First, make a separate dataframe with every minute for each of those days.
-
-```{r}
-all_times <- data.frame(collect_date_time = c(# April 5
-                           seq(from = as.POSIXct("2021-04-05 10:00"),
-                               to = as.POSIXct("2021-04-05 16:00"),
-                               by="min"),
-                           # April 19
-                           seq(from = as.POSIXct("2021-04-19 10:00"),
-                               to = as.POSIXct("2021-04-19 16:00"),
-                               by="min"),
-                           # April 26
-                           seq(from = as.POSIXct("2021-04-26 10:00"),
-                               to = as.POSIXct("2021-04-26 16:00"),
-                               by="min"),
-                           # May 3
-                           seq(from = as.POSIXct("2021-05-03 10:00"),
-                               to = as.POSIXct("2021-05-03 16:00"),
-                               by="min"),
-                           # May 10
-                           seq(from = as.POSIXct("2021-05-10 10:00"),
-                               to = as.POSIXct("2021-05-10 16:00"),
-                               by="min"),
-                           # May 17
-                           seq(from = as.POSIXct("2021-05-17 10:00"),
-                               to = as.POSIXct("2021-05-17 16:00"),
-                               by="min")
-                           ))
-
-```
-
-Next, merge the weather data into the times dataframe and interpolate the temperature and humidity between measurements.
-
-```{r}
-all_times_weather <- all_times %>% # time only dataframe
-  # add weather measurements based on matching date-time
-  left_join(weather, by = 'collect_date_time') %>%
-  # convert temperature units, thanks America
-  mutate(temp_C = fahrenheit.to.celsius(Temperature_F, round = 2),
-         # interpolate temperatures
-         temp_C_interpol = na.approx(temp_C),
-         # interpolate humidities
-         RH_percent_interpol = na.approx(RH_percent),
-         # interpolate Wind Speeds
-         Wind_mph_interpol = na.approx(Wind_Speed_mph),
-         # interpolate solar radiation
-         Solar_rad_Wm2_interpol = na.approx(Pyranometer_W_m),
-         # compute absolute humidity
-         abs_humidity_g_m3_interpol = ((6.112 * exp((17.67*temp_C_interpol)/(temp_C_interpol + 243.5)) * RH_percent_interpol * 2.1674) / (273.15 + temp_C_interpol))
-         ) %>%
-  # keep only the relevant variables
-  dplyr::select(collect_date_time, 
-                temp_C_interpol, 
-                RH_percent_interpol, 
-                abs_humidity_g_m3_interpol,
-                Wind_mph_interpol, 
-                Solar_rad_Wm2_interpol)
-summary(all_times_weather)
-```
-
-
+## Filter Data Capture Only 
 
 ## Compute Scaled Mass Index
 
@@ -533,14 +496,99 @@ morpho_blood_SMI %>%
 ```
 
 
+## Weather Data
+
+This data was obtained from http://www.itrc.org/databases/precip/ (Adcon Server Data) to test the effect of ambient conditions on CEWL. This is different from the ambient conditions already measured with CEWL, which are the temperature and humidity around the measurement device at the time of measurement. We think that the temperature, humidity, wind speed, and solar radiation the lizard was exposed to prior to capture may also affect CEWL.
+
+We didn't have a daylight savings time switchover during this study, so we don't need to worry about incorporating. 
+
+```{r}
+# load in csvs and put all in one dataframe
+weather <- read.csv("./data/weather/4_5Weather.csv", sep = ';') %>%
+  rbind(read.csv("./data/weather/4_19Weather.csv", sep = ';')) %>%
+  rbind(read.csv("./data/weather/5_3Weather.csv", sep = ';')) %>%
+  rbind(read.csv("./data/weather/5_10Weather.csv", sep = ';')) %>%
+  rbind(read.csv("./data/weather/5_17Weather.csv", sep = ';')) %>%
+  # add a variable for combined date-time
+  mutate(collect_date_time = as.POSIXct(paste(Date, Time),
+                                format = "%m/%d/%y %I:%M:%S %p")) %>%
+  # remove lonely date and time
+  dplyr::select(-Date, -Time)
+```
+
+The weather data is only every 15 minutes, but I want to match it to any minute measurement, so I need to interpolate the values for each minute.
+
+First, make a separate dataframe with every minute for each of those days.
+
+```{r}
+all_times <- data.frame(collect_date_time = c(# April 5
+                           seq(from = as.POSIXct("2021-04-05 10:00"),
+                               to = as.POSIXct("2021-04-05 16:00"),
+                               by="min"),
+                           # April 19
+                           seq(from = as.POSIXct("2021-04-19 10:00"),
+                               to = as.POSIXct("2021-04-19 16:00"),
+                               by="min"),
+                           # April 26
+                           seq(from = as.POSIXct("2021-04-26 10:00"),
+                               to = as.POSIXct("2021-04-26 16:00"),
+                               by="min"),
+                           # May 3
+                           seq(from = as.POSIXct("2021-05-03 10:00"),
+                               to = as.POSIXct("2021-05-03 16:00"),
+                               by="min"),
+                           # May 10
+                           seq(from = as.POSIXct("2021-05-10 10:00"),
+                               to = as.POSIXct("2021-05-10 16:00"),
+                               by="min"),
+                           # May 17
+                           seq(from = as.POSIXct("2021-05-17 10:00"),
+                               to = as.POSIXct("2021-05-17 16:00"),
+                               by="min")
+                           ))
+
+```
+
+Next, merge the weather data into the times dataframe and interpolate the temperature and humidity between measurements.
+
+```{r}
+all_times_weather <- all_times %>% # time only dataframe
+  # add weather measurements based on matching date-time
+  left_join(weather, by = 'collect_date_time') %>%
+  # convert temperature units, thanks America
+  mutate(temp_C = fahrenheit.to.celsius(Temperature_F, round = 2),
+         # interpolate temperatures
+         temp_C_interpol = na.approx(temp_C),
+         # interpolate humidities
+         RH_percent_interpol = na.approx(RH_percent),
+         # interpolate Wind Speeds
+         Wind_mph_interpol = na.approx(Wind_Speed_mph),
+         # interpolate solar radiation
+         Solar_rad_Wm2_interpol = na.approx(Pyranometer_W_m),
+         # compute absolute humidity
+         abs_humidity_g_m3_interpol = ((6.112 * exp((17.67*temp_C_interpol)/(temp_C_interpol + 243.5)) * RH_percent_interpol * 2.1674) / (273.15 + temp_C_interpol))
+         ) %>%
+  # keep only the relevant variables
+  dplyr::select(collect_date_time, 
+                temp_C_interpol, 
+                RH_percent_interpol, 
+                abs_humidity_g_m3_interpol,
+                Wind_mph_interpol, 
+                Solar_rad_Wm2_interpol)
+summary(all_times_weather)
+```
 
 
 
 
 
 
-## Join & Format Data 
 
+
+
+## Formatting
+
+filter for capture only, join weather and SMI
 Add CEWL and morpho_blood_SMI data together. 
 
 ```{r}
@@ -567,7 +615,7 @@ NOTE: running this more than once overrides things, so be careful
 
 
 
-# Check Data
+## Check Integrity
 
 I want to test if any IDs are missing, and which ones if so.
 
@@ -580,6 +628,9 @@ lost
 
 We have capture data for all individual_ID's.
 
+check that times are all within x of each other
+
+check number of obs per individual
 
 
 

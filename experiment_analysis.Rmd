@@ -120,6 +120,9 @@ dat_no_rehab <- dat %>%
 
 ### Checks
 
+  dplyr::filter(mass_g<18) %>% # wtf...fix later
+
+
 Dates:
 
 ```{r check dates}
@@ -148,33 +151,34 @@ That all looks good, experimental measurements are either 4 (first trial) or 2 (
 plot over course of experiment:
 
 ```{r SMI fig}
-all_dat_no_rehab %>% 
+dat_no_rehab %>% 
+  dplyr::filter(mass_g<18) %>% # wtf...fix later
   ggplot(data = .) + 
-  geom_point(aes(x = day,
+  geom_point(aes(x = day_n,
                  y = SMI, 
-                 color = humidity_tmt_percent
+                 color = tmt
                  ), 
              size = 1, 
              alpha = 0.6) +
-  stat_smooth(aes(x = day, 
+  stat_smooth(aes(x = day_n, 
                   y = SMI, 
-                  color = humidity_tmt_percent
+                  color = tmt
                   ), 
               formula = y ~ x, 
               method = "lm", 
               se = F, 
               size = 1.6, 
               alpha = 1 ) + 
-  geom_line(aes(x = day,
+  geom_line(aes(x = day_n,
                 y = SMI,
                 group = individual_ID,
-                color = humidity_tmt_percent),
+                color = tmt),
             alpha = 0.2) +
   theme_classic() + 
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
   scale_color_brewer(palette = "Set2",
-                     name = "Humidity Treatment") +
-  xlab("") + 
+                     name = "") +
+  xlab("Day") + 
   ylab("Body Condition (g)") + 
   theme(text = element_text(color = "black", 
                             family = "sans", 
@@ -182,21 +186,18 @@ all_dat_no_rehab %>%
         axis.text = element_text(color = "black", 
                                  family = "sans", 
                                  size = 12),
-        legend.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 18),
         legend.text.align = 0,
-        legend.position = "none"
+        legend.position = "right"
 ) -> tmt_effects_SMI
 tmt_effects_SMI
 
 # export figure
-#ggsave(filename = "tmt_effects_SMI.jpeg",
- #      plot = tmt_effects_SMI,
-  #     path = "./final_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 5, height = 4)
+ggsave(filename = "tmt_effects_SMI.jpeg",
+       plot = tmt_effects_SMI,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 8, height = 4) # width 5 without legend
 ```
 
 Check whether means started out different:

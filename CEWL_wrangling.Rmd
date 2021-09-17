@@ -106,6 +106,25 @@ summary(cloacal_temp_C)
 
 # Check Data
 
+
+## Technical Replicates COV
+
+```{r}
+COVs <- all_CEWL_data %>%
+  group_by(individual_ID, date) %>%
+  summarise(CEWL_mean = mean(CEWL_g_m2h),
+            CEWL_SD = sd(CEWL_g_m2h),
+            COV = (CEWL_SD/CEWL_mean) *100
+            )
+summary(COVs)
+sd(COVs$CEWL_mean)
+sd(COVs$COV)
+```
+
+
+
+
+
 Each individual should have 10 total measurements (5 before the experiment, 5 after). However, this is not the case. So, check how many measurements each individual has under each replicate number for each date to see if there are duplicates.
 
 ```{r}

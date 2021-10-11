@@ -22,3 +22,17 @@ trial,serial,humidity_tmt,temp_tmt,notes,in google drive?
 4,20785309,humid,cool,,Y
 4,20785317,dry,hot,,Y
 4,20785308,humid,hot,,Y
+5,20793609,humid,cool,,Y
+5,20932041,dry,cool,,Y
+5,20785311,humid,hot,,Y
+5,20932042,humid,hot,data lost,
+5,20785309,dry,hot,data lost,
+5,20785317,dry,hot,,Y
+5,20785308,dry,cool,data lost,
+5 rehab,20793609,terrarium 1,shade,~6 pm Mon Aug 30 - 10 am Wed Sept 1,Y
+5 rehab,20932041,terrarium 1,heatlamp,,Y
+5 rehab,20785311,terrarium 3,shade,,Y
+5 rehab,20932042,terrarium 2,shade,data lost,
+5 rehab,20785309,terrarium 3,heatlamp,data lost,
+5 rehab,20785317,terrarium 4,heatlamp,,Y
+5 rehab,20785308,terrarium 2,heatlamp,data lost,

@@ -1,0 +1,849 @@
+---
+title: "HOBO Data Logger Climate Treatment Summary"
+author: "Savannah Weaver"
+date: "10/15/2021"
+output: pdf_document
+toc: TRUE
+---
+
+# Packages
+
+```{r setup, echo=T, results='hide', message=FALSE}
+if (!require("tidyverse")) install.packages("tidyverse") 
+library("tidyverse")
+```
+
+**remember to do rehab data separately**
+
+# Load in Data
+
+This data was collected using Onset HOBO temperature and humidity dataloggers during the course of our experiment. See __ for full details. 
+
+The data is in a separate file for each download for each logger, so I need to compile each of those into one dataset. 
+
+To do this, first I compile a list of the filenames I need to read-in.
+
+## File Names
+
+```{r, filenames}
+# make a list of file names of all data to load in
+filenames <- list.files(path = "data/HOBOs")
+```
+
+Next, I make a function that will read in the data from each csv, name and organize the data correctly. 
+
+
+## Function
+
+```{r, create read_HOBO_files function to get each csv data}
+# make a function to read in data from each csv file and add correct identifiers
+read_HOBO_files <- function(filename) {
+  
+  # edit the filename inputted to funtion
+  # to make a unique identifier for each logger
+  name <- substr(filename, 1, nchar(filename)-15)
+  # read in the csv file for this given filename
+  dat <- read.csv(file.path("data/HOBOs", filename),
+                # each csv has headers
+                header = TRUE,
+                # this is what I want to rename the col headers
+                col.names = c("order", "date_time_PST", "temp_C", 
+                              "relative_humidity", "dew_pt_C", 
+                              # the 6,7,8th cols are not data
+                              # logger use info we don't need
+                              "mostly_blank", "mostly_blank", "mostly_blank")
+                ) %>%
+    # select only the cols with data we want
+    # don't need order- just an arbitrary observation identifier
+    # don't need "mostly_blank" cols- unnecessary logger use info
+    # but get the rest of the cols with informative data
+    dplyr::select(date_time_PST, temp_C, relative_humidity, dew_pt_C) %>%
+    # add a column with the name of the HOBO the data is from 
+    dplyr::mutate(HOBO_ID = name)
+  
+  # return the dataframe for that single csv file
+  dat
+}
+```
+
+
+
+## Apply
+
+Finally, I apply the function I made to all of the filenames I compiled, then put all of those dataframes into one dataframe for my analyses.
+
+This will print warnings saying that header and col.names are different lengths, because the data has extra notes on logger usage that we read-in, but get rid of.
+
+```{r, apply read_HOBO_files function}
+# apply function to get data from all csvs
+all_HOBO_data <- lapply(filenames, read_HOBO_files) %>%
+  # paste all data files together into one df by row
+  reduce(rbind) %>% 
+  mutate(date_time_PST = as.POSIXct(date_time_PST, 
+                                    format = "%m/%d/%Y %H:%M:%S")) %>%
+  # remove missing data
+  dplyr::filter(complete.cases(date_time_PST, relative_humidity)) %>%
+  mutate(serial = (substr(HOBO_ID, 7, 15)), # select characters
+         serial = str_trim(serial), # remove trailing white space
+         serial = str_replace_all(serial, "[^A-z0-9]", "_"), # replace any special characters with underscores
+         serial = as.factor(serial), # set class as factor
+         temp_C = as.numeric(temp_C),
+         relative_humidity = as.numeric(relative_humidity),
+         dew_pt_C = as.numeric(dew_pt_C)
+         )
+summary(all_HOBO_data)
+head(all_HOBO_data)
+```
+
+
+
+# Data Wrangling
+
+I need to subset the data based on the date range for actual experiment days.
+
+Trail 1: June 16-24
+Trail 2: June 26 - July 4
+Trial 3: July 20-28
+Trial 4: August 8-16
+Trial 5: August 22-30
+Trial 5 rehab: August 31-32
+
+However, lizards were usually placed in the chambers late on the first day and taken out early on the last day, so I'll use the exclusive range of those dates (17-23 instead of 16-24). the list of dates should total 7 days each trial * 5 trials = 30 dates.
+
+
+## Dates
+
+```{r}
+t1_days <- seq(as.Date("2021-06-17"),
+               as.Date("2021-06-23"), "days")
+t2_days <- seq(as.Date("2021-06-27"),
+               as.Date("2021-07-03"), "days")
+t3_days <- seq(as.Date("2021-07-21"),
+               as.Date("2021-07-27"), "days")
+t4_days <- seq(as.Date("2021-08-09"),
+               as.Date("2021-08-15"), "days")
+t5_days <- seq(as.Date("2021-08-23"),
+               as.Date("2021-08-29"), "days")
+exp_dates <- c(t1_days, t2_days, t3_days, t4_days, t5_days)
+```
+
+Subset data:
+
+```{r}
+subset_HOBO_data <- all_HOBO_data %>%
+  mutate(date_only = as.Date(date_time_PST, format = "%Y-%m-%d")) %>%
+  dplyr::filter(date_only %in% exp_dates)
+```
+
+
+## Trial & Tmt
+
+```{r}
+# load HOBO assignment data
+HOBO_tmts <- read.csv("./data/HOBO_assignments.csv") %>%
+  dplyr::filter(trial != "5 rehab") %>%
+  mutate(trial = as.factor(trial),
+         serial = as.factor(serial),
+         humidity_tmt = as.factor(humidity_tmt),
+         temp_tmt = as.factor(temp_tmt)
+         ) %>%
+  dplyr::select(-notes, -in.google.drive.) 
+# combine
+format_HOBO_data <- subset_HOBO_data %>% 
+  mutate(trial = as.factor(case_when(date_only %in% t1_days ~ 1,
+                                     date_only %in% t2_days ~ 2,
+                                     date_only %in% t3_days ~ 3,
+                                     date_only %in% t4_days ~ 4,
+                                     date_only %in% t5_days ~ 5))
+         ) %>%
+  left_join(HOBO_tmts, by = c("trial", "serial"))
+summary(format_HOBO_data)
+```
+
+
+
+# Check Data
+
+## Dates
+
+```{r}
+format_HOBO_data %>% 
+  group_by(trial) %>%
+  summarise(min_date = (min(date_only)),
+            max_date = (max(date_only)))
+```
+
+
+
+
+
+
+Check temperature values:
+
+```{r}
+format_HOBO_data %>% 
+  ggplot(data = ., aes(x = temp_C)) +
+  geom_histogram()
+format_HOBO_data %>%
+  group_by(date_only, HOBO_ID) %>%
+  summarise(mean_temp = mean(temp_C)) %>%
+  arrange(mean_temp, date_only)
+```
+
+
+# Data Cleaning
+
+set the not in function:
+
+```{r}
+`%nin%` = Negate(`%in%`)
+```
+
+
+## HOBO "dry cool 1":
+
+```{r}
+# temperature
+format_HOBO_data %>% 
+  dplyr::filter(HOBO_ID == "Dry_Cool_1") %>%
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = temp_C, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "red") + 
+  geom_line(color = "red") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-27")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-29")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-08")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-11")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-12")), 
+             linetype = 4, color = "purple") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+# humidity
+format_HOBO_data %>% 
+  dplyr::filter(HOBO_ID == "Dry_Cool_1") %>%
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = relative_humidity, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "blue") + 
+  geom_line(color = "blue") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-27")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-29")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-08")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-11")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-12")), 
+             linetype = 4, color = "purple") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+```
+
+There is room temperature/wacky temperature data between April 27-29, and on May 4, 8, 11, and 12. The humidity data only looks wrong on May 11 & 12. 
+
+Try excluding. For some reason the dates plotted versus filtered line up differently, which is why I filter out the date before what I plotted.
+
+```{r}
+unwanted_dates_dc1 <- as.Date(c("2021-04-26", "2021-04-27", 
+                        "2021-04-28",
+                        "2021-05-03", "2021-05-07", 
+                        "2021-05-10", "2021-05-11"),
+                        format = "%Y-%m-%d")
+dc1_subset <- format_HOBO_data %>%
+  dplyr::filter(HOBO_ID == "Dry_Cool_1") %>%
+  dplyr::filter(date_only %nin% unwanted_dates_dc1)
+```
+
+plot again to show that we removed erroneous data:
+
+```{r}
+# temperature
+dc1_subset %>% 
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = temp_C, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "red") + 
+  geom_line(color = "red") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-27")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-29")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-08")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-11")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-12")), 
+             linetype = 4, color = "purple") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+# humdity
+dc1_subset %>% 
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = relative_humidity, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "blue") + 
+  geom_line(color = "blue") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-27")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-29")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-08")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-11")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-12")), 
+             linetype = 4, color = "purple") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+```
+
+And, we confirmed that HOBO "dry cool 1" was indeed in the dry and cool treatment.
+
+
+## HOBO "dry cool 2":
+
+```{r}
+# temperature
+format_HOBO_data %>% 
+  dplyr::filter(HOBO_ID == "Dry_Cool_2") %>%
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = temp_C, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "red") + 
+  geom_line(color = "red") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+# humidity
+format_HOBO_data %>% 
+  dplyr::filter(HOBO_ID == "Dry_Cool_2") %>%
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = relative_humidity, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "blue") + 
+  geom_line(color = "blue") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-20")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-25")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-27")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-19")), 
+             linetype = 4, color = "purple") +
+  theme_classic()
+```
+
+Temperature is wrong on May 4. The humidity is wrong April 19-20, April 25-27, and on May 19. 
+
+Try excluding. For some reason the dates plotted versus filtered line up differently, which is why I filter out the date before what I plotted.
+
+```{r}
+unwanted_dates_dc2 <- as.Date(c("2021-04-18", "2021-04-19", 
+                        "2021-04-24", "2021-04-25", "2021-04-26",
+                        "2021-05-03", "2021-05-18"),
+                        format = "%Y-%m-%d")
+dc2_subset <- format_HOBO_data %>%
+  dplyr::filter(HOBO_ID == "Dry_Cool_2") %>%
+  dplyr::filter(date_only %nin% unwanted_dates_dc2)
+```
+
+plot again to show that we removed erroneous data:
+
+```{r}
+# temperature
+dc2_subset %>% 
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = temp_C, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "red") + 
+  geom_line(color = "red") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+# humdity
+dc2_subset %>% 
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = relative_humidity, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "blue") + 
+  geom_line(color = "blue") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-20")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-25")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-27")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-19")), 
+             linetype = 4, color = "purple") +
+  theme_classic()
+```
+
+That looks much better. However, HOBO "dry cool 2" is actually from the humid cool treatment. 
+
+
+## HOBO "dry hot 1":
+
+```{r}
+# temperature
+format_HOBO_data %>% 
+  dplyr::filter(HOBO_ID == "Dry_Hot_1") %>%
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = temp_C, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "red") + 
+  geom_line(color = "red") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-30")), 
+             linetype = 4, color = "purple") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+# humidity
+format_HOBO_data %>% 
+  dplyr::filter(HOBO_ID == "Dry_Hot_1") %>%
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = relative_humidity, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "blue") + 
+  geom_line(color = "blue") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-30")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-11")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-12")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-19")), 
+             linetype = 4, color = "purple") +
+  theme_classic()
+```
+
+
+This logger was definitely in the (failed) hot treatments until April 30, so I don't want to use data from before then. Between April 30 and May 4, humidity is a little high. It also does not have the typical diel variation which is from the 12-12 light cycle, so the logger must have been out of the experiment. Likely, it was not placed in the cool treatment immediately after being removed from the hot, so I will exclude this period as well. I will also exclude the spikes at May 11, 12, and 19. 
+
+Try excluding. For some reason the dates plotted versus filtered line up differently, which is why I filter out the date before what I plotted.
+
+```{r}
+unwanted_dates_dh1 <- as.Date(c(seq(as.Date("2021-04-19"), 
+                                    as.Date("2021-05-03"), "days"),
+                                "2021-05-10", "2021-05-11", "2021-05-18"),
+                        format = "%Y-%m-%d")
+dh1_subset <- format_HOBO_data %>%
+  dplyr::filter(HOBO_ID == "Dry_Hot_1") %>%
+  dplyr::filter(date_only %nin% unwanted_dates_dh1)
+```
+
+plot again to show that we removed erroneous data:
+
+```{r}
+# temperature
+dh1_subset %>% 
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = temp_C, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "red") + 
+  geom_line(color = "red") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+# humdity
+dh1_subset %>% 
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = relative_humidity, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "blue") + 
+  geom_line(color = "blue") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-11")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-12")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-19")), 
+             linetype = 4, color = "purple") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+```
+
+Much more realistic. This is for the cool dry treatment. 
+
+
+## HOBO "dry hot 2":
+
+```{r}
+# temperature
+format_HOBO_data %>% 
+  dplyr::filter(HOBO_ID == "Dry_Hot_2") %>%
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = temp_C, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "red") + 
+  geom_line(color = "red") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-30")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-18")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-11")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-12")), 
+             linetype = 4, color = "purple") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+# humidity
+format_HOBO_data %>% 
+  dplyr::filter(HOBO_ID == "Dry_Hot_2") %>%
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = relative_humidity, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "blue") + 
+  geom_line(color = "blue") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-18")), 
+             linetype = 4, color = "purple") +
+  theme_classic()
+```
+
+This logger was also in the hot treatment until April 30, and was also not put into a treatment until May 4. I'm not worried about May 11-12 so much for this one, it may have been out& back into a chamber within the logging interval. On May 18, however, the dip is a measurement from outside the chamber. 
+
+Try excluding. For some reason the dates plotted versus filtered line up differently, which is why I filter out the date before what I plotted.
+
+```{r}
+unwanted_dates_dh2 <- as.Date(c(seq(as.Date("2021-04-19"), 
+                                    as.Date("2021-05-03"), "days"),
+                                "2021-05-17", "2021-05-18"),
+                        format = "%Y-%m-%d")
+dh2_subset <- format_HOBO_data %>%
+  dplyr::filter(HOBO_ID == "Dry_Hot_2") %>%
+  dplyr::filter(date_only %nin% unwanted_dates_dh2)
+```
+
+plot again to show that we removed erroneous data:
+
+```{r}
+# temperature
+dh2_subset %>% 
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = temp_C, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "red") + 
+  geom_line(color = "red") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-18")), 
+             linetype = 4, color = "purple") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+# humidity
+dh2_subset %>% 
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = relative_humidity, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "blue") + 
+  geom_line(color = "blue") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-18")), 
+             linetype = 4, color = "purple") +
+  theme_classic()
+```
+
+
+this logger was in cool & humid treatment
+
+## HOBO "humid cool":
+
+```{r}
+# temperature
+format_HOBO_data %>% 
+  dplyr::filter(HOBO_ID == "Humid_Cool") %>%
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = temp_C, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "red") + 
+  geom_line(color = "red") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+# humidity
+format_HOBO_data %>% 
+  dplyr::filter(HOBO_ID == "Humid_Cool") %>%
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = relative_humidity, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "blue") + 
+  geom_line(color = "blue") +
+  theme_classic()
+```
+
+This actually looks good as-is. We let the paper towel dry out around April 26, but that should be reflected. 
+
+```{r}
+hc_subset <- format_HOBO_data %>%
+  dplyr::filter(HOBO_ID == "Humid_Cool")
+```
+
+And, the logger was named correctly. It was in humid and cool treatment. 
+
+
+## HOBO "humid hot":
+
+```{r}
+# temperature
+format_HOBO_data %>% 
+  dplyr::filter(HOBO_ID == "Humid_Hot") %>%
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = temp_C, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "red") + 
+  geom_line(color = "red") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-27")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-29")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-08")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-11")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-12")), 
+             linetype = 4, color = "purple") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+# humidity
+format_HOBO_data %>% 
+  dplyr::filter(HOBO_ID == "Humid_Hot") %>%
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = relative_humidity, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "blue") + 
+  geom_line(color = "blue") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-27")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-04-29")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-04")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-08")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-11")), 
+             linetype = 4, color = "purple") +
+  geom_vline(xintercept = as.POSIXct(as.Date("2021-05-12")), 
+             linetype = 4, color = "purple") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+```
+
+This logger was in the hot treatment, then not in any treatment, same as the ones before, so I will exclude the data up to May 4. It looks fine to be used in the cool humid treatment average otherwise. 
+
+```{r}
+unwanted_dates_hh <- c(seq(as.Date("2021-04-19"), 
+                                    as.Date("2021-05-03"), "days"))
+hh_subset <- format_HOBO_data %>%
+  dplyr::filter(HOBO_ID == "Humid_Hot") %>%
+  dplyr::filter(date_only %nin% unwanted_dates_hh)
+```
+
+plot again to show that we removed erroneous data:
+
+```{r}
+# temperature
+hh_subset %>% 
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = temp_C, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "red") + 
+  geom_line(color = "red") +
+  geom_hline(yintercept = 23) +
+  geom_hline(yintercept = 29) +
+  theme_classic()
+# humidity
+hh_subset %>% 
+  ggplot(data = ., aes(x = date_time_PST, 
+                       y = relative_humidity, 
+                       color = HOBO_ID
+                       )) +
+  geom_point(color = "blue") + 
+  geom_line(color = "blue") +
+  theme_classic()
+```
+
+
+
+
+## Correct Tmt Groups & Trial Numbers
+
+```{r}
+tmts <- data.frame(HOBO_ID = unique(format_HOBO_data$HOBO_ID),
+                   temp_tmt = as.factor(c("cool", "cool", "cool", 
+                                "cool", "cool", "cool")),
+                   humidity_tmt = as.factor(c("dry", "humid", "dry", 
+                                    "humid", "humid", "humid")))
+trials <- data.frame(trial_num = as.factor(c(rep("1", 8),
+                                   rep("2", 7),
+                                   rep("3", 7),
+                                   rep("4", 8))),
+                                    # trial 1
+                     date_only = c(c(seq(as.Date("2021-04-19"), 
+                                    as.Date("2021-04-26"), "days")),
+                                   # trial 2
+                                   c(seq(as.Date("2021-04-27"), 
+                                    as.Date("2021-05-03"), "days")),
+                                   # trial 3
+                                   c(seq(as.Date("2021-05-04"), 
+                                    as.Date("2021-05-10"), "days")),
+                                   # trial 4
+                                   c(seq(as.Date("2021-05-11"), 
+                                    as.Date("2021-05-18"), "days"))
+                                  )
+                     )
+```
+
+
+## Rejoin All
+
+```{r}
+clean_HOBO_data <- dc1_subset %>%
+  rbind(dc2_subset) %>%
+  rbind(dh1_subset) %>%
+  rbind(dh2_subset) %>%
+  rbind(hc_subset) %>%
+  rbind(hh_subset) %>%
+  left_join(tmts, by = 'HOBO_ID') %>%
+  left_join(trials, by = 'date_only')
+summary(clean_HOBO_data)
+```
+
+
+
+# Get Means
+
+## Grand Mean
+
+```{r}
+grand_mean <- clean_HOBO_data %>%
+  group_by(temp_tmt) %>%
+  summarise(temp_mean = mean(temp_C),
+            temp_SD = sd(temp_C))
+grand_mean
+```
+
+## Treatment Overall
+
+```{r}
+tmt_only_means <- clean_HOBO_data %>%
+  group_by(humidity_tmt) %>%
+  summarise(temp_mean = mean(temp_C),
+            temp_SD = sd(temp_C),
+            humidity_mean = mean(relative_humidity),
+            humidity_SD = sd(relative_humidity))
+tmt_only_means
+```
+
+
+
+## Treatment by Trial
+
+```{r}
+tmt_trial_means <- clean_HOBO_data %>%
+  group_by(humidity_tmt, trial_num) %>%
+  summarise(temp_mean = mean(temp_C),
+            temp_SD = sd(temp_C),
+            humidity_mean = mean(relative_humidity),
+            humidity_SD = sd(relative_humidity)) %>%
+  arrange(trial_num)
+tmt_trial_means
+write.csv(tmt_trial_means, "./HOBO_tmt_trial_diffs.csv")
+```
+
+
+
+## Check Statistical Differences
+
+```{r}
+# based on humidity treatment
+temp_tmt_mod <- lm(data = clean_HOBO_data, 
+               temp_C ~ humidity_tmt)
+summary(temp_tmt_mod)
+humidity_tmt_mod <- lm(data = clean_HOBO_data, 
+                   relative_humidity ~ humidity_tmt)
+summary(humidity_tmt_mod)
+# based on trial
+temp_trial_mod <- lm(data = clean_HOBO_data, 
+               temp_C ~ trial_num)
+summary(temp_trial_mod)
+humidity_trial_mod <- lm(data = clean_HOBO_data, 
+                   relative_humidity ~ trial_num)
+summary(humidity_trial_mod)
+```
+
+temp summary: dry mean = 25.1, humid mean = 24.9, estimate = -0.225, t = -5.069, p < 0.0001
+
+humidity summary: estimate = 69.232, t = 264.61, p < 0.0001
+
+
+Both humidity treatment and trial number, AND their interaction is significant for predicting the temperature and humidity the data loggers logged. 
+
+Need pairwise to know which ones are actually different:
+
+```{r}
+# humidity 
+anova_humidity <- aov(humidity_mod)
+posthoc_humidity <- TukeyHSD(anova_humidity)
+posthoc_humidity
+# temp
+anova_temp <- aov(temp_mod)
+posthoc_temp <- TukeyHSD(anova_temp)
+posthoc_temp
+```

@@ -312,7 +312,8 @@ ph_humid_mod <- TukeyHSD(a_humid_mod)
 summary(humidity_mod)
 humid_mod_df <- data.frame(broom::tidy(ph_humid_mod)) %>%
   arrange(desc(term, adj.p.value))
-write.csv(humid_mod_df, "./results_statistics/HOBO_temp_pairwise_diffs.csv")
+write.csv(humid_mod_df,
+          "./results_statistics/HOBO_humidity_pairwise_diffs.csv")
 ```
 
 
@@ -338,7 +339,7 @@ format_HOBO_data %>%
 ```
 
 
-FANCY boxplot for humidity, with ANOVA groups overlaid:
+FANCY boxplot for **temperature**, with ANOVA groups overlaid:
 
 ```{r}
 # create ANOVA labels
@@ -348,11 +349,11 @@ anova_labels_temp <- data.frame(tmt = c("cool-dry",
                                    "hot-humid"
                                   ),
                                 # c-d, c-h, h-d, h-h
-                           t1 = c("x", "b", "a", "a"),
-                           t2 = c("a", "b", "a", "a"),
-                           t3 = c("a", "b", "a", "a"),
-                           t4 = c("a", "b", "a", "a"),
-                           t5 = c("a", "b", "a", "x"))
+                           t1 = c("C", "A", "B", "B"),
+                           t2 = c("A", "D", "B", "B"),
+                           t3 = c("A", "A", "B", "B"),
+                           t4 = c("A", "E", "F", "B"),
+                           t5 = c("A", "A", "B", "B"))
 # plot!
 format_HOBO_data %>%
   ggplot() +
@@ -363,7 +364,9 @@ format_HOBO_data %>%
   facet_wrap(~tmt) +
   xlab("Trial") +
   ylab("Temperature (°C)") +
-  scale_color_brewer(palette = "Set2") +
+  ylim(18,38) +
+  scale_fill_brewer(palette = "Set2",
+                    name = "Trial") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 18),
@@ -375,30 +378,36 @@ format_HOBO_data %>%
   # trial 1 labels
   geom_text(data = anova_labels_temp,
             size = 7,
-            mapping = aes(x = 1, y = c(10,20,30,40), label = t1)) +
+            mapping = aes(x = 1, y = c(35,35,20,20), label = t1)) +
   # trial 2 labels
   geom_text(data = anova_labels_temp,
             size = 7,
-            mapping = aes(x = 2, y = c(10,20,30,40), label = t2)) +
+            mapping = aes(x = 2, y = c(35,35,20,20), label = t2)) +
   # trial 3 labels
   geom_text(data = anova_labels_temp,
             size = 7,
-            mapping = aes(x = 3, y = c(10,20,30,40), label = t3)) +
+            mapping = aes(x = 3, y = c(35,35,20,20), label = t3)) +
   # trial 4 labels
   geom_text(data = anova_labels_temp,
             size = 7,
-            mapping = aes(x = 4, y = c(10,20,30,40), label = t4)) +
+            mapping = aes(x = 4, y = c(35,35,20,20), label = t4)) +
   # trial 5 labels
   geom_text(data = anova_labels_temp,
             size = 7,
-            mapping = aes(x = 5, y = c(10,20,30,40), label = t5)
-            ) #-> ANOVA_temp_boxplot
-
+            mapping = aes(x = 5, y = c(35,35,20,20), label = t5)
+            ) -> ANOVA_temp_boxplot
+ANOVA_temp_boxplot
 # save
+ggsave(filename = "ANOVA_temp_boxplot.jpeg",
+       plot = ANOVA_temp_boxplot,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 4)
 ```
 
 
-FANCY boxplot for humidity, with ANOVA groups overlaid:
+FANCY boxplot for **humidity**, with ANOVA groups overlaid:
 
 ```{r}
 # create ANOVA labels
@@ -408,11 +417,11 @@ anova_labels_humidity <- data.frame(tmt = c("cool-dry",
                                    "hot-humid"
                                   ),
                                 # c-d, c-h, h-d, h-h
-                           t1 = c("x", "b", "a", "a"),
-                           t2 = c("a", "b", "a", "a"),
-                           t3 = c("a", "b", "a", "a"),
-                           t4 = c("a", "b", "a", "a"),
-                           t5 = c("a", "b", "a", "x"))
+                                t1 = c("A", "B", "B", "C"),
+                                t2 = c("A", "F", "D", "E"),
+                                t3 = c("A", "C", "D", "G"),
+                                t4 = c("A", "H", "D", "E"),
+                                t5 = c("I", "E", "J", "E"))
 # plot!
 format_HOBO_data %>%
   ggplot() +
@@ -424,7 +433,7 @@ format_HOBO_data %>%
   xlab("Trial") +
   ylab("Relative Humidity (%)") +
   ylim(0,100) +
-  scale_color_brewer(palette = "Set2") +
+  scale_fill_brewer(palette = "Set2") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 18),
@@ -453,9 +462,15 @@ format_HOBO_data %>%
   geom_text(data = anova_labels_humidity,
             size = 7,
             mapping = aes(x = 5, y = c(90,10,90,10), label = t5)
-            ) #-> ANOVA_humidity_boxplot
-
+            ) -> ANOVA_humidity_boxplot
+ANOVA_humidity_boxplot
 # save
+ggsave(filename = "ANOVA_humidity_boxplot.jpeg",
+       plot = ANOVA_humidity_boxplot,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 4)
 ```
 
 

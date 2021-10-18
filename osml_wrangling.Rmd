@@ -1,8 +1,9 @@
 ---
 title: "Climate Water Loss Experiment - Plasma Osmolality Data Wrangling"
 author: "Savannah Weaver"
-date: "August 2021"
+date: "2021"
 output: pdf_document
+toc: TRUE
 ---
 
 

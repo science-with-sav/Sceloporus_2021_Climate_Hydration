@@ -1,7 +1,7 @@
 ---
 title: "HOBO Data Logger Climate Treatment Summary"
 author: "Savannah Weaver"
-date: "10/15/2021"
+date: "2021"
 output: pdf_document
 toc: TRUE
 ---

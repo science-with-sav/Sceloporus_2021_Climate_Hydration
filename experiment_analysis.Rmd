@@ -1,10 +1,9 @@
 ---
-title: "Sceloporus Climate Water Loss Experiment - Data Analysis"
+title: "Climate Water Loss Experiment - Treatment Hydration Analysis"
 author: "Savannah Weaver"
-date: "August 2021"
-output: 
-  pdf_document:
-    toc: TRUE
+date: "2021"
+output: pdf_document:
+toc: TRUE
 ---
 
 # Packages

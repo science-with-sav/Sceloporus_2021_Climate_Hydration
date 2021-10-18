@@ -1,10 +1,9 @@
 ---
 title: "Climate Water Loss Experiment - Capture Hydration Analysis"
 author: "Savannah Weaver"
-date: "August 2021"
-output: 
-  pdf_document:
-    toc: TRUE
+date: "2021"
+output: pdf_document:
+toc: TRUE
 ---
 
 

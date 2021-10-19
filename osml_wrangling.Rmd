@@ -10,6 +10,7 @@ toc: TRUE
 # Packages
 
 ```{r setup, include=FALSE}
+`%nin%` = Negate(`%in%`)
 if (!require("tidyverse")) install.packages("tidyverse")
 library("tidyverse") # workflow and plots
 if (!require("UsingR")) install.packages("UsingR")
@@ -23,7 +24,7 @@ library("lmerTest") # for p-values
 
 # Background and Goals
 
-Blood was drawn from the postorbital sinus of adult male *Sceloporus occidentalis* between June - August. After centrifuging and separating, plasma was run on a VAPRO vapor pressure osmometer in 1-4 replicates, when plasma volume collected allowed. In this R script, I check the distribution of replicates, omit outliers, and average remaining replicates. The final values will be more precise and accurate estimates of the true plasma osmolality for each lizard, and those values will be used in the capture_analysis and experiment_analysis R script files. Please refer to **doi:** for the published scientific journal article and full details.
+Blood was drawn from the postorbital sinus of adult male *Sceloporus occidentalis* between June - August 2021. After centrifuging and separating, plasma was run on a VAPRO vapor pressure osmometer in 1-4 replicates, when plasma volume allowed. In this R script, I check the distribution of replicates, omit outliers, and average remaining replicates. The final values will be more precise and accurate estimates of the true plasma osmolality for each lizard, and those values will be used in the capture_analysis and experiment_analysis R script files. Please refer to **doi:** for the published scientific journal article and full details.
 
 
 # Load Data
@@ -40,7 +41,7 @@ osml_reps <- read.csv("./data/osmolality.csv",
                   time_osmom_run = as.POSIXct(time_osmom_run, 
                                                format = "%H:%M"),
                   individual_ID = as.factor(individual_ID),
-                  # add as factor rep no
+                  replicate_no = as.factor(replicate_no),
                   osmolality_mmol_kg = as.numeric(osmolality_mmol_kg)
                   )
 summary(osml_reps)
@@ -50,29 +51,65 @@ summary(osml_reps)
 # Check Data
 
 
+## Dates
 
+Blood was drawn on day 0, 4, 8, and 10 of the experiment. Create a list of the dates expected to have blood draw data, then determine whether I have dates outside those.
 
-# Format Data
-
-
-# Check Data
-
-## Number of Measurements
-
-Re-check how many measurements each individual has:
+Trail 1: June 16-24
+Trail 2: June 26 - July 4
+Trial 3: July 20-28
+Trial 4: August 8-16
+Trial 5: August 22-30
 
 ```{r}
+                            # trial 1
+expected_dates <- as.Date(c("2021-06-16", "2021-06-20", 
+                            "2021-06-24", "2021-06-26",
+                            # trial 2
+                            "2021-06-26", "2021-06-30", 
+                            "2021-07-04", "2021-07-06",
+                            # trial 3
+                            "2021-07-20", "2021-07-24", 
+                            "2021-07-28", "2021-07-30",
+                            # trial 4
+                            "2021-08-08", "2021-08-12", 
+                            "2021-08-16", "2021-08-18",
+                            # trial 5
+                            "2021-08-22", "2021-08-26", 
+                            "2021-08-30", "2021-09-01"))
 
+length(osml_reps$date_blood_drawn[osml_reps$date_blood_drawn %nin% expected_dates]
+)
+```
+
+There are zero blood draw dates that are not in our expected list.
+
+
+## Number of Blood Draws
+
+Each lizard should have had their blood drawn on 4 different dates, unless they were taken out of the experiment early.
+
+```{r}
+# get ID's of the individuals that completed treatment
+individuals <- read.csv("./data/tmt_assignments.csv") %>%
+  dplyr::select(conclusion, individual_ID) %>%
+  dplyr::filter(conclusion == "complete") %>%
+  mutate(individual_ID = as.factor(individual_ID),
+         conclusion = as.factor(conclusion))
+summary(individuals)
+
+# calculate the number of dates for each individual
+osml_reps %>%
+  dplyr::filter(individual_ID %in% individuals$individual_ID) %>%
+  group_by(individual_ID, date_blood_drawn) %>%
+  summarise(n()) %>%
+  group_by(individual_ID) %>%
+  summarise(n()) %>%
+  arrange(n())
 ```
 
 
-## Measurement Times
-
-Also check that all the measurement times for a given individual on a certain date are within ~10 minutes:
-
-```{r}
-
-```
+Wahoo, every lizard has blood draws from 4 different dates.
 
 
 
@@ -81,19 +118,79 @@ Also check that all the measurement times for a given individual on a certain da
 
 # Replicates
 
-## Check Distribution
+Now, I will try to identify outliers within the replicates for a given individual on a given date. There must be ≥3 replicates to do this, so the first thing I need to do is figure out which individuals/dates have enough replicates, then subset my data to be only those individuals.
+
+
+## Individuals w 3+ Replicates
+
+```{r}
+# identify individuals with 3-4 reps
+enuf_reps <- osml_reps %>%
+  group_by(individual_ID, date_blood_drawn) %>%
+  mutate(count = n()) %>%
+  dplyr::filter(count > 2) %>%
+  arrange(count)
+enuf_reps
+
+# identify individuals with 1-2 reps
+not_reps <- osml_reps %>%
+  group_by(individual_ID, date_blood_drawn) %>%
+  mutate(count = n()) %>%
+  dplyr::filter(count < 3) %>%
+  arrange(count)
+not_reps
+
+# check total obs still add to original 1484
+nrow(enuf_reps) + nrow(not_reps)
+```
+
+
+## Assess Variation
+
+We want the Coefficient of Variation (CV) among our technical replicates to be small. We need to find it to identify whether there may be outliers.
+
+```{r}
+CVs <- enuf_reps %>%
+  group_by(individual_ID, date_blood_drawn) %>%
+  summarise(osml_mean = mean(osmolality_mmol_kg),
+            osml_SD = sd(osmolality_mmol_kg),
+            CV = (osml_SD/osml_mean) *100,
+            min_osml = min(osmolality_mmol_kg),
+            max_osml = max(osmolality_mmol_kg),
+            osml_range = max_osml - min_osml
+            )
+summary(CVs)
+hist(CVs$CV)
+hist(CVs$osml_range)
+```
+
+Ideally, CV would be 10-15%. If it's larger, and one of the replicates is very different than the others, we can assume that the replicates that are closer together are more. 
+
+The CV is >10 for only one lizard on one date, so our replicates are likely to accurately represent the true value.
+
+However, the osmometer measures samples with a precision of ± 5 mmol/kg, so I still want to check the distribution of replicates for lizards/dates with a range of osmolality values > 10 mmol/kg.
+
+
+
+
 
 ## Remove Outliers
 
-## Re-Check Distribution
+```{r}
+enuf_reps_trimmed <- enuf_reps
+```
 
 
-## Average Replicates (outliers now removed) & Join Cloacal Temp Data
+
+## Average Remaining Replicates
+
+Now that the outliers are removed from the technical replicates when there were enough replicates to identify them, I will average the remaining replicates of the rejoined data for lizards with 1-2 and 3-4 replicates.
 
 ```{r}
-osml_means <- osml_reps %>%
+osml_means <- not_reps %>%
+  rbind(enuf_reps_trimmed)
   group_by(date_blood_drawn, individual_ID) %>%
-  summarise(osmolality_mmol_kg = mean(osmolality_mmol_kg))
+  summarise(osmolality_mmol_kg_mean = mean(osmolality_mmol_kg))
 ```
 
 
@@ -102,18 +199,6 @@ osml_means <- osml_reps %>%
 ```{r}
 write.csv(osml_means, "./data/osml_means_clean.csv")
 ```
-
-
-
-*other stuff*
-after finishing CEWL, go straight to avg osml
-do very simple invert analysis of just water content over time
-
-
-
-
-
-
 
 
 

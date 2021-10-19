@@ -9,7 +9,9 @@ toc: TRUE
 
 # Packages
 
+
 ```{r setup, include=FALSE}
+`%nin%` = Negate(`%in%`)
 if (!require("tidyverse")) install.packages("tidyverse")
 library("tidyverse") # workflow and plots
 if (!require("UsingR")) install.packages("UsingR")

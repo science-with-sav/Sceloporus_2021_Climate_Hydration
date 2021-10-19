@@ -8,12 +8,8 @@ toc: TRUE
 
 # Packages
 
-```{r}
-`%nin%` = Negate(`%in%`)
-```
-
-
 ```{r setup, echo=T, results='hide', message=FALSE}
+`%nin%` = Negate(`%in%`)
 if (!require("tidyverse")) install.packages("tidyverse") 
 library("tidyverse")
 ```
@@ -114,7 +110,6 @@ Trail 2: June 26 - July 4
 Trial 3: July 20-28
 Trial 4: August 8-16
 Trial 5: August 22-30
-Trial 5 rehab: August 31-32
 
 Lizards were usually placed in the chambers late on the first day and taken out early on the last day, so I'll only use from 8 pm on the first day up to 6 am the last day.
 

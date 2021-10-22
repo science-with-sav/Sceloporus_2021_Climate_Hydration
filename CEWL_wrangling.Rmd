@@ -190,23 +190,15 @@ Individuals 254 and 304 had their treatment canceled. 254 only had 3 measurement
 
 Individuals 239 and 303 only have 5 CEWL measurements, and it was unable to be explained by treatment cancellation.
 
-After these quick checks, these individuals still have **too few: 213, 216, 245, 278, 289, 294, 305 ** (all 9 observations)
+After these quick checks, these individuals still have **too few: 213, 216, 239, 245, 278, 289, 294, 303, 305 ** (all 9 observations)
 
 ```{r}
-indiv_too_few <- c(213, 216, 245, 278, 289, 294, 305)
+indiv_too_few <- c(213, 216, 239, 245, 278, 289, 294, 303, 305)
 indiv_too_many <- c(206, 215, 237, 302)
 ```
 
 
-
-
-
-***Left off here***
-
-
-
-
-Next, check how many measurements each individual has under each replicate number for each date to see if there are duplicates.
+Next, check how many measurements each individual has for each date.
 
 ```{r}
 rep_check_1 <- all_CEWL_data %>%
@@ -215,25 +207,174 @@ rep_check_1 <- all_CEWL_data %>%
                 arrange(n)
 rep_check_1
 unique(rep_check_1$n)
+
+# save the ones I need to investigate further
+wrong_amts <- rep_check_1 %>%
+  dplyr::filter(individual_ID %in% c(indiv_too_few, indiv_too_many))
+wrong_amts
 ```
 
-Individuals 206, 215, 237, and 302 have too many measurements. Others only have 3-4.
 
-## Extra Measurements
+I've already settled why there are discrepancies for individual 254. I haven't settled why individuals 213 and 216 (June 24), 245 (July 4), 278 and 289 (July 28), 294 and 305 (August 16) only have 4 observations on one date. The most likely explanation is that we miscounted replicates and only did 4, rather than 5.
+
+Individuals 206 and 215 both have extra measurements on June 24. Individuals 237 and 302 both have **10** measurements! On July 4 and August 8, respectively.
+
+I will need to do more digging to figure out why these individuals have the wrong number of measurements on these dates.
+
+
+
+## Extra/Missing Measurements
+
+Get all the data for the ones that aren't right:
 
 ```{r}
 rep_check_2 <- all_CEWL_data %>%
-                group_by(individual_ID, date, replicate_no) %>%
-                summarise(n = n()) %>% 
-                arrange(n)
-rep_check_2
-unique(rep_check_2$n)
+                dplyr::filter(individual_ID %in% wrong_amts$individual_ID &
+                                date %in% wrong_amts$date)
 ```
 
-Individual 206 has two values named replicate 2.
-Individual 215 has two values named replicate 1.
-Individual 233 has two values named replicate 5.
-Individuals 237 and 302 each have two values for each of the five replicates named 1-5...
+Look at the weird data one at a time, starting with sets with too many replicates.
+
+```{r}
+rep_check_2 %>%
+  dplyr::filter(individual_ID == 302)
+tmt %>%
+  dplyr::filter(individual_ID == 302)
+```
+
+Individual 302 has two sets of replicates from his capture day. One set is probably from him and the other set belongs to the lizard measured before or after him. Thankfully, on capture day, lizards are measured in number order, so I know it's probably either Individual 301 or 303. Since 303 is missing measurements, we'll check that.
+
+```{r}
+rep_check_2 %>%
+  dplyr::filter(individual_ID == 303)
+tmt %>%
+  dplyr::filter(individual_ID == 303)
+```
+
+As suspected, Individual 303 only has pre-experiment measurements. We can check the time cloacal temperature was measured for these lizards on capture day to see which set of CEWL measurements belongs to who.
+
+```{r}
+cloacal_temp_C %>% 
+  dplyr::filter(individual_ID %in% c(302,303) & 
+                  date == as.Date("2021-08-08"))
+```
+
+302's temperature was taken at 13:06 and 303's temperature was taken at 13:13, so **the 13:01-13:05 CEWL measurements are for 302 and the 13:09-13:12 CEWL measurements are for 303**.
+
+### I will need to reassign the measurements attributed to individual 302 taken between 13:09-13:12 on August 8 as pre-experiment measurements for individual 303. Discrepancies in number of measurements for individuals 302 and 303 solved!
+
+
+Next:
+
+```{r}
+rep_check_2 %>%
+  dplyr::filter(individual_ID == 237)
+tmt %>%
+  dplyr::filter(individual_ID == 237)
+```
+
+Individual 237 also has an extra set of replicate measurements on the post-experiment day. The two sets of measurements are taken at two very different time blocks: 10:26-10:32 vs 12:21-12:24.
+
+Interestingly, a closeby number is missing some measurements:
+
+```{r}
+rep_check_2 %>%
+  dplyr::filter(individual_ID == 239)
+tmt %>%
+  dplyr::filter(individual_ID == 239)
+```
+
+Individual 239 is missing his post-experiment measurements on July 4. So, use cloacal temperature measurement times again to fix:
+
+```{r}
+cloacal_temp_C %>% 
+  dplyr::filter(individual_ID %in% c(237,239) & 
+                  date == as.Date("2021-07-04"))
+```
+
+237's temperature was taken at 12:24 and 239's temperature was taken at 10:33, so **the 12:21-12:24 CEWL measurements are for 237 and the 10:26-10:32 CEWL measurements are for 239**.
+
+### I will need to reassign the measurements attributed to individual 237 taken between 10:26-10:32 on July 4 as post-experiment measurements for individual 239. Discrepancies in number of measurements for individuals 237 and 239 solved!
+
+Next:
+
+```{r}
+rep_check_2 %>%
+  dplyr::filter(individual_ID == 215)
+```
+
+The measurement from June 24 at 11:53:32 has a completely different time and CEWL value than the other measurements for Individual 215 on that day. I can check cloacal temperature times from that day to make sure it's not a measurement for 215 and check whether it might belong to someone else.
+
+```{r}
+cloacal_temp_C %>% 
+  dplyr::filter(date == as.Date("2021-06-24")) %>%
+  arrange(time_c_temp)
+```
+
+215 had his cloacal temperature taken at 11:16, confirming that only the CEWL values from between 11:12-11:16 are his. Individual 213 had his cloacal temp taken at 11:53, and 226 had his taken at 11:58. Now I can check whether either of them are missing CEWL values and what time their CEWL measurements were taken.
+
+```{r}
+rep_check_2 %>%
+  dplyr::filter(individual_ID == 213)
+all_CEWL_data %>%
+  dplyr::filter(individual_ID == 226)
+```
+
+Individual 226 isn't missing anything. BUT, individual 213 is missing his fifth replicate of CEWL measurements taken post-experiment. The 4 measurements currently attributed to him were taken between 11:49-11:52, so the extra value attributed to 215 at 11:53 fits perfectly into that sequence of replicates.
+
+### I will need to reassign the measurement attributed to individual 215 at 11:53 on June 24 as the fifth post-experiment measurement for individual 213. Discrepancies in number of measurements for individuals 215 and 213 solved!
+
+
+Next:
+
+```{r}
+rep_check_2 %>%
+  dplyr::filter(individual_ID == 206)
+```
+
+***left off assessing 206's extra value***
+
+
+
+
+
+
+
+```{r}
+rep_check_2 %>%
+  dplyr::filter(individual_ID == 216)
+```
+```{r}
+rep_check_2 %>%
+  dplyr::filter(individual_ID == 245)
+```
+```{r}
+rep_check_2 %>%
+  dplyr::filter(individual_ID == 278)
+```
+```{r}
+rep_check_2 %>%
+  dplyr::filter(individual_ID == 289)
+```
+```{r}
+rep_check_2 %>%
+  dplyr::filter(individual_ID == 294)
+```
+```{r}
+rep_check_2 %>%
+  dplyr::filter(individual_ID == 305)
+```
+
+
+
+## Check List
+
+Ensure I investigated each of the individuals that I noted had the wrong number of CEWL measurements
+
+```{r}
+wrong_amts %>%
+  dplyr::filter(individual_ID %nin% c(302,303,237,239,213,215))
+```
 
 
 ## Missing Measurements

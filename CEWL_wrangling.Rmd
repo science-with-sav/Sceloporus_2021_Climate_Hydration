@@ -80,23 +80,34 @@ read_CEWL_file <- function(filename) {
 all_CEWL_data <- lapply(filenames, read_CEWL_file) %>%
   # paste all data files together into one df by row
   reduce(rbind) %>%
-  dplyr::filter(status == "Normal")
+  dplyr::filter(status == "Normal") %>%
+  mutate(date_time = as.POSIXct(paste(date, time), 
+                                format = "%m/%d/%y %I:%M:%S %p"),
+         date = as.Date(date, 
+                        format = "%m/%d/%y"),
+         time = as.POSIXct(time, 
+                           format = "%I:%M:%S %p"),
+         status = as.factor(status),
+         individual_ID = as.factor(individual_ID),
+         replicate_no = as.factor(replicate_no)
+         )
 summary(all_CEWL_data)
 ```
 
-5. Also load in the cloacal temperature measured at the time of CEWL measurement.
+5. Load in and format the cloacal temperature measured at the time of CEWL measurement.
 
 ```{r}
 cloacal_temp_C <- read.csv("./data/c_temps.csv", # filename
                              na.strings=c("","NA") # fix empty cells
                              ) %>%
-  dplyr::select(date, 
-                temp_time = CEWL_time, 
+  dplyr::select(date, time_c_temp, 
                 day, 
                 individual_ID, 
                 cloacal_temp_C) %>%
-  mutate(date = as.Date(date, format = "%m/%d/%y"),
-         temp_time = (as.POSIXct(temp_time, format = "%H:%M")),
+  mutate(date_time = as.POSIXct(paste(date, time_c_temp), 
+                                format = "%m/%d/%y %H:%M"),
+         date = as.Date(date, format = "%m/%d/%y"),
+         time_c_temp = (as.POSIXct(time_c_temp, format = "%H:%M")),
          day = as.factor(day),
          individual_ID = as.factor(individual_ID),
          cloacal_temp_C = as.numeric(cloacal_temp_C)
@@ -105,30 +116,97 @@ cloacal_temp_C <- read.csv("./data/c_temps.csv", # filename
 summary(cloacal_temp_C)
 ```
 
+6. Load in and format the tmt assignments so we know which lizards were removed from the experiment.
+
+```{r}
+tmt <- read.csv("./data/tmt_assignments.csv") %>%
+  mutate(trial_number = as.factor(trial_number),
+         temp_tmt = as.factor(temp_tmt),
+         humidity_tmt = as.factor(humidity_tmt),
+         individual_ID = as.factor(individual_ID),
+         conclusion = as.factor(conclusion)
+         )
+summary(tmt)
+
+# specifically save canceled ones
+canceled <- tmt %>%
+  dplyr::filter(conclusion == "canceled") %>%
+  dplyr::select(individual_ID)
+canceled
+```
+
+
 
 
 # Check Data
 
+## Dates
 
-## Technical Replicates COV
+We should only have measurements from day 0 (beginning of date ranges below) and day 8 (end of date ranges below) for each trial.
+
+Trail 1: June 16-24
+Trail 2: June 26 - July 4
+Trial 3: July 20-28
+Trial 4: August 8-16
+Trial 5: August 22-30
 
 ```{r}
-COVs <- all_CEWL_data %>%
-  group_by(individual_ID, date) %>%
-  summarise(CEWL_mean = mean(CEWL_g_m2h),
-            CEWL_SD = sd(CEWL_g_m2h),
-            COV = (CEWL_SD/CEWL_mean) *100
-            )
-summary(COVs)
-sd(COVs$CEWL_mean)
-sd(COVs$COV)
+all_CEWL_data %>%
+  group_by(date) %>%
+  summarise(count = n())
+```
+
+All the correct dates, and only the correct dates, are in our dataset. In every trial except trial 5, the number of observations decreases post-experiment compared to pre-experiment, either due to lost lizards or the few that died during the experiment.
+
+
+## Number of Measurements
+
+Each individual should have 10 total measurements (5 before the experiment, 5 after). 
+
+```{r}
+rep_check <- all_CEWL_data %>%
+                group_by(individual_ID) %>%
+                summarise(n = n()) %>% 
+                arrange(n)
+rep_check
+```
+
+Oof... Many individuals have more or less than 10 CEWL measurements.
+
+**too many: 206 & 215 = 11; 237 & 302 = 15**
+too few: 254 = 3; 213, 216, 245, 278, 289, 294, 305 = 9
+
+There are also a handful with 5 measurements... Check whether these are the ones that had their treatment canceled (thus would only have measurements from pre experiment, not post).
+
+```{r}
+rep_check %>% dplyr::filter(n == 5) 
+canceled
+```
+
+
+*212*, *233*, 239, *248*, *283*, *284*, and 303 were the individuals with only 5 CEWL values. Of these, five individuals (italicized IDs) had their treatment canceled, so we have an explanation for their missing data.
+
+Individuals 254 and 304 had their treatment canceled. 254 only had 3 measurements taken because they were lost during CEWL measurement pre-treatment. *Individual 304 seems to have the correct number of observations, which will need to be validated...*
+
+Individuals 239 and 303 only have 5 CEWL measurements, and it was unable to be explained by treatment cancellation.
+
+After these quick checks, these individuals still have **too few: 213, 216, 245, 278, 289, 294, 305 ** (all 9 observations)
+
+```{r}
+indiv_too_few <- c(213, 216, 245, 278, 289, 294, 305)
+indiv_too_many <- c(206, 215, 237, 302)
 ```
 
 
 
 
 
-Each individual should have 10 total measurements (5 before the experiment, 5 after). However, this is not the case. So, check how many measurements each individual has under each replicate number for each date to see if there are duplicates.
+***Left off here***
+
+
+
+
+Next, check how many measurements each individual has under each replicate number for each date to see if there are duplicates.
 
 ```{r}
 rep_check_1 <- all_CEWL_data %>%
@@ -330,6 +408,20 @@ Also check that all the measurement times for a given individual on a certain da
 # Replicates
 
 ## Check Distribution
+## Technical Replicates COV
+
+```{r}
+COVs <- all_CEWL_data %>%
+  group_by(individual_ID, date) %>%
+  summarise(CEWL_mean = mean(CEWL_g_m2h),
+            CEWL_SD = sd(CEWL_g_m2h),
+            COV = (CEWL_SD/CEWL_mean) *100
+            )
+summary(COVs)
+sd(COVs$CEWL_mean)
+sd(COVs$COV)
+```
+
 
 ## Remove Outliers
 

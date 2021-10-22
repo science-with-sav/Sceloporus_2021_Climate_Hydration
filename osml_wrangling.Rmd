@@ -118,7 +118,7 @@ Wahoo, every lizard has blood draws from 4 different dates.
 
 # Replicates
 
-Now, I will try to identify outliers within the replicates for a given individual on a given date. There must be ≥3 replicates to do this, so the first thing I need to do is figure out which individuals/dates have enough replicates, then subset my data to be only those individuals.
+Now, I will try to identify outliers within the replicates for a given individual on a given date. There must be at least 3 replicates to do this, so the first thing I need to do is figure out which individuals/dates have enough replicates, then subset my data to be only those individuals.
 
 
 ## Individuals w 3+ Replicates
@@ -147,7 +147,7 @@ nrow(enuf_reps) + nrow(not_reps)
 
 ## Assess Variation
 
-We want the Coefficient of Variation (CV) among our technical replicates to be small. We need to find it to identify whether there may be outliers.
+We want the Coefficient of Variation (CV) among our technical replicates to be small. We need to calculate it to identify whether there may be outliers.
 
 ```{r}
 CVs <- enuf_reps %>%
@@ -161,23 +161,78 @@ CVs <- enuf_reps %>%
             )
 summary(CVs)
 hist(CVs$CV)
-hist(CVs$osml_range)
+hist(CVs$osml_range) 
 ```
 
-Ideally, CV would be 10-15%. If it's larger, and one of the replicates is very different than the others, we can assume that the replicates that are closer together are more. 
+Ideally, CV would be 10-15%. If it's larger, and one of the replicates is very different than the others, we can assume that the replicates that are closer together are more reliable. 
 
-The CV is >10 for only one lizard on one date, so our replicates are likely to accurately represent the true value.
-
-However, the osmometer measures samples with a precision of ± 5 mmol/kg, so I still want to check the distribution of replicates for lizards/dates with a range of osmolality values > 10 mmol/kg.
+The CV is >10 for only one lizard on one date, so our replicates are likely to accurately represent the true value. We don't want to lose accuracy by searching for precision, so we will only remove the one point driving the enormous CV value.
 
 
+## Find Outlier
 
-
-
-## Remove Outliers
+Determine which replicate is an outlier and pulls the CV above our acceptable range (10-15%).
 
 ```{r}
-enuf_reps_trimmed <- enuf_reps
+CV_all <- enuf_reps %>%
+    group_by(individual_ID, date_blood_drawn) %>%
+    summarise(mean = mean(osmolality_mmol_kg),
+              SD = sd(osmolality_mmol_kg),
+              CV_all = (SD/mean) *100) %>%
+    dplyr::select(-mean, -SD)
+  
+CV_12 <- enuf_reps %>%
+    dplyr::filter(replicate_no != 3) %>%
+    group_by(individual_ID, date_blood_drawn) %>%
+    summarise(mean = mean(osmolality_mmol_kg),
+              SD = sd(osmolality_mmol_kg),
+              CV_12 = (SD/mean) *100) %>%
+    dplyr::select(-mean, -SD)
+  
+CV_23 <- enuf_reps %>%
+    dplyr::filter(replicate_no != 1) %>%
+    group_by(individual_ID, date_blood_drawn) %>%
+    summarise(mean = mean(osmolality_mmol_kg),
+              SD = sd(osmolality_mmol_kg),
+              CV_23 = (SD/mean) *100) %>%
+    dplyr::select(-mean, -SD)
+  
+CV_31 <- enuf_reps %>%
+    dplyr::filter(replicate_no != 2) %>%
+    group_by(individual_ID, date_blood_drawn) %>%
+    summarise(mean = mean(osmolality_mmol_kg),
+              SD = sd(osmolality_mmol_kg),
+              CV_31 = (SD/mean) *100) %>%
+    dplyr::select(-mean, -SD)
+  
+compare <- CV_all %>%
+    left_join(CV_12, by = c('individual_ID', 'date_blood_drawn')) %>%
+    left_join(CV_23, by = c('individual_ID', 'date_blood_drawn')) %>%
+    left_join(CV_31, by = c('individual_ID', 'date_blood_drawn')) %>%
+  arrange(desc(CV_all)) %>%
+  dplyr::filter(CV_all>10)
+compare
+```
+
+We should remove replicate 2 for individual 225 on June 26.
+
+
+## Remove Outlier
+
+```{r}
+enuf_reps[200, "osmolality_mmol_kg"] = NA 
+
+# check
+enuf_reps %>%
+  dplyr::filter(individual_ID == 225,
+                date_blood_drawn == as.Date("2021-06-26", 
+                                              format= "%Y-%m-%d")
+                #replicate_no == 2
+                )
+
+# filter out the one NA
+enuf_reps_trimmed <- enuf_reps %>%
+  dplyr::filter(complete.cases(osmolality_mmol_kg))
 ```
 
 
@@ -188,7 +243,7 @@ Now that the outliers are removed from the technical replicates when there were 
 
 ```{r}
 osml_means <- not_reps %>%
-  rbind(enuf_reps_trimmed)
+  rbind(enuf_reps_trimmed) %>%
   group_by(date_blood_drawn, individual_ID) %>%
   summarise(osmolality_mmol_kg_mean = mean(osmolality_mmol_kg))
 ```
@@ -199,7 +254,6 @@ osml_means <- not_reps %>%
 ```{r}
 write.csv(osml_means, "./data/osml_means_clean.csv")
 ```
-
 
 
 

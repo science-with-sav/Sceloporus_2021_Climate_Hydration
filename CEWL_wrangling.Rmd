@@ -42,14 +42,8 @@ filenames <- list.files(path = "data/CEWL", pattern = "\\.csv$")
 ```{r}
 read_CEWL_file <- function(filename) {
   
-  dat <- read.csv(file.path("data/CEWL", filename),
-                # each csv has headers
-                header = TRUE
-                # this is what I want to rename the col headers
-                #col.names = c("seq_no", "date", "time", "ID_rep_no",
-                 #             "status", "termination", "CEWL_g_m2h",
-                  #            "CV", "SSWL", "msmt_temp_C", "msmt_RH_percent",
-                   #           "dont_need_rest")
+  dat <- read.csv(file.path("data/CEWL", filename), # load file
+                header = TRUE # each csv has headers
                 ) %>%
     # select only the relevant values
     dplyr::select(date = Date, 
@@ -80,7 +74,9 @@ read_CEWL_file <- function(filename) {
 all_CEWL_data <- lapply(filenames, read_CEWL_file) %>%
   # paste all data files together into one df by row
   reduce(rbind) %>%
+  # only use completed measurements
   dplyr::filter(status == "Normal") %>%
+  # properly format data classes
   mutate(date_time = as.POSIXct(paste(date, time), 
                                 format = "%m/%d/%y %I:%M:%S %p"),
          date = as.Date(date, 
@@ -100,10 +96,12 @@ summary(all_CEWL_data)
 cloacal_temp_C <- read.csv("./data/c_temps.csv", # filename
                              na.strings=c("","NA") # fix empty cells
                              ) %>%
+  # select variables of interest
   dplyr::select(date, time_c_temp, 
                 day, 
                 individual_ID, 
                 cloacal_temp_C) %>%
+  # properly format data classes
   mutate(date_time = as.POSIXct(paste(date, time_c_temp), 
                                 format = "%m/%d/%y %H:%M"),
          date = as.Date(date, format = "%m/%d/%y"),
@@ -112,6 +110,7 @@ cloacal_temp_C <- read.csv("./data/c_temps.csv", # filename
          individual_ID = as.factor(individual_ID),
          cloacal_temp_C = as.numeric(cloacal_temp_C)
          ) %>%
+  # get rid of rows with missing data
   dplyr::filter(complete.cases(.))
 summary(cloacal_temp_C)
 ```
@@ -120,6 +119,7 @@ summary(cloacal_temp_C)
 
 ```{r}
 tmt <- read.csv("./data/tmt_assignments.csv") %>%
+  # properly format data classes
   mutate(trial_number = as.factor(trial_number),
          temp_tmt = as.factor(temp_tmt),
          humidity_tmt = as.factor(humidity_tmt),
@@ -128,7 +128,7 @@ tmt <- read.csv("./data/tmt_assignments.csv") %>%
          )
 summary(tmt)
 
-# specifically save canceled ones
+# specifically save a df of canceled ones
 canceled <- tmt %>%
   dplyr::filter(conclusion == "canceled") %>%
   dplyr::select(individual_ID)
@@ -173,51 +173,100 @@ rep_check
 
 Oof... Many individuals have more or less than 10 CEWL measurements.
 
-**too many: 206 & 215 = 11; 237 & 302 = 15**
+too many: 206 & 215 = 11; 237 & 302 = 15
 too few: 254 = 3; 213, 216, 245, 278, 289, 294, 305 = 9
 
 There are also a handful with 5 measurements... Check whether these are the ones that had their treatment canceled (thus would only have measurements from pre experiment, not post).
 
 ```{r}
-rep_check %>% dplyr::filter(n == 5) 
-canceled
+# get the individuals with only 5 measures
+rep_check5_msmts <- rep_check %>% 
+  dplyr::filter(n == 5)
+rep_check5_msmts
+# when individuals with 5 reps makes sense
+rep_check5_msmts %>% 
+  dplyr::filter(individual_ID %in% canceled$individual_ID)
 ```
 
 
-*212*, *233*, 239, *248*, *283*, *284*, and 303 were the individuals with only 5 CEWL values. Of these, five individuals (italicized IDs) had their treatment canceled, so we have an explanation for their missing data.
-
-Individuals 254 and 304 had their treatment canceled. 254 only had 3 measurements taken because they were lost during CEWL measurement pre-treatment. *Individual 304 seems to have the correct number of observations, which will need to be validated...*
-
-Individuals 239 and 303 only have 5 CEWL measurements, and it was unable to be explained by treatment cancellation.
-
-After these quick checks, these individuals still have **too few: 213, 216, 239, 245, 278, 289, 294, 303, 305 ** (all 9 observations)
+Of the 7 individuals with only 5 CEWL values, 5 individual lizards (*212*, *233*, *248*, *283*, *284*) had their treatment canceled, so we have an explanation for their missing data.
 
 ```{r}
-indiv_too_few <- c(213, 216, 239, 245, 278, 289, 294, 303, 305)
-indiv_too_many <- c(206, 215, 237, 302)
+# when individuals with 5 reps DOES NOT make sense
+rep_check5_msmts %>% 
+  dplyr::filter(individual_ID %nin% canceled$individual_ID)
+```
+
+239 and 303 having 5 values is still unexplained and may be due to an error.
+
+```{r}
+# individuals with canceled tmt but msmt n != 5
+canceled %>% dplyr::filter(individual_ID %nin% rep_check5$individual_ID)
+# check their n's
+rep_check %>% dplyr::filter(individual_ID %in% c(254, 304))
+
+# check why canceled
+tmt %>% dplyr::filter(individual_ID %in% c(254, 304))
+```
+
+
+Individuals 254 and 304 had their treatments canceled, but their n!=5. 254 only had 3 measurements taken because they were lost during CEWL measurement pre-treatment. Individual 304 has the correct number of observations (10), but it was canceled because we realized after the experiment that his toe was already clipped, thus was a recapture from a previous trial and we did not want to include his data. There were no measurement errors for these individuals. Whereas 254's capture measurements can be used for the capture analysis, 304's measurements should be removed from the dataset completely.
+
+
+Save the individuals with measurement n's that I need to investigate further.
+
+```{r}
+indiv_too_few <- rep_check %>% dplyr::filter(n == 9)
+indiv_too_many <- rep_check %>% dplyr::filter(n > 10)
+other_weird <- rep_check %>% dplyr::filter(individual_ID %in% 
+                                             c(239, 303)) # only 5 msmts
+
+# save together to investigate further
+weird_n <- indiv_too_few %>%
+  rbind(indiv_too_many, other_weird) %>%
+  arrange(n)
+weird_n
 ```
 
 
 Next, check how many measurements each individual has for each date.
 
 ```{r}
-rep_check_1 <- all_CEWL_data %>%
+rep_check_1a <- all_CEWL_data %>%
+  dplyr::filter(individual_ID %nin% weird_n$individual_ID) %>%
                 group_by(individual_ID, date) %>%
                 summarise(n = n()) %>% 
                 arrange(n)
-rep_check_1
-unique(rep_check_1$n)
-
-# save the ones I need to investigate further
-wrong_amts <- rep_check_1 %>%
-  dplyr::filter(individual_ID %in% c(indiv_too_few, indiv_too_many))
-wrong_amts
+rep_check_1a
+unique(rep_check_1a$n)
 ```
 
+It seems I have extracted all of the weird measurements. Every n on a given date ==5 for the individuals not included in my dataframe "weird_n", with the exception of individual 254, which I've already accounted for.
 
-I've already settled why there are discrepancies for individual 254. I haven't settled why individuals 213 and 216 (June 24), 245 (July 4), 278 and 289 (July 28), 294 and 305 (August 16) only have 4 observations on one date. The most likely explanation is that we miscounted replicates and only did 4, rather than 5.
+Now I can focus on the observations for the individuals in weird_n.
 
-Individuals 206 and 215 both have extra measurements on June 24. Individuals 237 and 302 both have **10** measurements! On July 4 and August 8, respectively.
+```{r}
+# save ones with one day of 5 msmts so I can filter out others' complete days
+two_5s <- all_CEWL_data %>%
+  dplyr::filter(individual_ID %in% c(239, 303)) %>%
+  group_by(individual_ID, date) %>%
+  summarise(n = n())
+# get the weird msmt days for others
+rep_check_1b <- all_CEWL_data %>%
+  dplyr::filter(individual_ID %in% weird_n$individual_ID) %>%
+  group_by(individual_ID, date) %>%
+  summarise(n = n()) %>% 
+  dplyr::filter(n!=5) %>%
+  rbind(two_5s) %>%
+  arrange(n)
+rep_check_1b
+```
+
+I have yet to figure out why individuals 213 and 216 (June 24), 245 (July 4), 278 and 289 (July 28), 294 and 305 (August 16) only have 4 observations on that date. The most likely explanation is that we miscounted replicates and only did 4, rather than 5. They have the correct number of measurements on their other measurement days.
+
+Individuals 206 and 215 both have one extra replicate on June 24. Individuals 237 and 302 both have **10** replicates! On July 4 and August 8, respectively. They have the correct number of measurements on their other measurement days.
+
+239 and 303 only have one day of measurements.
 
 I will need to do more digging to figure out why these individuals have the wrong number of measurements on these dates.
 
@@ -229,8 +278,10 @@ Get all the data for the ones that aren't right:
 
 ```{r}
 rep_check_2 <- all_CEWL_data %>%
-                dplyr::filter(individual_ID %in% wrong_amts$individual_ID &
-                                date %in% wrong_amts$date)
+                dplyr::filter(individual_ID %in% rep_check_1b$individual_ID &
+                                date %in% rep_check_1b$date) %>%
+  group_by(individual_ID, date) %>%
+  mutate(n = nrow(CEWL_g_m2h))
 ```
 
 Look at the weird data one at a time, starting with sets with too many replicates.
@@ -245,7 +296,7 @@ tmt %>%
 Individual 302 has two sets of replicates from his capture day. One set is probably from him and the other set belongs to the lizard measured before or after him. Thankfully, on capture day, lizards are measured in number order, so I know it's probably either Individual 301 or 303. Since 303 is missing measurements, we'll check that.
 
 ```{r}
-rep_check_2 %>%
+all_CEWL_data %>%
   dplyr::filter(individual_ID == 303)
 tmt %>%
   dplyr::filter(individual_ID == 303)
@@ -261,7 +312,17 @@ cloacal_temp_C %>%
 
 302's temperature was taken at 13:06 and 303's temperature was taken at 13:13, so **the 13:01-13:05 CEWL measurements are for 302 and the 13:09-13:12 CEWL measurements are for 303**.
 
-### I will need to reassign the measurements attributed to individual 302 taken between 13:09-13:12 on August 8 as pre-experiment measurements for individual 303. Discrepancies in number of measurements for individuals 302 and 303 solved!
+### I will need to reassign the measurements attributed to individual 302 taken between 13:09-13:12 on August 8 as pre-experiment measurements for individual 303. 
+
+Discrepancies in number of measurements for individuals 302 and 303 solved!
+
+```{r}
+rep_check_3 <- rep_check_2 %>%
+  dplyr::filter(individual_ID %nin% c(302, 303)) %>%
+  arrange(individual_ID)
+# remaining individuals with replicate n's to investigate
+unique(rep_check_3$individual_ID)
+```
 
 
 Next:
@@ -474,6 +535,8 @@ I302, Aug 8: 1:09 - 1:13 PM
 
 
 ## Properly Re-Assigning Measurements
+
+304's measurements should be removed from the dataset completely.
 
 Measurements for individuals currently labeled 206, 215, 237, and 302 need to have editing done.
 

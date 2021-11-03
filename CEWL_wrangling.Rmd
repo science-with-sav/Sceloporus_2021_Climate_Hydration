@@ -9,8 +9,7 @@ toc: TRUE
 
 # Packages
 
-
-```{r setup, include=FALSE}
+```{r setup, include = TRUE}
 `%nin%` = Negate(`%in%`)
 if (!require("tidyverse")) install.packages("tidyverse")
 library("tidyverse") # workflow and plots
@@ -203,7 +202,7 @@ rep_check5_msmts %>%
 
 ```{r}
 # individuals with canceled tmt but msmt n != 5
-canceled %>% dplyr::filter(individual_ID %nin% rep_check5$individual_ID)
+canceled %>% dplyr::filter(individual_ID %nin% rep_check5_msmts$individual_ID)
 # check their n's
 rep_check %>% dplyr::filter(individual_ID %in% c(254, 304))
 
@@ -475,10 +474,14 @@ unconforming_but_fine <- data.frame(IDs = c(216, 245, 278, 289, 294, 305,
 
 ```{r}
 nrow(all_CEWL_data)
+all_CEWL_data %>%
+  dplyr::filter(individual_ID == 304)
 all_CEWL_data_edited <- all_CEWL_data %>%
   dplyr::filter(individual_ID != 304) %>%
   arrange(date, individual_ID, time, replicate_no)
 nrow(all_CEWL_data_edited)
+all_CEWL_data_edited %>%
+  dplyr::filter(individual_ID == 304)
 ```
 
 2. Reassign the measurements attributed to individual 302 taken between 13:09-13:12 on August 8 as pre-experiment measurements for individual 303. 
@@ -658,16 +661,16 @@ We want the Coefficient of Variation (CV) among our technical replicates to be s
 ```{r}
 CVs <- all_CEWL_data_edited2 %>%
   group_by(individual_ID, date) %>%
-  summarise(CEWL_mean = mean(CEWL_g_m2h),
-            CEWL_SD = sd(CEWL_g_m2h),
-            CV = (CEWL_SD/CEWL_mean) *100,
-            CEWL_min = min(CEWL_g_m2h),
-            CEWL_max = max(CEWL_g_m2h),
-            CEWL_range = CEWL_max - CEWL_min
+  summarise(mean = mean(CEWL_g_m2h),
+            SD = sd(CEWL_g_m2h),
+            CV = (SD/mean) *100,
+            min = min(CEWL_g_m2h),
+            max = max(CEWL_g_m2h),
+            range = max - min
             )
 summary(CVs)
 hist(CVs$CV)
-hist(CVs$CEWL_range) 
+hist(CVs$range) 
 ```
 
 We expect CV for technical replicates to be < 10-15%, so we must determine whether the CVs > 15% are due to outlier replicates.
@@ -675,24 +678,173 @@ We expect CV for technical replicates to be < 10-15%, so we must determine wheth
 
 ## Find Outliers
 
-need to research...
-
-## Remove Outliers
-
-## Re-Check Distribution
-
-
-## Average Replicates (outliers now removed) & Join Cloacal Temp Data
+First, create a function to look at the replicates for each individual on each day. This will be almost 300 iterations of the function. For each iteration, I will make a boxplot and extract any outliers, compiling a dataframe of outliers that I want to exclude from the final dataset. By printing the boxplots and compiling a dataframe of outliers, I can check the data against the plots to ensure confidence in the outliers quantified.
 
 ```{r}
-CEWL_final <- CEWL_clean %>%
-  group_by(date, individual_ID) %>%
-  summarise(CEWL_g_m2h = mean(CEWL_g_m2h)) %>%
-  left_join(cloacal_temp_C, by = c('date', 'individual_ID'))
+# write function to find outliers for each individual on each date
+find_outliers <- function(df) {
+  
+  # initiate dataframe to compile info and list to compile plots
+  outliers <- data.frame()
+  #boxplots <- list()
+
+  # initiate a for loop to go through every who in df
+  for(indiv_ch in unique(df$individual_ID)) {
+    
+    # select data for only the individual of interest
+    df_sub <- df %>%
+      dplyr::filter(individual_ID == as.numeric(indiv_ch))
+    
+    # make a boxplot
+    df_sub %>%
+      ggplot(.) +
+      geom_boxplot(aes(x = as.factor(date),
+                       y = CEWL_g_m2h,
+                       fill = as.factor(date))) +
+      ggtitle(paste("Individual", indiv_ch)) +
+      theme_classic() -> plot
+    
+    # print/save
+    print(plot)
+    #boxplots[[indiv_ch]] <- plot
+    
+    # extract outliers
+    outs <- df_sub %>%
+      group_by(individual_ID, date) %>%
+      summarise(outs = boxplot.stats(CEWL_g_m2h)$out)
+    
+    # add to running dataframe of outliers
+    outliers <- outliers %>%
+      rbind(outs)
+  }
+  #return(boxplots)
+  return(outliers)
+}
 ```
 
 
-# Export
+Now apply the function to the data:
+
+```{r, fig.show="hold", out.width="50%"}
+par(mfrow = c(71, 2))
+outliers_found <- find_outliers(all_CEWL_data_edited2)
+outliers_found
+par(mfrow = c(1, 1))
+```
+
+Based on the plots, the dataframe of outliers I compiled is correct.
+
+
+## Remove Outliers
+
+Now I will create a secondary version of the same function, but instead of compiling outliers, I will omit them from the dataset.
+
+```{r}
+# write function to find and exclude outliers
+omit_outliers <- function(df) {
+  
+  # initiate dataframe to compile info and list to compile plots
+  cleaned <- data.frame()
+
+  # initiate a for loop to go through every who in df
+  for(indiv_ch in unique(df$individual_ID)) {
+    
+    # select data for only the individual of interest
+    df_sub <- df %>%
+      dplyr::filter(individual_ID == as.numeric(indiv_ch))
+    
+    # extract outliers
+    outs <- df_sub %>%
+      group_by(individual_ID, date) %>%
+      summarise(outs = boxplot.stats(CEWL_g_m2h)$out)
+    
+    # filter outliers from data subset for this individual
+    filtered <- df_sub %>%
+      dplyr::filter(CEWL_g_m2h %nin% outs$outs)
+    
+    # add to running dataframe of cleaned data
+    cleaned <- cleaned %>%
+      rbind(filtered)
+  }
+  return(cleaned)
+}
+```
+
+
+Apply function to data and check that the new data subsets still contain the right amount of data:
+
+```{r}
+outliers_omitted <- omit_outliers(all_CEWL_data_edited2)
+nrow(all_CEWL_data_edited2) == nrow(outliers_omitted) + nrow(outliers_found)
+```
+
+
+
+
+## Re-Assess Variation
+
+```{r}
+new_CVs <- outliers_omitted %>%
+  group_by(individual_ID, date) %>%
+  summarise(mean = mean(CEWL_g_m2h),
+            SD = sd(CEWL_g_m2h),
+            CV = (SD/mean) *100,
+            min = min(CEWL_g_m2h),
+            max = max(CEWL_g_m2h),
+            range = max - min)
+summary(new_CVs)
+hist(new_CVs$CV)
+hist(CVs$CV)
+hist(new_CVs$range) 
+hist(CVs$range) 
+```
+
+
+Unfortunately, CVs are still skewed to the right, but overall, CVs are much lower and are mostly < 5-10%. We will continue with this dataset.
+
+
+## Average Replicates (outliers removed) & Join Cloacal Temp Data
+
+```{r}
+CEWL_final <- outliers_omitted %>%
+  group_by(date, individual_ID) %>%
+  summarise(CEWL_g_m2h = mean(CEWL_g_m2h)) %>%
+  left_join(cloacal_temp_C, by = c('date', 'individual_ID')) %>%
+  dplyr::filter(complete.cases(CEWL_g_m2h, cloacal_temp_C))
+head(CEWL_final)
+```
+
+
+# Final Synthesis
+
+## Re-Check Data
+
+Check that we still have data for every individual, except for 254 and 304. 254 did not have his cloacal temperature taken before escaping, thus could not be included in any capture day models. 304 was omitted completely because he was accidentally recaptured and we only want his data from the first time he was included in the experiment.
+
+I can check this by comparing a list of the individual IDs used (201-341) to the individual IDs in our final dataset, then selecting/printing the IDs used that are not in the final dataset.
+
+```{r}
+c(seq(201, 341, 1))[c(seq(201, 341, 1)) %nin% unique(CEWL_final$individual_ID)]
+```
+
+We expected individuals 254 and 304 not to be in the final dataset, so all is as expected.
+
+Check how many observations were used to calculate mean CEWL for each individual on each date:
+
+```{r}
+outliers_omitted %>%
+  group_by(individual_ID, date) %>%
+  summarise(n = n()) %>% 
+  arrange(n)
+```
+
+
+Between 3-6, awesome! That means we omitted 2 or less replicates for each individual on each measurement date.
+
+
+## Export
+
+Save the cleaned data for models and figures.
 
 ```{r}
 write.csv(CEWL_final, "./data/CEWL_dat_all_clean.csv")
@@ -700,26 +852,13 @@ write.csv(CEWL_final, "./data/CEWL_dat_all_clean.csv")
 
 
 
-*other stuff*
-after finishing CEWL, go straight to avg osml
-do very simple invert analysis of just water content over time
 
 
+## Reporting
 
+We omitted a total of 136 measurements from our CEWL dataset. We realized post-experiment that individual 304 was a recapture, and had already undergone experimental conditions once before, so his data was completely excluded. One measurement attributed to individual 233 on June 26 was made 1.5 hours later than his other CEWL measurements and cloacal temperature on that day, which would represent a major deviation from our protocol. This measurement could not be confidently, truly attributed to individual 233, thus was omitted. We used the boxplot.stats function in R to extract outliers from each set of technical replicates, totaling 134 points qualifying as outliers which were thus removed.
 
-
-
-
-# For Paper
-
-Report data omissions:
-- recaptured individual 304
-- msmt made 1.5 hours later from other msmts for an individual on a day (June 26, indiv 233)
-
-
-
-
-
+After data cleaning, every individual still had at least 3 technical replicates for each of their measurement dates, with most individuals retaining all 5 original replicates. The distribution of coefficient of variation values was more-heavily distributed between 0-10% after data cleaning than before.
 
 
 

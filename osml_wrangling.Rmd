@@ -136,6 +136,7 @@ not_reps
 
 # check total obs still add to original 1484
 nrow(enuf_reps) + nrow(not_reps)
+nrow(enuf_reps) + nrow(not_reps) == nrow(osml_reps)
 ```
 
 
@@ -146,24 +147,80 @@ We want the Coefficient of Variation (CV) among our technical replicates to be s
 ```{r}
 CVs <- enuf_reps %>%
   group_by(individual_ID, date_blood_drawn) %>%
-  summarise(osml_mean = mean(osmolality_mmol_kg),
-            osml_SD = sd(osmolality_mmol_kg),
-            CV = (osml_SD/osml_mean) *100,
-            min_osml = min(osmolality_mmol_kg),
-            max_osml = max(osmolality_mmol_kg),
-            osml_range = max_osml - min_osml
+  summarise(mean = mean(osmolality_mmol_kg),
+            SD = sd(osmolality_mmol_kg),
+            CV = (SD/mean) *100,
+            min = min(osmolality_mmol_kg),
+            max = max(osmolality_mmol_kg),
+            range = max - min
             )
 summary(CVs)
 hist(CVs$CV)
-hist(CVs$osml_range) 
+hist(CVs$range) 
 ```
 
 Ideally, CV would be 10-15%. If it's larger, and one of the replicates is very different than the others, we can assume that the replicates that are closer together are more reliable. 
 
-The CV is >10 for only one lizard on one date, so our replicates are likely to accurately represent the true value. We don't want to lose accuracy by searching for precision, so we will only remove the one point driving the enormous CV value.
+The CV is >10 for only one lizard on one date, so our replicates are already likely to accurately represent the true value. We don't want to lose accuracy by searching for precision, so we will only remove the one point driving the enormous CV value.
 
 
 ## Find Outlier
+
+```{r}
+# write function to find outliers for each individual on each date
+find_outliers <- function(df) {
+  
+  # initiate dataframe to compile info and list to compile plots
+  outliers <- data.frame()
+  #boxplots <- list()
+
+  # initiate a for loop to go through every who in df
+  for(indiv_ch in unique(df$individual_ID)) {
+    
+    # select data for only the individual of interest
+    df_sub <- df %>%
+      dplyr::filter(individual_ID == as.numeric(indiv_ch))
+    
+    # make a boxplot
+    df_sub %>%
+      ggplot(.) +
+      geom_boxplot(aes(x = as.factor(date_blood_drawn),
+                       y = osmolality_mmol_kg,
+                       fill = as.factor(date_blood_drawn))) +
+      ggtitle(paste("Individual", indiv_ch)) +
+      theme_classic() -> plot
+    
+    # print/save
+    print(plot)
+    #boxplots[[indiv_ch]] <- plot
+    
+    # extract outliers
+    outs <- df_sub %>%
+      group_by(individual_ID, date_blood_drawn) %>%
+      summarise(outs = boxplot.stats(osmolality_mmol_kg)$out)
+    
+    # add to running dataframe of outliers
+    outliers <- outliers %>%
+      rbind(outs)
+  }
+  #return(boxplots)
+  return(outliers)
+}
+```
+
+
+Now apply the function to the data:
+
+```{r, fig.show="hold", out.width="50%"}
+par(mfrow = c(71, 2))
+outliers_found <- find_outliers(enuf_reps)
+outliers_found
+par(mfrow = c(1, 1))
+```
+
+Based on boxplots, there are no outliers, but we still want to find and omit the point severely increasing CV for one individual on one date.
+
+
 
 Determine which replicate is an outlier and pulls the CV above our acceptable range (10-15%).
 

@@ -646,26 +646,36 @@ test_rep_nos$individual_ID %in% weird_n$individual_ID
 
 Individuals 233 (sum 11) and 254 (sum 6) are missing from the weird_n list, but still have an incorrect replicate sum. I just previously discovered that 233 is missing his fourth replicate, and 254 only had three replicates measured before he escaped. 
 
-So, every individual on every date has the correct number of and properly labeled replicates. Now the replicates can be interrogated for outliers and influential points, then averaged into one observation for each individual on each date.
+So, every individual on every date has the correct number of and properly labeled replicates. Now the replicates can be interrogated for outliers, then averaged into one observation for each individual on each date.
 
 
 # Replicates
 
-## Check Distribution
-## Technical Replicates COV
+## Assess Variation
+
+We want the Coefficient of Variation (CV) among our technical replicates to be small. We need to calculate it to identify whether there may be outliers.
 
 ```{r}
-COVs <- all_CEWL_data %>%
+CVs <- all_CEWL_data_edited2 %>%
   group_by(individual_ID, date) %>%
   summarise(CEWL_mean = mean(CEWL_g_m2h),
             CEWL_SD = sd(CEWL_g_m2h),
-            COV = (CEWL_SD/CEWL_mean) *100
+            CV = (CEWL_SD/CEWL_mean) *100,
+            CEWL_min = min(CEWL_g_m2h),
+            CEWL_max = max(CEWL_g_m2h),
+            CEWL_range = CEWL_max - CEWL_min
             )
-summary(COVs)
-sd(COVs$CEWL_mean)
-sd(COVs$COV)
+summary(CVs)
+hist(CVs$CV)
+hist(CVs$CEWL_range) 
 ```
 
+We expect CV for technical replicates to be < 10-15%, so we must determine whether the CVs > 15% are due to outlier replicates.
+
+
+## Find Outliers
+
+need to research...
 
 ## Remove Outliers
 

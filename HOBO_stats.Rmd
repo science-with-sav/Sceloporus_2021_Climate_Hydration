@@ -8,7 +8,7 @@ toc: TRUE
 
 # Packages
 
-```{r setup, echo=T, results='hide', message=FALSE}
+```{r setup, include = TRUE, message = FALSE}
 `%nin%` = Negate(`%in%`)
 if (!require("tidyverse")) install.packages("tidyverse") 
 library("tidyverse")

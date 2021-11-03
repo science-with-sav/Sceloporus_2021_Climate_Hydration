@@ -9,16 +9,10 @@ toc: TRUE
 
 # Packages
 
-```{r setup, include=FALSE}
+```{r setup, include = TRUE}
 `%nin%` = Negate(`%in%`)
 if (!require("tidyverse")) install.packages("tidyverse")
 library("tidyverse") # workflow and plots
-if (!require("UsingR")) install.packages("UsingR")
-library("UsingR")
-if (!require("lme4")) install.packages("lme4")
-library("lme4") # for LMMs
-if (!require("lmerTest")) install.packages("lmerTest")
-library("lmerTest") # for p-values
 ```
 
 

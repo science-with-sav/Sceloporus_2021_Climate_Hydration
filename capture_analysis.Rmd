@@ -9,7 +9,7 @@ toc: TRUE
 
 # Packages
 
-```{r setup, include = TRUE}
+```{r setup, include = TRUE, message = FALSE}
 if (!require("tidyverse")) install.packages("tidyverse")
 library("tidyverse") # workflow and plots
 if (!require("zoo")) install.packages("zoo")
@@ -37,85 +37,61 @@ library("broom.mixed") # lmer model export
 
 # Background and Goals
 
-This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Robin Bedard, Tess McIntyre, and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus and and in Poly Canyon. This R file analyzes hydrophysiological variation at the time of capture. Please refer to **doi:** for the published scientific journal article and full details.
+This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus and in Poly Canyon. This R file analyzes the state and variation of osmotic balance and regulation at the time of capture. Please refer to **doi:** for the published scientific journal article and full details.
 
 
 # Data
 
 ## Load
 
-Read-in and attach all data. Details described in the sub-sections below.
+Read-in and attach all data. Details described later.
 
 ```{r}
-full_dat <- read.csv("./data/mass_hct.csv", # filename
+        # mass and hematocrit data
+full_dat <- read.csv("./data/mass_hct_notes.csv", # filename
                              na.strings=c("","NA") # fix empty cells
                              ) %>%
+        # format date to enable joining by date
   mutate(measurement_date = as.character(as.Date(measurement_date, 
                                           format = "%m/%d/%y"))
          ) %>%
+        # join plasma osmolality data
   left_join(read.csv("./data/osml_means_clean.csv", # filename
                              na.strings=c("","NA") # fix empty cells
             ), by = c("individual_ID", 
                       "measurement_date" = "date_blood_drawn")
             ) %>%
+        # join CEWL data
   left_join(read.csv("./data/CEWL_dat_all_clean.csv", # filename
                              na.strings=c("","NA") # fix empty cells
             ), by = c("individual_ID", 
                       "measurement_date" = "date")
             ) %>%
+        # select variables of interest only
   dplyr::select(measurement_date,
                 time_captured,
                 time_processed,
-                time_c_temp = temp_time, # will be different
+                time_c_temp,
                 type, day, 
                 individual_ID,
                 mass_g, 
-                blood_sample_eye, hemolyzed,
+                hemolyzed,
                 hematocrit_percent, 
-                osmolality_mmol_kg,
-                CEWL_g_m2h,
+                osmolality_mmol_kg_mean,
+                CEWL_g_m2h_mean = CEWL_g_m2h,
                 cloacal_temp_C
                 ) %>%
-  mutate(# put date and time together
-                #collect_date_time = (paste(date, collect_time)), 
-                # replace some date-time values that have missing times
-                #collect_date_time = replace(collect_date_time, 
-                               #collect_date_time == "4/5/21 NA", NA),
-                # correctly format date-time variable
-                #collect_date_time = as.POSIXct(collect_date_time, 
-                 #                              format = "%m/%d/%y %H:%M"),
-                # correctly format date-only variable
-                measurement_date = as.Date(measurement_date, 
-                                          format = "%Y-%m-%d"),
-                # correctly format time variables
-                # format extracts just time after posix adds arbitrary date
-                time_captured = (as.POSIXct(time_captured, 
-                                           format = "%H:%M")),
-                time_processed = (as.POSIXct(time_processed, 
-                                              format = "%H:%M")),
-                time_c_temp = (as.POSIXct(time_c_temp, 
-                               format = "%Y-%m-%d %H:%M:%S")),
-                # set categorical variables as factors
-                type = as.factor(type),
-                day = as.factor(day),
-                individual_ID = as.factor(individual_ID),
-                blood_sample_eye = as.factor(blood_sample_eye),
-                hemolyzed = as.factor(hemolyzed),
-                # set numeric measurements as numeric
-                mass_g = as.numeric(mass_g),
-                hematocrit_percent = as.numeric(hematocrit_percent),
-                osmolality_mmol_kg = as.numeric(osmolality_mmol_kg),
-                CEWL_g_m2h = as.numeric(CEWL_g_m2h),
-                cloacal_temp_C = as.numeric(cloacal_temp_C)
-                ) %>%
+          # format date-time-related variables
+  mutate(measurement_date = as.Date(measurement_date, 
+                                    format = "%Y-%m-%d")) %>%
   group_by(individual_ID) %>%
+          # for each individual, extract capture date
   mutate(capture_date = min(measurement_date),
-         day_n = as.numeric(measurement_date - capture_date))# %>%
-  #dplyr::filter(day == 0) %>%
-  #dplyr::filter(complete.cases(individual_ID)) %>%
-  #dplyr::select(-notes)
+         day_n = as.numeric(measurement_date - capture_date))
 
 summary(full_dat)
+# check
+unique(full_dat$capture_date)
 ```
 
 
@@ -128,107 +104,73 @@ write.csv(full_dat, "./data/full_exp_data.csv")
 ```
 
 
-## Mass & Hematocrit
+## Format
 
-Variables in this dataframe:
-- measurement_date = date the measurements were taken, including capture day
+Extract only the data from capture day (1 row of observations for each individual) and format the data classes properly for analysis.
+
+```{r}
+capture_dat <- full_dat %>%
+          # select only data from capture days
+  dplyr::filter(day_n == 0) %>%
+  left_join(read.csv("./data/tmt_assignments.csv"),
+            by = "individual_ID") %>%
+          # put date and time together
+  mutate(capture_date_time = (paste(capture_date, time_captured)),
+         capture_date_time = as.POSIXct(capture_date_time, 
+                                        format = "%Y-%m-%d %H:%M"),
+          # correctly format time-only variables
+         time_captured = as.POSIXct(time_captured, 
+                                     format = "%H:%M"),
+         time_processed = as.POSIXct(time_processed, 
+                                      format = "%H:%M"),
+         time_c_temp = as.POSIXct(substr(time_c_temp, 12, 16), 
+                                  format = "%H:%M"),
+          # set categorical variables as factors
+         type = as.factor(type),
+         day = as.factor(day),
+         individual_ID = as.factor(individual_ID),
+         hemolyzed = as.factor(hemolyzed),
+          # set numeric measurements as numeric
+         mass_g = as.numeric(mass_g),
+         hematocrit_percent = as.numeric(hematocrit_percent),
+         osmolality_mmol_kg_mean = as.numeric(osmolality_mmol_kg_mean),
+         CEWL_g_m2h_mean = as.numeric(CEWL_g_m2h_mean),
+         cloacal_temp_C = as.numeric(cloacal_temp_C)
+                ) %>%
+  # make sure only complete data included
+  # this removes the data for individuals 304 (recapture) & 254 (escapee)
+  dplyr::filter(complete.cases(osmolality_mmol_kg_mean,
+                               CEWL_g_m2h_mean, cloacal_temp_C)) %>%
+  # remove experiment variables not relevant to capture analysis
+  dplyr::select(-trial_number, -temp_tmt, -humidity_tmt, 
+                -conclusion, -notes, 
+                -shed, -tail_broken, -died)
+summary(capture_dat)
+```
+
+
+
+
+## Variable Summary
+
+- measurement_date = date measurements were taken, including capture day
 - collection/capture time for each lizard
-- type = whether measurements were during experiment (exp) or after rehydration (post-rehab). For this R script/analysis, I'm only going to use capture day data.
-- individual ID for each lizard
-- which eye the blood sample was taken from
-- mass in grams
 - time_processed = when mass and blood draw were recorded
-- hematocrit_percent = percent of blood that's red blood cells (measured in CRITOCAP microhematocrit capillary tubes)
+- time_c_temp = the time when cloacal temperature was recorded, immediately after CEWL measurements
+- type = whether measurements were during experiment (exp) or after rehydration (post-rehab). For this R script/analysis, I'm only going to use capture day data, which is listed as "exp"
+- day = whether measurements are from capture day or post-experiment, which was recorded in relation to CEWL & cloacal temp data. All observations used for this analysis will be from capture day
+- individual ID for each lizard
+- mass in grams
 - hemolyzed = whether or not red blood cells burst and contaminated plasma
-- any notes (will remove to keep dataframe clean)
+- hematocrit_percent = percent of blood that's red blood cells (measured in CRITOCAP microhematocrit capillary tubes)
+- osmolality_mmol_kg_mean = the mean of 1-3 technical replicates of plasma osmolality measurements taken from plasma extracted from our blood samples and run on a VAPRO vapor pressure osmometer
+- CEWL_g_m2h_mean = the mean of 3-5 technical replicates, after outliers were omitted, of CEWL measurements taken in the same area of the dorsum
+- cloacal_temp_C = cloacal temperature recorded immediately after CEWL measurements
+- capture_date = date of capture. For this dataset, it should be the same as measurement date
+- day_n = numeric day of measurement. In this dataset, it should always be zero
+- capture_date_time = combination of capture date and time
+- SVL_mm = snout-to-vent length in mm
 
-```{r}
-# load data, format, and select only capture data
-
-# these two should be the same
-unique(mass_hct_dat$capture_date)
-unique(mass_hct_dat$measurement_date)
-```
-
-
-
-## Osmolality
-
-```{r}
-osml_capture <- read.csv("./data/osml_means_clean.csv",
-                         na.strings=c("","NA")
-                         ) %>%
-  # reformat data
-  dplyr::mutate(# paste and format date-time variable
-                CEWL_date_time = as.POSIXct(paste(date, Time), 
-                                            format = "%m/%d/%y %I:%M:%S %p"),
-                # reformat date only
-                date = as.Date(date, format = "%m/%d/%y"),
-                # reformat time 
-                # format extracts just time after posix adds arbitrary date
-                # but then it's a character again... 
-                Time = format(as.POSIXct(Time, format = "%I:%M:%S %p"), 
-                              format = "%H:%M:%S"),
-                # format individual ID as a factor
-                individual_ID = as.factor(individual_ID),
-                # set body region as a factor variable after getting only the consistent characters due to typos
-                region = as.factor(substring(region, 1, 4)),
-                # convert RH to absolute humidity
-                abs_humidity_g_m3 = ((6.112 * exp((17.67*ambient_temp_C)/(ambient_temp_C + 243.5)) * ambient_RH_percent * 2.1674) / (273.15 + ambient_temp_C))
-                ) %>%
-  # remove cols not relevant to stats
-  dplyr::select(-Status) %>%
-  # remove any rows with missing values
-  dplyr::filter(complete.cases(.))
-summary(CEWL)
-```
-
-
-
-## CEWL Data
-
-Variables in this dataframe are:
-- date
-- time
-- date_time combined variable
-- individual_ID for each lizard measured
-- region = where on the body CEWL was measured
-- TEWL_g_m2h = CEWL measurement value in grams/sq-meter/hour
-- ambient_temp_C = temperature when and where measurement was taken
-- ambient_RH_percent = relative humidity when and where measurement was taken
-- abs_humidity = computed from RH using formula on this website: https://carnotcycle.wordpress.com/2012/08/04/how-to-convert-relative-humidity-to-absolute-humidity/
-
-```{r}
-CEWL_capture <- read.csv("./data/CEWL_dat_all_clean.csv",
-                         na.strings=c("","NA")
-                         ) %>%
-  # reformat data
-  dplyr::mutate(# paste and format date-time variable
-                CEWL_date_time = as.POSIXct(paste(date, Time), 
-                                            format = "%m/%d/%y %I:%M:%S %p"),
-                # reformat date only
-                date = as.Date(date, format = "%m/%d/%y"),
-                # reformat time 
-                # format extracts just time after posix adds arbitrary date
-                # but then it's a character again... 
-                Time = format(as.POSIXct(Time, format = "%I:%M:%S %p"), 
-                              format = "%H:%M:%S"),
-                # format individual ID as a factor
-                individual_ID = as.factor(individual_ID),
-                # set body region as a factor variable after getting only the consistent characters due to typos
-                region = as.factor(substring(region, 1, 4)),
-                # convert RH to absolute humidity
-                abs_humidity_g_m3 = ((6.112 * exp((17.67*ambient_temp_C)/(ambient_temp_C + 243.5)) * ambient_RH_percent * 2.1674) / (273.15 + ambient_temp_C))
-                ) %>%
-  # remove cols not relevant to stats
-  dplyr::select(-Status) %>%
-  # remove any rows with missing values
-  dplyr::filter(complete.cases(.))
-summary(CEWL)
-```
-
-
-## Filter Data Capture Only 
 
 ## Compute Scaled Mass Index
 
@@ -236,121 +178,69 @@ This is also known as the body condition index, or log-log residuals.
 
 I calculate as described by: Peig, J., & Green, A. J. (2009). New perspectives for estimating body condition from mass/length data: The scaled mass index as an alternative method. Oikos, 118(12), 1883–1891. https://doi.org/10.1111/j.1600-0706.2009.17643.x
 
-### Step 1: mass ~ SVL
-
-plot:
+### Step 1: Simple Linear Regression
 
 ```{r}
-morpho_blood_dat %>% 
-  ggplot(data = .) + 
-  geom_point(aes(x = SVL_mm,
-                 y = mass_g, 
-                 ), 
-             size = 1, 
-             alpha = 0.6) + 
-  stat_smooth(aes(x = SVL_mm, 
-                  y = mass_g, 
-                  ), 
-              formula = y ~ x, 
-              method = "lm", 
-              color = "gray",
-              se = F, 
-              size = 1.6, 
-              alpha = 1 ) + 
-  theme_classic() + 
-  xlab("SVL") + 
-  ylab("Mass") + 
-  theme(text = element_text(color = "black", 
-                            family = "sans", 
-                            size = 12),
-        axis.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 10),
-        legend.text.align = 0
-)
-```
-
-create a simple linear regression 
-
-```{r}
-mass_SVL_SLR <- lm(data = morpho_blood_dat, mass_g ~ SVL_mm)
+mass_SVL_SLR <- lm(data = capture_dat, mass_g ~ SVL_mm)
 summary(mass_SVL_SLR)
 ```
 
-look for outliers by calculating residuals
+
+### Step 2: Identify Outliers
 
 ```{r}
-mass_SVL_SLR_residuals <- morpho_blood_dat %>%
-  # not working with function, so just compute by hand... 
-  mutate(#y_hat = predict(mass_SVL_SLR),
-         #e = residuals(mass_SVL_SLR),
-         y_hat = 0.40988*SVL_mm - 16.04514,
-         e = y_hat - mass_g
-         ) %>%
-  dplyr::filter(e < 3 & e > -3)
+plot(mass_SVL_SLR)
 ```
 
-plot residuals
+The conditions of linearity, equal error variance, and normality are all satisfied. It doesn't look like any residuals are >3 or <-3.
 
 ```{r}
-ggplot(data = mass_SVL_SLR_residuals, 
-       aes(x = e)) +
-  geom_histogram() + 
-  theme_classic() + 
-  xlab("residuals (e)")
-ggplot(data = mass_SVL_SLR_residuals, 
-       aes(x = e)) +
-  geom_boxplot() + 
-  theme_classic() + 
-  scale_x_continuous(breaks = c(seq(-5, 5, 1))) +
-  xlab("residuals (e)") +
-  geom_vline(xintercept = -3, lty = 1) +
-  geom_vline(xintercept = 3, lty = 1)
+boxplot(residuals(mass_SVL_SLR))
+hist(residuals(mass_SVL_SLR))
 ```
 
-From the histogram, there are clearly points disconnected from the main curve. In the boxplot, we can distinguish that those outlying points have residuals <-3.5 and >3, so I'll go back and filter those out in the code chunk before making the distribution plots. Now the boxplot has no dots outside the main distribution.
+From the boxplot, there is one individual with a much higher residual than the rest of the distribution. The histogram looks fine, and incredibly normally distributed.
 
-And, check mean residual value:
+Check average residual value:
 
 ```{r}
-mass_SVL_SLR_residuals %>%
-  summarise(mean_res = mean(e),
-            med = median(e))
+mean(residuals(mass_SVL_SLR))
+median(residuals(mass_SVL_SLR))
 ```
 
-Not zero, which is not ideal, but pretty close. 
+The mean is basically zero and the median is pretty close to zero, which is very good.
 
-Next, check for high leverage points:
+Check for high leverage points:
 
 ```{r}
 # compute values for observations 
-high_leverage <- data.frame(H = hatvalues(mass_SVL_SLR)
-                            ) %>% mutate(row = rownames(.))
+high_leverage <- data.frame(H = hatvalues(mass_SVL_SLR)) %>% 
+  mutate(row = row_number())
 
 # compute cutoff value 
 h_bar <- (3*sum(high_leverage$H))/nrow(high_leverage)
 
 # add to original dataframe 
 # see which observations have extremely high leverage (if any)
-high_leverage_dat <- mass_SVL_SLR_residuals %>%
-  mutate(row = rownames(.)) %>%
+high_leverage_dat <- capture_dat %>%
+  mutate(row = row_number()) %>%
   left_join(., high_leverage, by = "row") %>%
   dplyr::filter(H > h_bar) 
 high_leverage_dat
 ```
 
-The points for individuals 4, 5, 6, 8, 9, 57, 64, 67, 87, and 123 seem to be high-leverage, so we will try removing them.
+No points are considered high leverage, which is fantastic.
 
 Check for influential points based on Cook's distance:
 
 ```{r}
 # get Cook's distance 
-cooks <- data.frame(c = cooks.distance(mass_SVL_SLR) # specify model name 
-                    ) %>% mutate(row = rownames(.))
+cooks <- data.frame(c = cooks.distance(mass_SVL_SLR)) %>% 
+  mutate(row = row_number())
 
 # add to original dataframe 
-influential <- mass_SVL_SLR_residuals %>%
-  mutate(row = rownames(.)) %>% 
+influential <- capture_dat %>%
+  mutate(row = row_number()) %>% 
   left_join(., cooks, by = "row")
 
 # see moderately influential points 
@@ -359,100 +249,44 @@ cook_mod_inf <- influential %>%
 cook_mod_inf
 ```
 
-There are no even moderately-infuential points, at least based on Cook's distance, so there's nothing to potentially remove.
+There are no infuential points based on Cook's distance, so there's nothing to potentially remove.
 
-Create new SLR and check mean residual value after removing outliers and high leverage points:
+We could remove the one outlier found using the boxplot, but it's the only one, so we will leave it in the dataset. No points were indicated to be outliers based on residuals or a histogram, and there were no high leverage or influential points. Thus I can create a log-log model using the data as-is. Observation omissions are unlikely to increase generalizability.
 
-```{r}
-# create new dataframe with filtered data 
-cleaned_SMI_dat <- mass_SVL_SLR_residuals %>% # already had outliers removed
-  mutate(row = rownames(.)) %>%
-  # add high leverage point info
-  left_join(., high_leverage, by = "row") %>%
-  # remove high leverage points
-  dplyr::filter(H < h_bar) 
 
-# model
-mass_SVL_SLR2 <- lm(data = cleaned_SMI_dat, mass_g ~ SVL_mm)
-summary(mass_SVL_SLR2)
-
-# compute residuals
-mass_SVL_SLR2_residuals <- cleaned_SMI_dat %>%
-  mutate(y_hat = predict(mass_SVL_SLR2),
-         e = residuals(mass_SVL_SLR2))
-
-# check residuals values
-mass_SVL_SLR2_residuals %>%
-  summarise(mean_res = mean(e),
-            med = median(e))
-```
-
-The residuals are much much smaller, so I believe it is the right choice to remove the high leverage points. The "cleaned_SMI_dat" will be used to calculate the equation for SMI.
  
- 
-### Step 2: make log-log relationship
-
-plot and calculate SLR for filtered data
+### Step 3: log-log Regression
 
 ```{r}
-cleaned_SMI_dat %>% 
-  ggplot(data = .) + 
-  geom_point(aes(x = log(SVL_mm),
-                 y = log(mass_g), 
-                 ), 
-             size = 1, 
-             alpha = 0.6) + 
-  stat_smooth(aes(x = log(SVL_mm), 
-                  y = log(mass_g), 
-                  ), 
-              formula = y ~ x, 
-              method = "lm", 
-              color = "gray",
-              se = F, 
-              size = 1.6, 
-              alpha = 1 ) + 
-  theme_classic() + 
-  xlab("log-SVL") + 
-  ylab("log-Mass") + 
-  theme(text = element_text(color = "black", 
-                            family = "sans", 
-                            size = 12),
-        axis.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 10),
-        legend.text.align = 0
-)
-```
-
-SLR
-
-```{r}
-log_mass_SVL_SLR <- lm(data = cleaned_SMI_dat, 
+log_mass_SVL_SLR <- lm(data = capture_dat, 
                        log(mass_g) ~ log(SVL_mm))
 summary(log_mass_SVL_SLR)
 ```
 
-compute standardized major axis using this regression equation:
+
+### Step 4: Extract Values
+
+compute standardized major axis using the log-log regression equation:
 
 ```{r}
-r <- sqrt(0.8391) # Pearson's correlection coefficient (sqrt of R-squared)
-b_OLS <- 3.0611 # regression slope
+r <- sqrt(0.5699) # Pearson's correlection coefficient (sqrt of R-squared)
+b_OLS <- 2.0013 # regression slope
 b_SMA <- b_OLS/r
 ```
 
-also get a value for L0:
+mean length in capture data:
 
 ```{r}
-L0 <- mean(cleaned_SMI_dat$SVL_mm)
+L0 <- mean(capture_dat$SVL_mm)
 ```
 
 
-### Step 3: calculate scaled mass index
+### Step 5: Calculate Scaled Mass Index
 
 (And join weather data.)
 
 ```{r}
-morpho_blood_SMI <- morpho_blood_dat %>%
+capture_dat_SMI <- capture_dat %>%
   mutate(SMI = mass_g * ((L0/SVL_mm) ^ b_SMA)) %>%
   left_join(all_times_weather, 
             by = c("collect_date_time")
@@ -465,7 +299,7 @@ morpho_blood_SMI <- morpho_blood_dat %>%
 Look at the difference between regular mass and SMI:
 
 ```{r}
-morpho_blood_SMI %>% 
+capture_dat_SMI %>% 
   ggplot(data = .) + 
   geom_point(aes(x = mass_g,
                  y = SMI, 
@@ -483,36 +317,38 @@ morpho_blood_SMI %>%
               alpha = 1 ) + 
   theme_classic() + 
   xlab("Mass") + 
-  ylab("SMI") + 
-  theme(text = element_text(color = "black", 
-                            family = "sans", 
-                            size = 12),
-        axis.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 10),
-        legend.text.align = 0
-)
+  ylab("SMI")
 ```
 
 
 ## Weather Data
 
-This data was obtained from http://www.itrc.org/databases/precip/ (Adcon Server Data) to test the effect of ambient conditions on CEWL. This is different from the ambient conditions already measured with CEWL, which are the temperature and humidity around the measurement device at the time of measurement. We think that the temperature, humidity, wind speed, and solar radiation the lizard was exposed to prior to capture may also affect CEWL.
+This data was obtained from http://www.itrc.org/databases/precip/ (Adcon Server Data) to test the effect of ambient conditions on CEWL.
 
-We didn't have a daylight savings time switchover during this study, so we don't need to worry about incorporating. 
+Load and format: 
 
 ```{r}
-# load in csvs and put all in one dataframe
-weather <- read.csv("./data/weather/4_5Weather.csv", sep = ';') %>%
-  rbind(read.csv("./data/weather/4_19Weather.csv", sep = ';')) %>%
-  rbind(read.csv("./data/weather/5_3Weather.csv", sep = ';')) %>%
-  rbind(read.csv("./data/weather/5_10Weather.csv", sep = ';')) %>%
-  rbind(read.csv("./data/weather/5_17Weather.csv", sep = ';')) %>%
-  # add a variable for combined date-time
-  mutate(collect_date_time = as.POSIXct(paste(Date, Time),
-                                format = "%m/%d/%y %I:%M:%S %p")) %>%
+weather <- read.csv("./data/weather.csv", sep = ';') %>%
+         # add a variable for combined date-time
+  mutate(capture_date_time = as.POSIXct(paste(date, time),
+                                format = "%m/%d/%y %I:%M:%S %p"),
+         # convert temp F to C
+         temp_C = fahrenheit.to.celsius(temperature_F, round = 2),
+         # compute vapor pressure deficit
+         VPD
+         ) %>%
   # remove lonely date and time
   dplyr::select(-Date, -Time)
+
+######## LEFT OFF HERE
+######### I THINK I SHOULD ADD NEW VARIABLES AFTER INTERPOLATING
+
+temp_K_interpol = temp_C_interpol + 273.15,
+         e_s_kPa_int = 0.611*exp((2500000/461.5)*
+                                  ((1/273)-(1/temp_K_interpol))),
+         e_a_kPa_int = e_s_kPa_int * (RH_percent_interpol/100),
+         VPD_kPa_int = e_s_kPa_int - e_a_kPa_int
+
 ```
 
 The weather data is only every 15 minutes, but I want to match it to any minute measurement, so I need to interpolate the values for each minute.

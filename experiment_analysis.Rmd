@@ -12,12 +12,12 @@ toc: TRUE
 `%nin%` = Negate(`%in%`)
 if (!require("tidyverse")) install.packages("tidyverse")
 library("tidyverse") # workflow and plots
-if (!require("UsingR")) install.packages("UsingR")
-library("UsingR")
 if (!require("lme4")) install.packages("lme4")
 library("lme4") # for LMMs
 if (!require("lmerTest")) install.packages("lmerTest")
 library("lmerTest") # for p-values
+if (!require("ggpubr")) install.packages("ggpubr")
+library("ggpubr") # for multi-ggplot figs
 if (!require("broom")) install.packages("broom")
 library("broom") # lmer model export
 if (!require("broom.mixed")) install.packages("broom.mixed")
@@ -27,7 +27,7 @@ library("broom.mixed") # lmer model export
 
 # Background and Goals
 
-This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Robin Bedard, Tess McIntyre, and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus and and in Poly Canyon. This R file analyzes the effect of experimental climate treatments on their hydrophysiology. Please refer to **doi:** for the published scientific journal article and full details.
+This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus and in Poly Canyon. This R file analyzes the effect of experimental climate treatments on their body condition, osmotic balance, and osmoregulation. Please refer to **doi:** for the published scientific journal article and full details.
 
 
 # Data

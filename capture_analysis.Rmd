@@ -16,16 +16,10 @@ if (!require("zoo")) install.packages("zoo")
 library("zoo") # interpolation using na.approx
 if (!require("weathermetrics")) install.packages("weathermetrics")
 library("weathermetrics") # F to C conversion
-if (!require("PerformanceAnalytics")) install.packages("PerformanceAnalytics") 
-library("PerformanceAnalytics") # pretty multicollinearity plots
-if (!require("UsingR")) install.packages("UsingR")
-library("UsingR")
 if (!require("lme4")) install.packages("lme4")
 library("lme4") # for LMMs
 if (!require("lmerTest")) install.packages("lmerTest")
 library("lmerTest") # for p-values
-if (!require("onewaytests")) install.packages("onewaytests")
-library("onewaytests") # for Brown-Forsythe test
 if (!require("ggpubr")) install.packages("ggpubr")
 library("ggpubr") # for multi-ggplot figs
 if (!require("broom")) install.packages("broom")

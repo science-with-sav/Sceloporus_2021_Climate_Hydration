@@ -172,6 +172,91 @@ summary(capture_dat)
 - SVL_mm = snout-to-vent length in mm
 
 
+
+## Weather Data
+
+This data was obtained from http://www.itrc.org/databases/precip/ (Adcon Server Data) to test the effect of ambient conditions on CEWL.
+
+Load and format: 
+
+```{r}
+weather <- read.csv("./data/weather.csv", sep = ';') %>%
+         # add a variable for combined date-time
+  mutate(capture_date_time = as.POSIXct(paste(date, time),
+                                format = "%m/%d/%y %I:%M %p"))
+```
+
+The weather data is only every 15 minutes, but I want to match it to any minute measurement, so I need to interpolate the values for each minute.
+
+First, make a separate dataframe with every minute on each capture day.
+
+```{r}
+all_times <- data.frame(capture_date_time = c(
+                           # June 16
+                           seq(from = as.POSIXct("2021-06-16 07:00"),
+                               to = as.POSIXct("2021-06-16 19:00"),
+                               by="min"),
+                           # June 26
+                           seq(from = as.POSIXct("2021-06-26 07:00"),
+                               to = as.POSIXct("2021-06-26 19:00"),
+                               by="min"),
+                           # July 20
+                           seq(from = as.POSIXct("2021-07-20 07:00"),
+                               to = as.POSIXct("2021-07-20 19:00"),
+                               by="min"),
+                           # August 8
+                           seq(from = as.POSIXct("2021-08-08 07:00"),
+                               to = as.POSIXct("2021-08-08 19:00"),
+                               by="min"),
+                           # August 22
+                           seq(from = as.POSIXct("2021-08-22 07:00"),
+                               to = as.POSIXct("2021-08-22 19:00"),
+                               by="min")
+                           ))
+
+```
+
+Next, merge the weather data into the times dataframe and interpolate the temperature and humidity between measurements.
+
+```{r}
+weather_every_minute <- all_times %>% # time only dataframe
+  # add weather measurements based on matching date-time
+  left_join(weather, by = 'capture_date_time') %>%
+         # convert temperature units F->C
+  mutate(temp_C = fahrenheit.to.celsius(temperature_F, round = 2),
+         # interpolate temperatures
+         temp_C_interpol = na.approx(temp_C),
+         # also get temperature C-> K
+         temp_K_interpol = temp_C_interpol + 273.15,
+         # interpolate humidities
+         RH_percent_interpol = na.approx(relative_humidity_percent),
+         # interpolate Wind Speeds
+         wind_mph_interpol = na.approx(wind_speed_mph),
+         # interpolate solar radiation
+         solar_rad_W_sqm_interpol = na.approx(solar_radiation_W_sqm),
+         # compute vapor pressure deficit
+         # find saturation level first
+         e_s_kPa_int = 0.611*exp((2500000/461.5)*
+                                  ((1/273)-(1/temp_K_interpol))),
+         # actual vapor pressure
+         e_a_kPa_int = e_s_kPa_int * (RH_percent_interpol/100),
+         # VPD
+         VPD_kPa_int = e_s_kPa_int - e_a_kPa_int
+         ) %>%
+  # keep only the relevant variables
+  dplyr::select(capture_date_time, 
+                temp_C_interpol, 
+                RH_percent_interpol, 
+                VPD_kPa_int,
+                wind_mph_interpol, 
+                solar_rad_W_sqm_interpol)
+summary(weather_every_minute)
+```
+
+I will add the weather data in when I add the scaled mass index (computed next) to the dataframe.
+
+
+
 ## Compute Scaled Mass Index
 
 This is also known as the body condition index, or log-log residuals.
@@ -286,11 +371,19 @@ L0 <- mean(capture_dat$SVL_mm)
 (And join weather data.)
 
 ```{r}
-capture_dat_SMI <- capture_dat %>%
+capture_dat_plus <- capture_dat %>%
+  # compute SMI
   mutate(SMI = mass_g * ((L0/SVL_mm) ^ b_SMA)) %>%
-  left_join(all_times_weather, 
-            by = c("collect_date_time")
-            )
+  # join weather data
+  left_join(weather_every_minute, by = c("capture_date_time")) %>%
+  # clean up the dataframe
+  dplyr::select(capture_date, capture_date_time, individual_ID, # basics
+                mass_g, SVL_mm, SMI, # lizard size
+                hemolyzed, hematocrit_percent, osmolality_mmol_kg_mean, # blood
+                CEWL_g_m2h_mean, cloacal_temp_C, # CEWL
+                temp_C_interpol, VPD_kPa_int, wind_mph_interpol, solar_rad_W_sqm_interpol # weather
+                )
+summary(capture_dat_plus)
 ```
 
 
@@ -321,230 +414,239 @@ capture_dat_SMI %>%
 ```
 
 
-## Weather Data
 
-This data was obtained from http://www.itrc.org/databases/precip/ (Adcon Server Data) to test the effect of ambient conditions on CEWL.
 
-Load and format: 
 
-```{r}
-weather <- read.csv("./data/weather.csv", sep = ';') %>%
-         # add a variable for combined date-time
-  mutate(capture_date_time = as.POSIXct(paste(date, time),
-                                format = "%m/%d/%y %I:%M:%S %p"),
-         # convert temp F to C
-         temp_C = fahrenheit.to.celsius(temperature_F, round = 2),
-         # compute vapor pressure deficit
-         VPD
-         ) %>%
-  # remove lonely date and time
-  dplyr::select(-Date, -Time)
 
-######## LEFT OFF HERE
-######### I THINK I SHOULD ADD NEW VARIABLES AFTER INTERPOLATING
+# Quick Plots
 
-temp_K_interpol = temp_C_interpol + 273.15,
-         e_s_kPa_int = 0.611*exp((2500000/461.5)*
-                                  ((1/273)-(1/temp_K_interpol))),
-         e_a_kPa_int = e_s_kPa_int * (RH_percent_interpol/100),
-         VPD_kPa_int = e_s_kPa_int - e_a_kPa_int
+Plot very basic graphs to get an idea of what variables to incorporate into models and how.
 
-```
-
-The weather data is only every 15 minutes, but I want to match it to any minute measurement, so I need to interpolate the values for each minute.
-
-First, make a separate dataframe with every minute for each of those days.
+## Osmolality
 
 ```{r}
-all_times <- data.frame(collect_date_time = c(# April 5
-                           seq(from = as.POSIXct("2021-04-05 10:00"),
-                               to = as.POSIXct("2021-04-05 16:00"),
-                               by="min"),
-                           # April 19
-                           seq(from = as.POSIXct("2021-04-19 10:00"),
-                               to = as.POSIXct("2021-04-19 16:00"),
-                               by="min"),
-                           # April 26
-                           seq(from = as.POSIXct("2021-04-26 10:00"),
-                               to = as.POSIXct("2021-04-26 16:00"),
-                               by="min"),
-                           # May 3
-                           seq(from = as.POSIXct("2021-05-03 10:00"),
-                               to = as.POSIXct("2021-05-03 16:00"),
-                               by="min"),
-                           # May 10
-                           seq(from = as.POSIXct("2021-05-10 10:00"),
-                               to = as.POSIXct("2021-05-10 16:00"),
-                               by="min"),
-                           # May 17
-                           seq(from = as.POSIXct("2021-05-17 10:00"),
-                               to = as.POSIXct("2021-05-17 16:00"),
-                               by="min")
-                           ))
-
+plot(capture_dat_plus$individual_ID,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$capture_date,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$mass_g,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$SVL_mm,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$SMI,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$hemolyzed,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$hematocrit_percent,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$CEWL_g_m2h_mean,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$temp_C_interpol,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$VPD_kPa_int,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$wind_mph_interpol,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$solar_rad_W_sqm_interpol,
+     capture_dat_plus$osmolality_mmol_kg_mean)
 ```
 
-Next, merge the weather data into the times dataframe and interpolate the temperature and humidity between measurements.
+There does not appear to be a meaningful visual trend for plasma osmolality, so it will be interesting to see how the model selection process goes... There is definitely an increase in osmolality over the course of the season, though.
+
+
+## CEWL
 
 ```{r}
-all_times_weather <- all_times %>% # time only dataframe
-  # add weather measurements based on matching date-time
-  left_join(weather, by = 'collect_date_time') %>%
-  # convert temperature units, thanks America
-  mutate(temp_C = fahrenheit.to.celsius(Temperature_F, round = 2),
-         # interpolate temperatures
-         temp_C_interpol = na.approx(temp_C),
-         # interpolate humidities
-         RH_percent_interpol = na.approx(RH_percent),
-         # interpolate Wind Speeds
-         Wind_mph_interpol = na.approx(Wind_Speed_mph),
-         # interpolate solar radiation
-         Solar_rad_Wm2_interpol = na.approx(Pyranometer_W_m),
-         # compute absolute humidity
-         abs_humidity_g_m3_interpol = ((6.112 * exp((17.67*temp_C_interpol)/(temp_C_interpol + 243.5)) * RH_percent_interpol * 2.1674) / (273.15 + temp_C_interpol))
-         ) %>%
-  # keep only the relevant variables
-  dplyr::select(collect_date_time, 
-                temp_C_interpol, 
-                RH_percent_interpol, 
-                abs_humidity_g_m3_interpol,
-                Wind_mph_interpol, 
-                Solar_rad_Wm2_interpol)
-summary(all_times_weather)
+plot(capture_dat_plus$individual_ID,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$capture_date,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$mass_g,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$SVL_mm,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$SMI,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$hematocrit_percent,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$osmolality_mmol_kg_mean,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$cloacal_temp_C,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$temp_C_interpol,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$VPD_kPa_int,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$wind_mph_interpol,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$solar_rad_W_sqm_interpol,
+     capture_dat_plus$CEWL_g_m2h_mean)
 ```
 
-
-
-
-
-
-
-
-
-## Formatting
-
-filter for capture only, join weather and SMI
-Add CEWL and morpho_blood_SMI data together. 
-
-```{r}
-CEWL_data_full <- CEWL %>%
-  left_join(morpho_blood_SMI, 
-            by = c("date", "individual_ID")
-            ) 
-summary(CEWL_data_full)
-```
-
-redo the levels for body region:
-
-```{r}
-CEWL_data_full$region <- factor(CEWL_data_full$region,
-                                levels = c("dors", "vent", 
-                                           "head", "dewl", "mite"),
-                                labels = c("Dorsum", "Ventrum", "Head",
-                                           "Dewlap", "Mite Patch")
-                                )
-head(CEWL_data_full)
-```
-
-NOTE: running this more than once overrides things, so be careful
-
-
-
-## Check Integrity
-
-I want to test if any IDs are missing, and which ones if so.
-
-```{r}
-`%nin%` = Negate(`%in%`)
-test <- (c(seq(201, 321, by = 1)))
-lost <- test[test %nin% mass_hct_dat$individual_ID]
-lost
-```
-
-We have capture data for all individual_ID's.
-
-check that times are all within x of each other
-
-check number of obs per individual
-
+It looks like there are meaningful differences in CEWL across individuals/dates (probably confounded), and based on cloacal temp, capture temp, capture VPD, capture wind, and capture solar radiation.
 
 
 
 # LMMs
 
-## Hydration
 
-Based on the simple linear models and figures above, osmolality should be predicted by sample eye, hemolysis, date/week, individual, capture temperature, and capture absolute humidity.
-
-Prep dataframe for computing models:
-
-```{r}
-hydrat_mod_dat <- morpho_blood_SMI %>%
-  dplyr::select(date, 
-                individual_ID,
-                osmolality_mmol_kg,
-                temp_C_interpol,
-                abs_humidity_g_m3_interpol,
-                SMI,
-                hemolyzed
-                ) %>%
-  dplyr::filter(complete.cases(.))
-summary(hydrat_mod_dat)
-```
+## Osmolality
 
 
-### Multicollinearity
+### Model Selection
 
-First, check for multicollinearity among independent variables:
+Since there are large differences in osmolality by date, but we are interested in what's different among dates, rather than the capture date itself, we will include that as a random effect in the model.
 
-```{r}
-pairs(hydrat_mod_dat)
-
-# also make another plot with r-sq values
-# only continuous numeric variables work for this one
-hydrat_mod_dat %>% 
-  # select cont variables 
-  dplyr::select(temp_C_interpol,
-                abs_humidity_g_m3_interpol) %>% 
-  # multicollinearity plot
-  chart.Correlation(., histogram = F, pch = 19)
-```
-
-Date and individual_ID are collinear and should not both be used as fixed effects. But, individual_ID is a factor and there is not repetition in the dataset, so that's not feasible as a variable. Temperature and absolute humidity are the only continuous variables, and they are not badly collinear.
-
-
-### Models & Selection
-                
-Start with all the variables that were significant individually in SLRs. 
-
-```{r, hydration model 1}
-# model 1
-hydrat_mod1 <- lme4::lmer(data = hydrat_mod_dat,
+```{r, osmolality model 1}
+osml_mod1 <- lme4::lmer(data = capture_dat_plus,
                           # response variable
-                          osmolality_mmol_kg ~ 
-                            # start with interaction + singular effect
-                           abs_humidity_g_m3_interpol*temp_C_interpol +
-                            # other potentially important factor
-                            SMI +
-                            # random effects
-                            (1|date) + (1|hemolyzed)) 
-summary(hydrat_mod1)
-drop1(hydrat_mod1)
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          mass_g + SVL_mm + SMI +
+                          # blood sample traits
+                          hemolyzed + hematocrit_percent + 
+                          # weather at the time of capture
+                          temp_C_interpol * VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          # random effect
+                          (1|capture_date)) 
+summary(osml_mod1)
+drop1(osml_mod1)
 ```
 
-The model would improve (based on lower AIC) if we drop SMI as a predictor.
+The model would improve the most (based on lower AIC) if we drop hematocrit.
 
-```{r, hydration model 2}
-# model 2
-hydrat_mod2 <- lmerTest::lmer(data = hydrat_mod_dat,
-                          osmolality_mmol_kg ~ 
-                           abs_humidity_g_m3_interpol*temp_C_interpol +
-                            (1|date) + (1|hemolyzed)) 
-summary(hydrat_mod2)
+```{r, osmolality model 2}
+osml_mod2 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          mass_g + SVL_mm + SMI +
+                          # blood sample traits
+                          hemolyzed + 
+                          # weather at the time of capture
+                          temp_C_interpol * VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          # random effect
+                          (1|capture_date)) 
+summary(osml_mod2)
+drop1(osml_mod2)
 
 # compare to full model
-anova(hydrat_mod1, hydrat_mod2)
+anova(osml_mod1, osml_mod2)
 ```
+
+Next we can drop the interaction between temperature and VPD.
+
+```{r, osmolality model 3}
+osml_mod3 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          mass_g + SVL_mm + SMI +
+                          # blood
+                          hemolyzed +
+                          # weather at the time of capture
+                          temp_C_interpol + VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          # random effect
+                          (1|capture_date)) 
+summary(osml_mod3)
+drop1(osml_mod3)
+
+# compare to previous model
+anova(osml_mod2, osml_mod3)
+```
+
+
+Drop wind.
+
+```{r, osmolality model 4}
+osml_mod4 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          mass_g + SVL_mm + SMI +
+                          # blood
+                          hemolyzed +
+                          # weather at the time of capture
+                          temp_C_interpol + VPD_kPa_int +
+                          solar_rad_W_sqm_interpol +
+                          # random effect
+                          (1|capture_date)) 
+summary(osml_mod4)
+drop1(osml_mod4)
+
+# compare to previous model
+anova(osml_mod3, osml_mod4)
+```
+
+Next drop mass, SMI, and whether a sample is hemolyzed.
+
+```{r, osmolality model 5}
+osml_mod5 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm + 
+                          # weather at the time of capture
+                          temp_C_interpol + VPD_kPa_int +
+                          solar_rad_W_sqm_interpol +
+                          # random effect
+                          (1|capture_date)) 
+summary(osml_mod5)
+drop1(osml_mod5)
+
+# compare to previous model
+anova(osml_mod4, osml_mod5)
+```
+
+Drop temperature.
+
+```{r, osmolality model 6}
+osml_mod6 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm + 
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          solar_rad_W_sqm_interpol +
+                          # random effect
+                          (1|capture_date)) 
+summary(osml_mod6)
+drop1(osml_mod6)
+
+# compare to previous model
+anova(osml_mod5, osml_mod6)
+```
+
+Drop VPD.
+
+```{r, osmolality model 7}
+osml_mod7 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm + 
+                          # weather at the time of capture
+                          solar_rad_W_sqm_interpol +
+                          # random effect
+                          (1|capture_date)) 
+summary(osml_mod7)
+drop1(osml_mod7)
+
+# compare to previous model
+anova(osml_mod6, osml_mod7)
+```
+
+```{r}
+
+```
+
+
+
+
 
 We do not decrease our predictive power significantly by dropping SMI, so we will consider the reduced model (2) to be better than the full (1).
 

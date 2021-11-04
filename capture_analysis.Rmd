@@ -392,7 +392,7 @@ summary(capture_dat_plus)
 Look at the difference between regular mass and SMI:
 
 ```{r}
-capture_dat_SMI %>% 
+capture_dat_plus %>% 
   ggplot(data = .) + 
   geom_point(aes(x = mass_g,
                  y = SMI, 
@@ -624,7 +624,13 @@ anova(osml_mod5, osml_mod6)
 Drop VPD.
 
 ```{r, osmolality model 7}
-osml_mod7 <- lme4::lmer(data = capture_dat_plus,
+# need to exclude NA data
+# weird that I didn't need to do this before
+cap_dat_osml_mod7 <- capture_dat_plus %>%
+  dplyr::filter(complete.cases(osmolality_mmol_kg_mean, SVL_mm,
+                               solar_rad_W_sqm_interpol, capture_date))
+# model
+osml_mod7 <- lme4::lmer(data = cap_dat_osml_mod7,
                           # response variable
                           osmolality_mmol_kg_mean ~ 
                           # body size
@@ -635,618 +641,691 @@ osml_mod7 <- lme4::lmer(data = capture_dat_plus,
                           (1|capture_date)) 
 summary(osml_mod7)
 drop1(osml_mod7)
-
-# compare to previous model
-anova(osml_mod6, osml_mod7)
 ```
+
+It looks like osml_mod7 is the best model to explain plasma osmolality. Now we can re-run it with lmerTest to get associated p-values.
 
 ```{r}
-
+osml_mod_best <- lmerTest::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm + 
+                          # weather at the time of capture
+                          solar_rad_W_sqm_interpol +
+                          # random effect
+                          (1|capture_date)) 
+summary(osml_mod_best)
 ```
 
 
 
 
 
-We do not decrease our predictive power significantly by dropping SMI, so we will consider the reduced model (2) to be better than the full (1).
 
-Check whether to continue dropping terms:
+
+### LM Conditions
+
+Check residual plots:
 
 ```{r}
-drop1(hydrat_mod2)
+plot(osml_mod_best)
+simple.eda(residuals(osml_mod_best))
+shapiro.test(residuals(osml_mod_best))
 ```
 
-Dropping the current predictors will not improve AIC any more than its current value, so hydrat_mod2 is the best model to predict osmolality.
+There is no clear pattern in the residuals ~ fitted plot, so linearity seems satisfied. However, the high residuals for fitted values 320-350 may violate equal error variance. The Shapiro-Wilk normality test indicates that normality is violated.
 
 
-### Best Model
+### Transform Data
+
+To attempt to remedy unequal variance and normality, I tried transforming each response and fixed effect variable using log- and 1/ transformations. I also tried transforming more than one or all of the variables. None of these attempts improved the linear regression conditions for this model.
 
 ```{r}
-# save model 2 summary object
-osml_best_mod <- broom.mixed::tidy(hydrat_mod2)
-# export 
-write.csv(osml_best_mod, "./best models/osml_best_mod_vals.csv")
+osml_mod_best_t <- lmerTest::lmer(data = capture_dat_plus,
+                          # response variable
+                          log(osmolality_mmol_kg_mean) ~ 
+                          # body size
+                          SVL_mm + 
+                          # weather at the time of capture
+                          solar_rad_W_sqm_interpol +
+                          # random effect
+                          (1|capture_date)) 
+plot(osml_mod_best_t)
+simple.eda(residuals(osml_mod_best_t))
+shapiro.test(residuals(osml_mod_best_t))
 ```
 
-
-### Check LM Assumptions (Hydration Model)
-
-First, get residuals:
-
-```{r}
-res_hydrat_mod <- hydrat_mod_dat %>%
-  mutate(y_hat = predict(hydrat_mod2),
-         e = residuals(hydrat_mod2))
-```
-
-
-Linearity and Equal Variance
-
-Is the function **linear**? Is there **equal** variance of the residuals? The residuals should be homoskedactic relative to y_hat (or x). We don't care if there is a relationship between the residuals ~ dependent variable (actual y).
-
-Plotting residuals shows us whether the data meets linearity and equal variance assumptions:
-
-```{r}
-ggplot(data = res_hydrat_mod, aes(x = y_hat, y = e)) +
-  geom_point() + 
-  theme_classic() + 
-  xlab("predicted y (y-hat)") +
-  ylab("residuals (e)") +
-  ggtitle("Hydration Model 5") +
-  geom_hline(yintercept = 0)
-```
-
-It looks pretty evenly distributed. No clear patterning, so linearity and equal error variance should be satisfied.
-
-Brown-Forsythe test to statistically check equal variance:
-
-H0: normally distributed (non-sig test is GOOD)
-HA: NOT normally distributed (reject nul == assumption not satisfied)
-
-```{r}
-# need to create the right data & format first
-bf_data_temp <- res_hydrat_mod %>%
-  dplyr::filter(complete.cases(temp_C_interpol)) %>%
-  dplyr::mutate(middle = median(temp_C_interpol),
-                side = temp_C_interpol > middle)
-bf_data_temp$side <- as.factor(bf_data_temp$side)
-
-# now run test
-bf.test(formula = e ~ side, # y~x
-        data = bf_data_temp, # dataframe
-        alpha = 0.05, # default 0.05
-        na.rm = TRUE, # remove missing data before running?
-        verbose = TRUE # print output to console?
-        )
-
-# need to create the right data & format first
-bf_data_abshum <- res_hydrat_mod %>%
-  dplyr::filter(complete.cases(abs_humidity_g_m3_interpol)) %>%
-  dplyr::mutate(middle = median(abs_humidity_g_m3_interpol),
-                side = abs_humidity_g_m3_interpol > middle)
-bf_data_abshum$side <- as.factor(bf_data_abshum$side)
-
-# now run test
-bf.test(formula = e ~ side, # y~x
-        data = bf_data_abshum, # dataframe
-        alpha = 0.05, # default 0.05
-        na.rm = TRUE, # remove missing data before running?
-        verbose = TRUE # print output to console?
-        )
-```
-
-Equal variance is satisfied.
-
-
-Now check normality. Is the distribution of residuals **normal**?
-
-use Shapiro-Wilk normality test:
-H0: data is NOT significantly different from normal distribution
-HA: data IS significantly different from normal distribution
-
-```{r}
-simple.eda(res_hydrat_mod$e)
-shapiro.test(res_hydrat_mod$e)
-```
-
-Normality is satisfied.
 
 
 ### Conclusion
 
-hydrat_mod2 is the best model to predict osmolality, and the model satisfies all linear regression assumptions.
+Since transformations did not improve the conditions for the osmolality model, we will keep it as-is and report that some conditions of linear regression were not met. 
+
+Save the model output.
+
+```{r}
+osml_best_mod_results <- broom.mixed::tidy(osml_mod_best)
+write.csv(osml_best_mod_results,
+          "./results_statistics/capture_osml_best_model.csv")
+```
+
+
+To report in paper:
+
+The best model to predict plasma osmolality included SVL and solar radiation at the time of capture as fixed effects, with date as a random effect. The final model did not meet linear regression conditions for normality and equal error variance, but transformations of neither response nor predictor variables improved this.
+During model selection, each reduced model was only 1-2-delta-AIC better than the previous model. The full model included mass, SVL, SMI, whether the blood sample was hemolyzed, percent hematocrit, and temperature, VPD, wind speed, and solar radiation at the time of capture, with date as a random effect.
 
 
 
 ## CEWL
 
-Based on the simple linear models and figures above, CEWL should be predicted by:
-- body region
-- cloacal temperature at measurement
-- capture temperature, absolute humidity, wind speed, and solar radiation
-- ambient temperature during measurement
-- SVL and mass
-- hold time (time between capture vs measurement)
-- individual ID (as a random effect)
-
-Prep dataframe for models:
-
-```{r}
-CEWL_mod_dat <- CEWL_data_full %>% 
-  # select variables of interest
-  dplyr::select(date,
-                hold_time,
-                individual_ID,
-                mass_g,
-                SVL_mm, 
-                TEWL_g_m2h,
-                region,
-                cloacal_temp_C,
-                temp_C_interpol,
-                abs_humidity_g_m3_interpol,
-                Wind_mph_interpol,
-                Solar_rad_Wm2_interpol,
-                ambient_temp_C
-                ) %>%
-  dplyr::filter(complete.cases(.)) # removes 69 observations
-```
-
-
-### Multicollinearity
-
-Check for multicollinearity among independent variables:
-
-```{r}
-CEWL_mod_dat %>% 
-  # get rid of dependent variable
-  dplyr::select(-TEWL_g_m2h, individual_ID) %>%
-  # multicollinearity plot
-  pairs(.)
-
-# also make another plot with r-sq values
-# non-numeric variables don't work for this
-CEWL_mod_dat %>% 
-  # select variables of interest
-  dplyr::select(-TEWL_g_m2h, -date, -region, -individual_ID) %>% 
-  # multicollinearity plot
-  chart.Correlation(., histogram = F, pch = 19)
-```
-
-Mass and SVL are very collinear variables that should not be used in combination. Cloacal temp and hold time are pretty collinear, which makes sense; as we held them, they got cooler because they were inside and not basking. Individual ID and absolute humidity are also pretty collinear, but it's less intuitive. Temperature and solar radiation, as well as humidity and solar radiation, are each collinear pairs. We will use model selection to figure out which variable from each collinear pair is better to include in the model.
+It looks like there are meaningful differences in CEWL across individuals/dates (probably confounded), and based on cloacal temp, capture temp, capture VPD, capture wind, and capture solar radiation.
 
 
 
-### Models & Selection
+### Model Selection
 
-This is the full model with every potential variable and interaction baed on figures and SLR.
+Start with the full model of all potential predictor variables. We will again include date as a random effect.
 
-```{r}
-# model 1
-CEWL_mod1 <- lme4::lmer(data = CEWL_mod_dat,
-                        TEWL_g_m2h ~
-                         region * (mass_g + ambient_temp_C +
-                                     temp_C_interpol +
-                                     abs_humidity_g_m3_interpol) +
-                         hold_time + SVL_mm +
-                         cloacal_temp_C +
-                         temp_C_interpol:abs_humidity_g_m3_interpol +
-                         Wind_mph_interpol +
-                         Solar_rad_Wm2_interpol + 
-                         (1|individual_ID)) 
+```{r, CEWL model 1}
+CEWL_mod1 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # essential covariate
+                          cloacal_temp_C +
+                          # body size
+                          mass_g + SVL_mm + SMI +
+                          # blood
+                          osmolality_mmol_kg_mean + hematocrit_percent + 
+                          # weather at the time of capture
+                          temp_C_interpol * VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          # random effect
+                          (1|capture_date)) 
 summary(CEWL_mod1)
-```
-
-
-Check which variables to drop:
-
-```{r}
 drop1(CEWL_mod1)
 ```
 
-Based on AIC, dropping SVL, hold time, temp, humidity, wind speed, region:ambient_temp_C, and temp_C_interpol:abs_humidity_g_m3_interpol would result in a better model. 
+We will start with dropping hematocrit.
 
-Start with region:ambient_temp_C and temp_C_interpol:abs_humidity_g_m3_interpol interactions:
-
-```{r}
-# model 2
-CEWL_mod2 <- lme4::lmer(data = CEWL_mod_dat,
-                        TEWL_g_m2h ~
-                         region * (mass_g +
-                                     temp_C_interpol +
-                                     abs_humidity_g_m3_interpol) +
-                         hold_time + SVL_mm +
-                         cloacal_temp_C +
-                         Wind_mph_interpol +
-                         Solar_rad_Wm2_interpol + 
-                         (1|individual_ID)) 
+```{r, CEWL model 2}
+CEWL_mod2 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # essential covariate
+                          cloacal_temp_C +
+                          # body size
+                          mass_g + SVL_mm + SMI +
+                          # blood
+                          osmolality_mmol_kg_mean + 
+                          # weather at the time of capture
+                          temp_C_interpol * VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          # random effect
+                          (1|capture_date)) 
 summary(CEWL_mod2)
-
-# compare
-anova(CEWL_mod2, CEWL_mod1)
-```
-
-AIC improved somewhat and we do not lose a significant amount of predictive power, so the reduced model is better. Continue dropping...
-
-Check drop terms again:
-
-```{r}
+anova(CEWL_mod1, CEWL_mod2)
 drop1(CEWL_mod2)
 ```
 
-Hold time, SVL, and wind should still be deleted.
+I'm shocked that AIC suggests dropping cloacal temperature. We know it's important, so I will retain it despite the supposed benefits to model fit.
 
-```{r}
-# model 3
-CEWL_mod3 <- lme4::lmer(data = CEWL_mod_dat,
-                        TEWL_g_m2h ~
-                         region * (mass_g +
-                                     temp_C_interpol +
-                                     abs_humidity_g_m3_interpol) +
-                         cloacal_temp_C +
-                         Solar_rad_Wm2_interpol + 
-                         (1|individual_ID)) 
+Instead, we will try dropping SVL and SMI because they are slightly less helpful than their collinear variable, mass.
+
+```{r, CEWL model 3}
+CEWL_mod3 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # essential covariate
+                          cloacal_temp_C +
+                          # body size
+                          mass_g +
+                          # blood
+                          osmolality_mmol_kg_mean + 
+                          # weather at the time of capture
+                          temp_C_interpol * VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          # random effect
+                          (1|capture_date)) 
 summary(CEWL_mod3)
-
-# compare
-anova(CEWL_mod3, CEWL_mod1)
-anova(CEWL_mod3, CEWL_mod2)
-```
-
-Once again, the AIC is slightly lower, and our model fit is not significantly worse by going to model 3, so the reduced model is better.
-
-Check drop terms again to make sure nothing else could potentially be removed:
-
-```{r}
+anova(CEWL_mod2, CEWL_mod3)
 drop1(CEWL_mod3)
 ```
 
-Check whether removing Solar_rad_Wm2_interpol is okay:
+Drop solar radiation next:
 
-```{r}
-# model 4
-CEWL_mod4 <- lme4::lmer(data = CEWL_mod_dat,
-                        TEWL_g_m2h ~
-                         region * (mass_g +
-                                     temp_C_interpol +
-                                     abs_humidity_g_m3_interpol) +
-                         cloacal_temp_C +
-                         (1|individual_ID)) 
+```{r, CEWL model 4}
+CEWL_mod4 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # essential covariate
+                          cloacal_temp_C +
+                          # body size
+                          mass_g + 
+                          # blood
+                          osmolality_mmol_kg_mean + 
+                          # weather at the time of capture
+                          temp_C_interpol * VPD_kPa_int +
+                          wind_mph_interpol +
+                          # random effect
+                          (1|capture_date)) 
 summary(CEWL_mod4)
-
-# compare
-anova(CEWL_mod4, CEWL_mod1)
-anova(CEWL_mod4, CEWL_mod3)
+anova(CEWL_mod3, CEWL_mod4)
+drop1(CEWL_mod4)
 ```
 
-We do lose significant predictive power when we go from model 3 to 4... So model 3 is the best model to predict CEWL.
 
-Since we dropped a lot of variables, I want to go back and make sure to use as much data as possible in the final model, so I can add back in observations with missing values for variables no longer included in the reduced model.
+Drop wind.
+
+```{r, CEWL model 5}
+CEWL_mod5 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # essential covariate
+                          cloacal_temp_C +
+                          # body size
+                          mass_g + 
+                          # blood
+                          osmolality_mmol_kg_mean + 
+                          # weather at the time of capture
+                          temp_C_interpol * VPD_kPa_int +
+                          # random effect
+                          (1|capture_date)) 
+summary(CEWL_mod5)
+anova(CEWL_mod4, CEWL_mod5)
+drop1(CEWL_mod5)
+```
+
+Try dropping mass:
+
+```{r, CEWL model 6}
+CEWL_mod6 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # essential covariate
+                          cloacal_temp_C +
+                          # blood
+                          osmolality_mmol_kg_mean + 
+                          # weather at the time of capture
+                          temp_C_interpol * VPD_kPa_int +
+                          # random effect
+                          (1|capture_date)) 
+summary(CEWL_mod6)
+anova(CEWL_mod5, CEWL_mod6)
+drop1(CEWL_mod6)
+```
+
+It looks like CEWL_mod6 is the best model to explain CEWL. Now we can re-run it with lmerTest to get associated p-values.
 
 ```{r}
-# filter
-CEWL_mod_dat2 <- CEWL_data_full %>% 
-  # select variables of interest
-  dplyr::select(individual_ID,
-                mass_g,
-                TEWL_g_m2h,
-                region,
-                cloacal_temp_C,
-                temp_C_interpol,
-                abs_humidity_g_m3_interpol,
-                Solar_rad_Wm2_interpol,
-                ) %>%
-  dplyr::filter(complete.cases(.)) # able to have 5 more observations
-
-# redo best model
-
-
-
-# model 3
-CEWL_mod3_adj <- lmerTest::lmer(data = CEWL_mod_dat2,
-                        TEWL_g_m2h ~
-                         region * (mass_g +
-                                     temp_C_interpol +
-                                     abs_humidity_g_m3_interpol) +
-                         cloacal_temp_C +
-                         Solar_rad_Wm2_interpol + 
-                         (1|individual_ID)) 
-summary(CEWL_mod3_adj)
+CEWL_mod_best <- lmerTest::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # essential covariate
+                          cloacal_temp_C +
+                          # blood
+                          osmolality_mmol_kg_mean + 
+                          # weather at the time of capture
+                          temp_C_interpol * VPD_kPa_int +
+                          # random effect
+                          (1|capture_date)) 
+summary(CEWL_mod_best)
 ```
 
 
+### LM Conditions
 
-### Best Model
-
-The best model is CEWL predicted by: body region and its interaction with mass and capture temp and humidity, cloacal temperature, solar radiation at capture time, and individual ID as a random effect.
+Check that the best model meets the criteria for linear regression.
 
 ```{r}
-# save best model info
-CEWL_best_mod <- broom.mixed::tidy(CEWL_mod3_adj)
-# export 
-#write.csv(CEWL_best_mod, "./best models/CEWL_best_mod_vals.csv")
+plot(CEWL_mod_best)
+simple.eda(residuals(CEWL_mod_best))
+shapiro.test(residuals(CEWL_mod_best))
 ```
 
-
-
-### Check LM Assumptions
-
-First, get residuals:
-
-```{r}
-CEWL_mod_res <- CEWL_mod_dat2 %>%
-  mutate(y_hat = predict(CEWL_mod3_adj),
-         e = residuals(CEWL_mod3_adj))
-```
-
-
-Linearity and Equal Variance
-
-Is the function **linear**? Is there **equal** variance of the residuals? The residuals should be homoskedactic relative to y_hat (or x). We don't care if there is a relationship between the residuals ~ dependent variable (actual y).
-
-Plotting residuals shows us whether the data meets linearity and equal variance assumptions:
-
-```{r}
-ggplot(data = CEWL_mod_res, aes(x = y_hat, y = e)) +
-  geom_point() + 
-  theme_classic() + 
-  xlab("predicted y (y-hat)") +
-  ylab("residuals (e)") +
-  ggtitle("CEWL Model Residuals") +
-  geom_hline(yintercept = 0)
-```
-
-It's definitely making a fan shape. :(
-
-Brown-Forsythe test to statistically check equal variance, for each continuous predictor variable:
-
-H0: normally distributed (non-sig test is GOOD)
-HA: NOT normally distributed (reject nul == assumption not satisfied)
-
-
-```{r}
-# need to create the right data & format first
-bf_data_CEWL <- CEWL_mod_res %>%
-  dplyr::mutate(middle_mass = median(mass_g), # mass
-                side_mass = as.factor(mass_g > middle_mass),
-                # solar radiation
-                middle_sorad = median(Solar_rad_Wm2_interpol),
-                side_sorad = as.factor(Solar_rad_Wm2_interpol > middle_sorad), 
-                # temperature
-                middle_temp = median(temp_C_interpol),
-                side_temp = as.factor(temp_C_interpol > middle_temp),
-                # absolute humidity
-                middle_absh = median(abs_humidity_g_m3_interpol),
-                side_absh = as.factor(abs_humidity_g_m3_interpol > middle_absh),
-                middle_ct = median(cloacal_temp_C),
-                side_ct = as.factor(cloacal_temp_C > middle_ct)
-                )
-
-
-# now run test
-bf.test(formula = e ~ side_absh, # y~x
-        data = bf_data_CEWL, # dataframe
-        alpha = 0.05, # default 0.05
-        na.rm = TRUE, # remove missing data before running?
-        verbose = TRUE # print output to console?
-        )
-bf.test(formula = e ~ side_temp, # y~x
-        data = bf_data_CEWL, # dataframe
-        alpha = 0.05, # default 0.05
-        na.rm = TRUE, # remove missing data before running?
-        verbose = TRUE # print output to console?
-        )
-bf.test(formula = e ~ side_sorad, # y~x
-        data = bf_data_CEWL, # dataframe
-        alpha = 0.05, # default 0.05
-        na.rm = TRUE, # remove missing data before running?
-        verbose = TRUE # print output to console?
-        )
-bf.test(formula = e ~ side_ct, # y~x
-        data = bf_data_CEWL, # dataframe
-        alpha = 0.05, # default 0.05
-        na.rm = TRUE, # remove missing data before running?
-        verbose = TRUE # print output to console?
-        )
-bf.test(formula = e ~ side_mass, # y~x
-        data = bf_data_CEWL, # dataframe
-        alpha = 0.05, # default 0.05
-        na.rm = TRUE, # remove missing data before running?
-        verbose = TRUE # print output to console?
-        )
-```
-
-Equal variance is satisfied for all 5 continuous predictor variables.
-
-
-Now check normality. Is the distribution of residuals **normal**?
-
-use Shapiro-Wilk normality test:
-H0: data is NOT significantly different from normal distribution
-HA: data IS significantly different from normal distribution
-
-```{r}
-simple.eda(CEWL_mod_res$e)
-shapiro.test(CEWL_mod_res$e)
-```
-
-not normal!
-
-
-### Test Transformations 
-
-Can I improve satisfaction of LM assumptions by transforming the dependent variable?
-
-```{r}
-# sqrt(TEWL)
-CEWL_data_full %>%
-  ggplot(., aes(x = sqrt(TEWL_g_m2h))) +
-  geom_histogram(color = "black", fill="steelblue", bins=50) + 
-  theme_classic() +
-  xlab("sqrt(CEWL)") + 
-  ylab("Count") + 
-  facet_wrap(~region)
-
-# log(temperature)
-CEWL_data_full %>%
-  ggplot(., aes(x = log(TEWL_g_m2h))) +
-  geom_histogram(color = "black", fill="steelblue", bins=50) + 
-  theme_classic() +
-  xlab("LOG(CEWL)") + 
-  ylab("Count") + 
-  facet_wrap(~region)
-```
-
-
-Log transforming seems to be pretty effective across body regions.
-
-
-
-### Transform & Re-Model
-
-I will log-transform CEWL and see whether it makes the models satisfy LMM assumptions better.
-
-Run CEWL model 4 with log-transformed CEWL:
-
-```{r}
-summary(CEWL_mod_dat2)
-# log-transformed model 3
-CEWL_mod3_t <- lmerTest::lmer(data = CEWL_mod_dat2,
-                          log(TEWL_g_m2h) ~
-                            region * (mass_g +
-                                     temp_C_interpol +
-                                     abs_humidity_g_m3_interpol) +
-                            cloacal_temp_C + Solar_rad_Wm2_interpol +
-                            (1|individual_ID)) 
-summary(CEWL_mod3_t)
-
-# compare
-anova(CEWL_mod3_t, CEWL_mod3_adj)
-```
-
-
-
-### Re-Check Assumptions (transformed model 3)
-
-First, get residuals:
-
-```{r}
-CEWL_t_mod_res <- CEWL_mod_dat2 %>%
-  mutate(y_hat = predict(CEWL_mod3_t),
-         e = residuals(CEWL_mod3_t))
-```
-
-
-Linearity and Equal Variance
-
-Is the function **linear**? Is there **equal** variance of the residuals? The residuals should be homoskedactic relative to y_hat (or x). We don't care if there is a relationship between the residuals ~ dependent variable (actual y).
-
-Plotting residuals shows us whether the data meets linearity and equal variance assumptions:
-
-```{r}
-ggplot(data = CEWL_t_mod_res, aes(x = y_hat, y = e)) +
-  geom_point() + 
-  theme_classic() + 
-  xlab("predicted y (y-hat)") +
-  ylab("residuals (e)") +
-  ggtitle("CEWL Model 13 Residuals") +
-  geom_hline(yintercept = 0)
-```
-
-It looks much much better. :) Equal error variance doesn't look perfect, but there's no more fan shape.
-
-Brown-Forsythe test to statistically check equal variance:
-
-H0: normally distributed (non-sig test is GOOD)
-HA: NOT normally distributed (reject nul == assumption not satisfied)
-
-```{r}
-# need to create the right data & format first
-bf_data_CEWL_t <- CEWL_t_mod_res %>%
-  dplyr::mutate(middle_mass = median(mass_g), # mass
-                side_mass = as.factor(mass_g > middle_mass),
-                # solar radiation
-                middle_sorad = median(Solar_rad_Wm2_interpol),
-                side_sorad = as.factor(Solar_rad_Wm2_interpol > middle_sorad), 
-                # temperature
-                middle_temp = median(temp_C_interpol),
-                side_temp = as.factor(temp_C_interpol > middle_temp),
-                # absolute humidity
-                middle_absh = median(abs_humidity_g_m3_interpol),
-                side_absh = as.factor(abs_humidity_g_m3_interpol > middle_absh),
-                middle_ct = median(cloacal_temp_C),
-                side_ct = as.factor(cloacal_temp_C > middle_ct)
-                )
-
-
-# now run test
-bf.test(formula = e ~ side_absh, # y~x
-        data = bf_data_CEWL_t, # dataframe
-        alpha = 0.05, # default 0.05
-        na.rm = TRUE, # remove missing data before running?
-        verbose = TRUE # print output to console?
-        )
-bf.test(formula = e ~ side_temp, # y~x
-        data = bf_data_CEWL_t, # dataframe
-        alpha = 0.05, # default 0.05
-        na.rm = TRUE, # remove missing data before running?
-        verbose = TRUE # print output to console?
-        )
-bf.test(formula = e ~ side_sorad, # y~x
-        data = bf_data_CEWL_t, # dataframe
-        alpha = 0.05, # default 0.05
-        na.rm = TRUE, # remove missing data before running?
-        verbose = TRUE # print output to console?
-        )
-bf.test(formula = e ~ side_ct, # y~x
-        data = bf_data_CEWL_t, # dataframe
-        alpha = 0.05, # default 0.05
-        na.rm = TRUE, # remove missing data before running?
-        verbose = TRUE # print output to console?
-        )
-bf.test(formula = e ~ side_mass, # y~x
-        data = bf_data_CEWL_t, # dataframe
-        alpha = 0.05, # default 0.05
-        na.rm = TRUE, # remove missing data before running?
-        verbose = TRUE # print output to console?
-        )
-```
-
-Equal variance is still satisfied for all continuous predictor variables.
-
-
-Now check normality. Is the distribution of residuals **normal**?
-
-use Shapiro-Wilk normality test:
-H0: data is NOT significantly different from normal distribution
-HA: data IS significantly different from normal distribution
-
-```{r}
-simple.eda(CEWL_t_mod_res$e)
-shapiro.test(CEWL_t_mod_res$e)
-```
-
-Still not statistically normal... but the distribution looks a lot better.
+There is some slight fanning in the residuals ~ fitted plot, suggesting equal error variance is not perfect, but overall, all LNE conditions appear to be met.
 
 
 ### Conclusion
 
-The best CEWL model should use log-transformed CEWL because this greatly improves the model based on AIC and it allows the model to satisfy the linearity assumption of LMM. 
+Save the model output.
 
 ```{r}
-# save log model 3 summary object
-CEWL_best_t_mod <- broom.mixed::tidy(CEWL_mod3_t)
-# export 
-write.csv(CEWL_best_t_mod, "./best models/CEWL_best_mod_t_vals.csv")
+CEWL_best_mod_results <- broom.mixed::tidy(CEWL_mod_best)
+write.csv(CEWL_best_mod_results,
+          "./results_statistics/capture_CEWL_best_model.csv")
+```
+
+
+To report in paper:
+
+The best model to predict CEWL included cloacal temperature, plasma osmolality, temperature and VPD at the time of capture, and their interaction, with date as a random effect. The final model met all linear regression conditions for linearity, normality, and equal error variance.
+During model selection, each reduced model was only 1-2-delta-AIC better than the previous model. The full model included cloacal temperature, mass, SVL, SMI, plasma osmolality, percent hematocrit, and temperature, VPD, wind speed, and solar radiation at the time of capture, with date as a random effect. The effect of cloacal temperature was not significant and should have been dropped from the model based on AIC, but the literature and our previous study suggest that cloacal temperature is an strong covariate of CEWL, so we retained it in the reduced model despite nonsignificance.
+
+
+
+# Model Figures
+
+## Osmolality ~ SVL
+
+```{r}
+capture_dat_plus %>% 
+  ggplot() + 
+  geom_point(aes(x = SVL_mm,
+                 y = osmolality_mmol_kg_mean), 
+             size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(aes(x = SVL_mm, 
+                  y = osmolality_mmol_kg_mean), 
+              formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("Snout-Vent Length (mm)") + 
+  ylab("Plasma Osmolality (mmol/kg)") + 
+  #ylab("") +
+  #xlim() +
+  #ylim() +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(p), \" < 0.0001\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_osml_SVL_fig
+cap_osml_SVL_fig
+# export figure
+#ggsave(filename = "cap_osml_mass_fig.jpeg",
+ #      plot = cap_osml_mass_fig,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 6, height = 4)
+```
+
+
+## Osmolality ~ Solar Radiation
+
+```{r}
+capture_dat_plus %>% 
+  ggplot() + 
+  geom_point(aes(x = solar_rad_W_sqm_interpol,
+                 y = osmolality_mmol_kg_mean), 
+             size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(aes(x = solar_rad_W_sqm_interpol, 
+                  y = osmolality_mmol_kg_mean), 
+              formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab(bquote('Solar Radiation (W/'*m^2*')')) + 
+  ylab("Plasma Osmolality (mmol/kg)") + 
+  #ylab("") +
+  #xlim() +
+  #ylim() +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(p), \" < 0.0001\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_osml_sorad_fig
+cap_osml_sorad_fig
+# export figure
+#ggsave(filename = "cap_osml_mass_fig.jpeg",
+ #      plot = cap_osml_mass_fig,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 6, height = 4)
+```
+
+
+## Osmolality ~ Date
+
+```{r}
+capture_dat_plus %>% 
+  ggplot() + 
+  geom_point(aes(x = capture_date,
+                 y = osmolality_mmol_kg_mean), 
+             size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(aes(x = capture_date, 
+                  y = osmolality_mmol_kg_mean), 
+              formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("Date") + 
+  ylab("Plasma Osmolality (mmol/kg)") + 
+  #ylab("") +
+  #xlim() +
+  #ylim() +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(p), \" < 0.0001\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_osml_date_fig
+cap_osml_date_fig
+# export figure
+#ggsave(filename = "cap_osml_mass_fig.jpeg",
+ #      plot = cap_osml_mass_fig,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 6, height = 4)
+```
+
+
+
+
+## CEWL ~ Cloacal Temperature
+
+```{r}
+capture_dat_plus %>% 
+  ggplot() + 
+  geom_point(aes(x = cloacal_temp_C,
+                 y = CEWL_g_m2h_mean), 
+             size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(aes(x = cloacal_temp_C, 
+                  y = CEWL_g_m2h_mean), 
+              formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("Cloacal Temperature (°C)") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  #xlim() +
+  #ylim() +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(p), \" < 0.0001\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_clotemp_fig
+cap_CEWL_clotemp_fig
+# export figure
+#ggsave(filename = "cap_osml_mass_fig.jpeg",
+ #      plot = cap_osml_mass_fig,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 6, height = 4)
+```
+
+
+## CEWL ~ Plasma Osmolality
+
+```{r}
+capture_dat_plus %>% 
+  ggplot() + 
+  geom_point(aes(x = osmolality_mmol_kg_mean,
+                 y = CEWL_g_m2h_mean), 
+             size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(aes(x = osmolality_mmol_kg_mean, 
+                  y = CEWL_g_m2h_mean), 
+              formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("Plasma Osmolality (mmol/kg)") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  #xlim() +
+  #ylim() +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(p), \" < 0.0001\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_osml_fig
+cap_CEWL_osml_fig
+# export figure
+#ggsave(filename = "cap_osml_mass_fig.jpeg",
+ #      plot = cap_osml_mass_fig,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 6, height = 4)
+```
+
+
+
+## CEWL ~ Temperature at Capture
+
+```{r}
+capture_dat_plus %>% 
+  ggplot() + 
+  geom_point(aes(x = temp_C_interpol,
+                 y = CEWL_g_m2h_mean), 
+             size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(aes(x = temp_C_interpol, 
+                  y = CEWL_g_m2h_mean), 
+              formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("Temperature at Capture (°C)") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  #xlim() +
+  #ylim() +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(p), \" < 0.0001\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_temp_fig
+cap_CEWL_temp_fig
+# export figure
+#ggsave(filename = "cap_osml_mass_fig.jpeg",
+ #      plot = cap_osml_mass_fig,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 6, height = 4)
+```
+
+
+## CEWL ~ VPD at Capture
+
+```{r}
+capture_dat_plus %>% 
+  ggplot() + 
+  geom_point(aes(x = VPD_kPa_int,
+                 y = CEWL_g_m2h_mean), 
+             size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(aes(x = VPD_kPa_int, 
+                  y = CEWL_g_m2h_mean), 
+              formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("Vapor Pressure Deficit (kPa)") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  #xlim() +
+  #ylim() +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(p), \" < 0.0001\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_VPD_fig
+cap_CEWL_VPD_fig
+# export figure
+#ggsave(filename = "cap_osml_mass_fig.jpeg",
+ #      plot = cap_osml_mass_fig,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 6, height = 4)
+```
+
+
+## CEWL ~ Date
+
+```{r}
+capture_dat_plus %>% 
+  ggplot() + 
+  geom_point(aes(x = capture_date,
+                 y = CEWL_g_m2h_mean), 
+             size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(aes(x = capture_date, 
+                  y = CEWL_g_m2h_mean), 
+              formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("Date") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  #xlim() +
+  #ylim() +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(p), \" < 0.0001\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_date_fig
+cap_CEWL_date_fig
+# export figure
+#ggsave(filename = "cap_osml_mass_fig.jpeg",
+ #      plot = cap_osml_mass_fig,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 6, height = 4)
 ```
 
 
 
 
 
-# What to Present in the Paper
 
-- figures (exported)
-- hct SLR
-- best osml mod (transformed?)
-- best CEWL mod (CEWL transformed)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

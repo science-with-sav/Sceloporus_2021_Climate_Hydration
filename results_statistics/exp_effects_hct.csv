@@ -1,0 +1,7 @@
+"","effect","group","term","estimate","std.error","statistic","df","p.value"
+"1","fixed",NA,"(Intercept)",37.794736337939,1.31871824394322,28.6602058563515,4.95996222980971,1.05589963024967e-06
+"2","fixed",NA,"day_n",-1.30104755193566,0.0600659097788724,-21.6603320706431,264.550523064565,1.53322616031717e-60
+"3","fixed",NA,"temp_tmtCool",2.08472396959615,0.719625703562746,2.8969559581808,128.009452849332,0.00443338738850639
+"4","ran_pars","individual_ID:trial_number","sd__(Intercept)",3.48781742405369,NA,NA,NA,NA
+"5","ran_pars","trial_number","sd__(Intercept)",2.66493701324111,NA,NA,NA,NA
+"6","ran_pars","Residual","sd__Observation",3.9027769867,NA,NA,NA,NA

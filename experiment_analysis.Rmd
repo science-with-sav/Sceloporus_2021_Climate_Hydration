@@ -8,7 +8,7 @@ toc: TRUE
 
 # Packages
 
-```{r setup, include = TRUE}
+```{r setup, include = TRUE, message = FALSE}
 `%nin%` = Negate(`%in%`)
 if (!require("tidyverse")) install.packages("tidyverse")
 library("tidyverse") # workflow and plots
@@ -18,6 +18,8 @@ if (!require("lmerTest")) install.packages("lmerTest")
 library("lmerTest") # for p-values
 if (!require("ggpubr")) install.packages("ggpubr")
 library("ggpubr") # for multi-ggplot figs
+if (!require("UsingR")) install.packages("UsingR")
+library("UsingR") # simple.eda model assumption checker
 if (!require("broom")) install.packages("broom")
 library("broom") # lmer model export
 if (!require("broom.mixed")) install.packages("broom.mixed")
@@ -84,14 +86,32 @@ There are a handful of points that appear erroneous.
 
 Individual 239 had post-treatment CEWL >60, which is incredibly unusual for our experiment. He was in the process of shedding when we took this CEWL measurement, so we assume that his process of shedding confounded potential treatment effects, and we should remove that point from our data. We still want to use the other measurements for this individual, so we will just set that CEWL measurement as an NA.
 
-```{r fix weird CEWL}
+```{r fix erroneous CEWL}
 which(dat$CEWL_g_m2h_mean > 60)
-dat[332,]
+dat[332, ]
+dat[332, "CEWL_g_m2h_mean"]
 dat[332, "CEWL_g_m2h_mean"] <- NA
-dat[332,]
+dat[332, "CEWL_g_m2h_mean"]
+dat %>%
+  dplyr::filter(complete.cases(CEWL_g_m2h_mean)) %>%
+  summarise(max(CEWL_g_m2h_mean))
 ```
 
-Weird osmolality??
+
+10 trial 1 lizards have unreasonably high osmolality measurements on June 24, which we think are due to an osmometer technical error. The values are way too far outside the usual range to be trustworthy, so we will exclude them.
+
+```{r fix erroneous osml}
+which(dat$osmolality_mmol_kg_mean > 500)
+dat[136:145, ]
+dat[136:145, "osmolality_mmol_kg_mean"]
+dat[136:145, "osmolality_mmol_kg_mean"] <- c(rep(NA, 10))
+dat[136:145, "osmolality_mmol_kg_mean"]
+dat[136:145, ]
+dat %>%
+  dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
+  summarise(max(osmolality_mmol_kg_mean))
+```
+
 
 
 
@@ -195,7 +215,7 @@ dat_no_rehab %>%
   # this point is more for the legend than for showing means
   geom_point(data = mean_SMI,
              aes(x = day,
-                 y = mean_SMI - 0.08, # slight adjustment to center on line
+                 y = mean_SMI - 0.1, # slight adjustment to center on line
                  color = tmt,
                  shape = tmt),
              size = 4, 
@@ -302,14 +322,11 @@ ggsave(filename = "tmt_effects_hct.jpeg",
 
 ## Osmolality
 
-### Cleaning
-Note that we removed trial 1 data from this figure!
 
 ```{r osmolality exp fig}
 # calculate means to overlay
 mean_osml <- dat %>%
   dplyr::filter(day == "post-exp") %>%
-  dplyr::filter(trial_number != 1) %>% 
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
   group_by(tmt) %>%
   summarise(day = 8,
@@ -317,9 +334,6 @@ mean_osml <- dat %>%
 # plot
 dat_no_rehab %>% 
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>% 
-  # remove trail 1 data
-  dplyr::filter(trial_number != 1) %>% 
-  # plot
   ggplot(aes(x = day_n,
              y = osmolality_mmol_kg_mean, 
              color = tmt,
@@ -334,7 +348,7 @@ dat_no_rehab %>%
   # this point is more for the legend than for showing means
   geom_point(data = mean_osml,
              aes(x = day,
-                 y = mean_osml + 5, # slight adjust to center on line 
+                 y = mean_osml + 3, # slight adjust to center on line 
                  color = tmt,
                  shape = tmt),
              size = 4, 
@@ -476,6 +490,16 @@ drop1(SMI_mod1)
 
 The full model is the best model.
 
+Check linear regression assumptions/conditions:
+
+```{r SMI exp model assumptions}
+plot(SMI_mod1)
+simple.eda(residuals(SMI_mod1))
+shapiro.test(residuals(SMI_mod1))
+```
+
+Save best model stats:
+
 ```{r best SMI exp model}
 SMI_mod_best <- lmerTest::lmer(data = dat_no_rehab,
                        SMI ~ 
@@ -532,6 +556,17 @@ drop1(hct_mod3)
 We do not lose predictive power, and AIC suggests not dropping any more variables. This is the best model.
 
 
+Check linear regression assumptions/conditions:
+
+```{r hct exp model assumptions}
+plot(hct_mod3)
+simple.eda(residuals(hct_mod3))
+shapiro.test(residuals(hct_mod3))
+```
+
+Save best model stats:
+
+
 ```{r best hct exp model}
 hct_mod_best <- dat_no_rehab %>%
   dplyr::filter(complete.cases(hematocrit_percent)) %>%
@@ -548,31 +583,15 @@ write.csv(broom::tidy(hct_mod_best),
 
 ## Osmolality
 
-```{r osmolality exp model 1a}
-osml_mod1a <- dat_no_rehab %>%
+```{r osmolality exp model 1}
+osml_mod1 <- dat_no_rehab %>%
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
-  #dplyr::filter(trial_number != 1) %>%
   lme4::lmer(data = .,
                        osmolality_mmol_kg_mean ~ 
                          day_n*humidity_tmt*temp_tmt +
                          (1|trial_number/individual_ID))
-summary(osml_mod1a)
-drop1(osml_mod1a)
-```
-
-
-Actually, re-run without individual ID as a randome effect, since it accounts for none of the variation in plasma osmolality:
-
-```{r osmolality exp model 1b}
-osml_mod1b <- dat_no_rehab %>%
-  dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
-  #dplyr::filter(trial_number != 1) %>%
-  lme4::lmer(data = .,
-                       osmolality_mmol_kg_mean ~ 
-                         day_n*humidity_tmt*temp_tmt +
-                         (1|trial_number))
-summary(osml_mod1b)
-drop1(osml_mod1b)
+summary(osml_mod1)
+drop1(osml_mod1)
 ```
 
 
@@ -584,65 +603,75 @@ osml_mod2 <- dat_no_rehab %>%
   lme4::lmer(data = .,
                        osmolality_mmol_kg_mean ~ 
                          day_n * humidity_tmt + temp_tmt +
-                         (1|trial_number))
+                         (1|trial_number/individual_ID))
 summary(osml_mod2)
 anova(osml_mod1, osml_mod2)
 drop1(osml_mod2)
 ```
 
-Drop temperature completely:
+Drop the day* humidity interaction:
 
 ```{r osmolality exp model 3}
 osml_mod3 <- dat_no_rehab %>%
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
   lme4::lmer(data = .,
                        osmolality_mmol_kg_mean ~ 
-                         day_n * humidity_tmt +
-                         (1|trial_number))
+                         day_n + humidity_tmt + temp_tmt +
+                         (1|trial_number/individual_ID))
 summary(osml_mod3)
 anova(osml_mod2, osml_mod3)
 drop1(osml_mod3)
 ```
 
-We can no longer improve AIC, so this is the best model. Seemingly, temperature acclimation had no effect on plasma osmolality, but humidity had a small effect.
 
-Alternatively, since AIC is ~same with or without the day* humidity interaction, try dropping that:
+Drop humidity:
+
 
 ```{r osmolality exp model 4}
 osml_mod4 <- dat_no_rehab %>%
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
   lme4::lmer(data = .,
                        osmolality_mmol_kg_mean ~ 
-                         day_n + humidity_tmt +
-                         (1|trial_number))
+                         day_n + temp_tmt +
+                         (1|trial_number/individual_ID))
 summary(osml_mod4)
 anova(osml_mod3, osml_mod4)
 drop1(osml_mod4)
 ```
 
-We do not lose predictive power. Now that the humidity effect is freed from the interaction, AIC suggests dropping that variable as well:
+We do not lose predictive power. Drop day:
 
 ```{r osmolality exp model 5}
 osml_mod5 <- dat_no_rehab %>%
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
   lme4::lmer(data = .,
                        osmolality_mmol_kg_mean ~ 
-                         day_n +
-                         (1|trial_number))
+                         temp_tmt +
+                         (1|trial_number/individual_ID))
 summary(osml_mod5)
 anova(osml_mod3, osml_mod5)
 drop1(osml_mod5)
 ```
 
-Compared to the day*humidity model (osmolality model 3), the day-only model (model 5) does not lose predictive power and has slightly better AIC, so I would consider this the best model, even though it is comparable to the model including humidity.
+This is the best model, with only temperature as a predictor.
+
+Check linear regression assumptions/conditions:
+
+```{r osml exp model assumptions}
+plot(osml_mod5)
+simple.eda(residuals(osml_mod5))
+shapiro.test(residuals(osml_mod5))
+```
+
+Save best model stats:
 
 ```{r best osml exp model}
 osml_mod_best <- dat_no_rehab %>%
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
   lmerTest::lmer(data = .,
                        osmolality_mmol_kg_mean ~ 
-                         day_n + 
-                         (1|trial_number))
+                         temp_tmt + 
+                         (1|trial_number/individual_ID))
 summary(osml_mod_best)
 write.csv(broom::tidy(osml_mod_best), 
           "./results_statistics/exp_effects_osml.csv")
@@ -687,7 +716,7 @@ CEWL_mod2 <- lme4::lmer(data = dat_no_rehab,
                          cloacal_temp_C + 
                          (1|trial_number))
 summary(CEWL_mod2)
-anova(CEWL_mod1, CEWL_mod2)
+anova(CEWL_mod1b, CEWL_mod2)
 drop1(CEWL_mod2)
 ```
 
@@ -710,7 +739,17 @@ drop1(CEWL_mod3)
 
 This model has a lower AIC than the previous model, all the remaining t-values are large, and we lose no predictive power. This is the best model.
 
-```{r run best CEWL model}
+Check linear regression assumptions/conditions:
+
+```{r CEWL exp model assumptions}
+plot(CEWL_mod3)
+simple.eda(residuals(CEWL_mod3))
+shapiro.test(residuals(CEWL_mod3))
+```
+
+Save best model stats:
+
+```{r best CEWL model}
 CEWL_mod_best <- lmerTest::lmer(data = dat_no_rehab,
                         CEWL_g_m2h_mean ~ 
                          day_n:humidity_tmt:temp_tmt +
@@ -728,14 +767,13 @@ write.csv(broom::tidy(CEWL_mod3),
 
 ## Conclusion
 
-The change in body condition due to experimental treatment was best described by the full model including time in acclimation treatment, acclimation temperature, acclimation humidity, and both pairwise and three-way interactions. Hematocrit was best-predicted by a reduced model including time in acclimation treatment and acclimation temperature. Plasma osmolality was best-predicted by a reduced model including only the time in acclimation treatment. In model selection for hematocrit and plasma osmolality, each dropped variable only improved the model by <2-delta-AIC, so each stepwise model predicted the variability in the response variable equally well. However, the variables dropped also had very low t-values, evidence for their lack of influence thus exclusion from the model. The best model to predict the changes in CEWL included time in acclimation treatment, its interactions with acclimation temperature and acclimation humidity, and their three-way interaction. Nested effects of trial number and individual lizard ID were included as random effects in the LMMs predicting body condition and hematocrit. Individual ID did not account for any variation in plasma osmolality or CEWL, so only trial number was included as a random effect in those models.
+The change in body condition due to experimental treatment was best described by the full model including time in acclimation treatment, acclimation temperature, acclimation humidity, and both pairwise and three-way interactions. Hematocrit was best-predicted by a reduced model including time in acclimation treatment and acclimation temperature. Plasma osmolality was best-predicted by a reduced model including only acclimation temperature In model selection for hematocrit and plasma osmolality, each dropped variable only improved the model by <2-delta-AIC, so each stepwise model predicted the variability in the response variable equally well. However, the variables dropped also had very low t-values, evidence for their lack of influence thus exclusion from the model. The best model to predict the changes in CEWL included time in acclimation treatment, its interactions with acclimation temperature and acclimation humidity, and their three-way interaction. Nested effects of trial number and individual lizard ID were included as random effects in the LMMs predicting body condition, hematocrit, and plasma osmolality. Individual ID did not account for any variation in CEWL, so only trial number was included as a random effect in that model.
 
 
 
 
 
 # Rehydration Figures
-
 
 
 ## SMI
@@ -871,14 +909,10 @@ ggsave(filename = "rehab_effects_hct.jpeg",
 
 ## Osmolality
 
-### Cleaning
-Note that we removed trial 1 data from this figure!
-
 ```{r osmolality rehydration fig}
 # calculate means to overlay
 mean_osml_rehab <- dat %>%
   dplyr::filter(type == "rehab") %>%
-  dplyr::filter(trial_number != 1) %>% 
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
   group_by(tmt) %>%
   summarise(day = 10,
@@ -886,9 +920,6 @@ mean_osml_rehab <- dat %>%
 # plot
 dat_for_rehab %>% 
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>% 
-  # remove trail 1 data
-  dplyr::filter(trial_number != 1) %>% 
-  # plot
   ggplot(aes(x = day_n,
              y = osmolality_mmol_kg_mean, 
              color = tmt,
@@ -1003,6 +1034,16 @@ drop1(SMI_rmod3)
 
 This is the best model.
 
+Check linear regression assumptions/conditions:
+
+```{r SMI rehydration model assumptions}
+plot(SMI_rmod3)
+simple.eda(residuals(SMI_rmod3))
+shapiro.test(residuals(SMI_rmod3))
+```
+
+Save best model stats:
+
 ```{r best SMI rehydration model}
 SMI_rmod_best <- lmerTest::lmer(data = dat_for_rehab,
                        SMI ~ 
@@ -1070,6 +1111,16 @@ drop1(hct_rmod4)
 
 This seems to be the best model.
 
+Check linear regression assumptions/conditions:
+
+```{r hct rehydration model assumptions}
+plot(hct_rmod4)
+simple.eda(residuals(hct_rmod4))
+shapiro.test(residuals(hct_rmod4))
+```
+
+Save best model stats:
+
 ```{r best hct rehydration model}
 hct_rmod_best <- dat_for_rehab %>%
   dplyr::filter(complete.cases(hematocrit_percent)) %>%
@@ -1089,40 +1140,37 @@ write.csv(broom::tidy(hct_rmod_best),
 ```{r osmolality rehydration model 1}
 osml_rmod1 <- dat_for_rehab %>%
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
-  #dplyr::filter(trial_number != 1) %>%
   lme4::lmer(data = .,
                        osmolality_mmol_kg_mean ~ 
                          type*humidity_tmt*temp_tmt +
-                         (1|trial_number))
+                         (1|trial_number/individual_ID))
 summary(osml_rmod1)
 drop1(osml_rmod1)
 ```
 
-Drop the interaction between temperature and humidity:
+Drop the interaction with day:
 
 ```{r osmolality rehydration model 2}
 osml_rmod2 <- dat_for_rehab %>%
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
-  #dplyr::filter(trial_number != 1) %>%
   lme4::lmer(data = .,
                        osmolality_mmol_kg_mean ~ 
-                         type*humidity_tmt + type*temp_tmt +
-                         (1|trial_number))
+                         type + humidity_tmt*temp_tmt +
+                         (1|trial_number/individual_ID))
 summary(osml_rmod2)
 drop1(osml_rmod2)
 ```
 
 
-Drop the interactions with day:
+Drop the interaction between temperature and humidity:
 
 ```{r osmolality rehydration model 3}
 osml_rmod3 <- dat_for_rehab %>%
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
-  #dplyr::filter(trial_number != 1) %>%
   lme4::lmer(data = .,
                        osmolality_mmol_kg_mean ~ 
                          type + humidity_tmt + temp_tmt +
-                         (1|trial_number))
+                         (1|trial_number/individual_ID))
 summary(osml_rmod3)
 drop1(osml_rmod3)
 ```
@@ -1132,48 +1180,47 @@ Drop humidity:
 ```{r osmolality rehydration model 4}
 osml_rmod4 <- dat_for_rehab %>%
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
-  #dplyr::filter(trial_number != 1) %>%
   lme4::lmer(data = .,
                        osmolality_mmol_kg_mean ~ 
                          type + temp_tmt +
-                         (1|trial_number))
+                         (1|trial_number/individual_ID))
 summary(osml_rmod4)
 drop1(osml_rmod4)
 ```
 
-Drop the effect of rehab:
+The best model to predict the rehydration effects on plasma osmolality included only additive effects of rehab and acclimation temp tmt prior to rehab.
 
-```{r osmolality rehydration model 5}
-osml_rmod5 <- dat_for_rehab %>%
-  dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
-  #dplyr::filter(trial_number != 1) %>%
-  lme4::lmer(data = .,
-                       osmolality_mmol_kg_mean ~ 
-                         temp_tmt +
-                         (1|trial_number))
-summary(osml_rmod5)
-drop1(osml_rmod5)
+Check linear regression assumptions/conditions:
+
+```{r osml rehydration model assumptions}
+plot(osml_rmod4)
+simple.eda(residuals(osml_rmod4))
+shapiro.test(residuals(osml_rmod4))
 ```
 
-Including only temperature as a predictor seems to be the best model. HOWEVER, I would conclude that rehydration did not increase hydration at all, at least as measured by plasma osmolality. Based on AIC, the null model to explain osmolality is just as good, so I will conclude that the change in plasma osmolality was best-predicted by the null model.
+Save best model stats:
+
+```{r best osmolality rehydration model}
+osml_rmod_best <- dat_for_rehab %>%
+  dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
+  lmerTest::lmer(data = .,
+                       osmolality_mmol_kg_mean ~ 
+                         type + temp_tmt +
+                         (1|trial_number/individual_ID))
+summary(osml_rmod_best)
+write.csv(broom::tidy(osml_rmod_best), 
+          "./results_statistics/rehab_effects_osml.csv")
+```
 
 
 
 
 ## Conclusion
 
-During the 2-day rehydration opportunity provided to lizards following experimental climate treatment, body condition significantly increased and hematocrit significantly decreased. The change in body condition during rehydration was also effected by the interaction between rehydration and acclimation temperature prior to rehydration, with cool-acclimated lizards having overall higher body condition and showing a larger increase in body condition during rehydration. Hematocrit was also affected by acclimation temperature prior to rehydration, with cool-acclimated lizards maintaining higher hematocrit levels with decreases the same as hot-acclimated lizards. Nested effects of trial number and individual lizard ID were included as random effects in both LMMs. Plasma osmolality did not change during the rehydration period, and that was the same across acclimation treatments. The LMM for plasma osmolality included only trial number as a random effect.
+During the 2-day rehydration opportunity provided to lizards following experimental climate treatment, body condition and plasma osmolality significantly increased and hematocrit significantly decreased. The change in body condition during rehydration was also effected by the interaction between rehydration and acclimation temperature prior to rehydration, with cool-acclimated lizards having overall higher body condition and showing a larger increase in body condition during rehydration. Cool-acclimated lizards also maintained higher hematocrit and lower plasma osmolality during rehydration compared to other treatment groups, although changes in hct and osml during rehydration were not different due to acclimation. Nested effects of trial number and individual lizard ID were included as random effects in all three LMMs.
 
 
 This is true for pretty much all the model selection I did:
 In model selection, each dropped variable only improved the model by <2-delta-AIC, so each stepwise model predicted the variability in the response variable equally well. However, the variables dropped also had very low t-values, evidence for their lack of influence thus exclusion from the model.
-
-
-
-# To do
-
-I still need to determine whether trial 1 significantly effects the models for osmolality.
-
-
 
 

@@ -1,5 +1,6 @@
 "","effect","group","term","estimate","std.error","statistic","df","p.value"
-"1","fixed",NA,"(Intercept)",349.115386043768,5.73494661953696,60.8750890295045,5.58014457886353,4.29973521543436e-09
-"2","fixed",NA,"day_n",2.20343594527346,0.557799598879677,3.95022862995776,395.024285362342,9.24628093527057e-05
-"3","ran_pars","trial_number","sd__(Intercept)",11.0688830327257,NA,NA,NA,NA
-"4","ran_pars","Residual","sd__Observation",36.5262919427129,NA,NA,NA,NA
+"1","fixed",NA,"(Intercept)",354.476229861956,2.28670721769193,155.016010409825,8.16683350507738,1.85337281191041e-15
+"2","fixed",NA,"temp_tmtCool",-3.7569524189376,2.42593382386518,-1.54866236744733,123.483867004131,0.124022043580526
+"3","ran_pars","individual_ID:trial_number","sd__(Intercept)",3.41307064903902,NA,NA,NA,NA
+"4","ran_pars","trial_number","sd__(Intercept)",3.3632730693195,NA,NA,NA,NA
+"5","ran_pars","Residual","sd__Observation",23.2512988247053,NA,NA,NA,NA

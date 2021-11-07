@@ -23,7 +23,7 @@ Blood was drawn from the postorbital sinus of adult male *Sceloporus occidentali
 
 # Load Data
 
-```{r}
+```{r load data}
 osml_reps <- read.csv("./data/osmolality.csv",
                 na.strings = c("","NA"),
                 header = TRUE
@@ -55,7 +55,7 @@ Trial 3: July 20-28
 Trial 4: August 8-16
 Trial 5: August 22-30
 
-```{r}
+```{r check dates}
                             # trial 1
 expected_dates <- as.Date(c("2021-06-16", "2021-06-20", 
                             "2021-06-24", "2021-06-26",
@@ -83,7 +83,7 @@ There are zero blood draw dates that are not in our expected list.
 
 Each lizard should have had their blood drawn on 4 different dates, unless they were taken out of the experiment early.
 
-```{r}
+```{r check n obs}
 # get ID's of the individuals that completed treatment
 individuals <- read.csv("./data/tmt_assignments.csv") %>%
   dplyr::select(conclusion, individual_ID) %>%
@@ -117,7 +117,7 @@ Now, I will try to identify outliers within the replicates for a given individua
 
 ## Individuals w 3+ Replicates
 
-```{r}
+```{r separate data w enough reps to assess}
 # identify individuals with 3-4 reps
 enuf_reps <- osml_reps %>%
   group_by(individual_ID, date_blood_drawn) %>%
@@ -144,7 +144,7 @@ nrow(enuf_reps) + nrow(not_reps) == nrow(osml_reps)
 
 We want the Coefficient of Variation (CV) among our technical replicates to be small. We need to calculate it to identify whether there may be outliers.
 
-```{r}
+```{r calculate CVs}
 CVs <- enuf_reps %>%
   group_by(individual_ID, date_blood_drawn) %>%
   summarise(mean = mean(osmolality_mmol_kg),
@@ -166,7 +166,7 @@ The CV is >10 for only one lizard on one date, so our replicates are already lik
 
 ## Find Outlier
 
-```{r}
+```{r create find outlier function}
 # write function to find outliers for each individual on each date
 find_outliers <- function(df) {
   
@@ -211,7 +211,7 @@ find_outliers <- function(df) {
 
 Now apply the function to the data:
 
-```{r, fig.show="hold", out.width="50%"}
+```{r find outlier using boxplots, fig.show="hold", out.width="50%"}
 par(mfrow = c(71, 2))
 outliers_found <- find_outliers(enuf_reps)
 outliers_found
@@ -224,7 +224,7 @@ Based on boxplots, there are no outliers, but we still want to find and omit the
 
 Determine which replicate is an outlier and pulls the CV above our acceptable range (10-15%).
 
-```{r}
+```{r find outlier using CV}
 CV_all <- enuf_reps %>%
     group_by(individual_ID, date_blood_drawn) %>%
     summarise(mean = mean(osmolality_mmol_kg),
@@ -270,8 +270,10 @@ We should remove replicate 2 for individual 225 on June 26.
 
 ## Remove Outlier
 
-```{r}
+```{r remove outlier}
+enuf_reps[199:201, 5:6]
 enuf_reps[200, "osmolality_mmol_kg"] = NA 
+enuf_reps[199:201, 5:6]
 
 # check
 enuf_reps %>%
@@ -292,7 +294,7 @@ enuf_reps_trimmed <- enuf_reps %>%
 
 Now that the outliers are removed from the technical replicates when there were enough replicates to identify them, I will average the remaining replicates of the rejoined data for lizards with 1-2 and 3-4 replicates.
 
-```{r}
+```{r calculate means}
 osml_means <- not_reps %>%
   rbind(enuf_reps_trimmed) %>%
   group_by(date_blood_drawn, individual_ID) %>%
@@ -302,7 +304,7 @@ osml_means <- not_reps %>%
 
 # Export
 
-```{r}
+```{r export cleaned}
 write.csv(osml_means, "./data/osml_means_clean.csv")
 ```
 

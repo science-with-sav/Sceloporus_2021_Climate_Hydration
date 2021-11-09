@@ -759,7 +759,7 @@ CEWL_mod_best <- lmerTest::lmer(data = dat_no_rehab,
                          cloacal_temp_C + 
                          (1|trial_number))
 summary(CEWL_mod_best)
-write.csv(broom::tidy(CEWL_mod3), 
+write.csv(broom::tidy(CEWL_mod_best), 
           "./results_statistics/exp_effects_CEWL.csv")
 ```
 

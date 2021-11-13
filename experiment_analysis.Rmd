@@ -448,16 +448,16 @@ dat %>%
   ylab(bquote('CEWL (g/'*m^2*'h)')) + 
   theme(text = element_text(color = "black", 
                             family = "sans", 
-                            size = 22),
+                            size = 20),
         axis.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 16,
+                                 size = 14,
                                  angle = 90),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 22),
+                                 size = 14),
         legend.text.align = 0,
-        legend.position = "right"
+        legend.position = c(0.25,0.85)
 ) -> tmt_effects_CEWL
 tmt_effects_CEWL
 
@@ -467,7 +467,7 @@ ggsave(filename = "tmt_effects_CEWL.jpeg",
        path = "./results_figures",
        device = "jpeg",
        dpi = 1200,
-       width = 6, height = 4)
+       width = 5, height = 4)
 ```
 
 
@@ -488,7 +488,32 @@ summary(SMI_mod1)
 drop1(SMI_mod1)
 ```
 
-The full model is the best model.
+The full model is the best model based on AIC, but the interaction between acclimation temp & humidity has such a small t-value, I want to try dropping it.
+
+```{r SMI exp model 2}
+SMI_mod2 <- lme4::lmer(data = dat_no_rehab,
+                       SMI ~ 
+                         day_n* (humidity_tmt + temp_tmt) +
+                         (1|trial_number/individual_ID))
+summary(SMI_mod2)
+anova(SMI_mod1, SMI_mod2)
+drop1(SMI_mod2)
+```
+
+Hm, we do lose significant predictive power. What if we drop the singular effects of temp & humidity also??
+
+```{r SMI exp model 3}
+SMI_mod3 <- lme4::lmer(data = dat_no_rehab,
+                       SMI ~ 
+                         day_n:humidity_tmt + day_n:temp_tmt + day_n +
+                         (1|trial_number/individual_ID))
+summary(SMI_mod3)
+anova(SMI_mod1, SMI_mod2)
+anova(SMI_mod2, SMI_mod3)
+drop1(SMI_mod3)
+```
+
+Well, it seems like we lose significant predictive power if we drop acclimation temp, humidity, and their interaction, so we need to retain them despite their small p-values and likely non-significance.
 
 Check linear regression assumptions/conditions:
 
@@ -990,6 +1015,305 @@ ggsave(filename = "rehab_multi_fig.jpeg",
        dpi = 1200,
        width = 6, height = 12)
 ```
+
+
+
+# Exp -> Rehydration Figure
+
+## SMI
+
+```{r SMI fig}
+ggplot() + 
+  geom_line(data = dat_no_rehab,
+            aes(x = day_n,
+             y = SMI, 
+             color = tmt,
+             group = individual_ID),
+            alpha = 0.2) +
+  geom_line(data = dat_for_rehab,
+            aes(x = day_n,
+             y = SMI, 
+             color = tmt,
+             group = individual_ID),
+            alpha = 0.2) +
+  stat_smooth(data = dat_no_rehab,
+    aes(x = day_n,
+             y = SMI, 
+             color = tmt,
+             group = tmt),
+            formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.2, 
+              alpha = 1 ) + 
+  stat_smooth(data = dat_for_rehab,
+    aes(x = day_n,
+             y = SMI, 
+             color = tmt,
+             group = tmt),
+            formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.2, 
+              alpha = 1 ) + 
+  geom_point(data = mean_SMI,
+             aes(x = day,
+                 y = mean_SMI - 0.1, # slight adjustment to center on line
+                 color = tmt,
+                 shape = tmt),
+             size = 4, 
+             alpha = 1) +
+  geom_point(data = mean_SMI_rehab,
+             aes(x = day,
+                 y = mean_SMI,
+                 color = tmt,
+                 shape = tmt),
+             size = 4, 
+             alpha = 1) +
+  theme_classic() + 
+  scale_shape_manual(values = c(15:18), name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_color_brewer(palette = "Set2", name = "") +
+  xlab("Day") + 
+  ylab("Body Condition (g)") + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  geom_vline(xintercept = 9,
+             linetype = "dashed",
+             color = "darkgrey") +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none"
+) -> overall_fig_SMI
+overall_fig_SMI
+
+# export figure
+ggsave(filename = "overall_fig_SMI.jpeg",
+       plot = overall_fig_SMI,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 4)
+```
+
+
+
+
+
+## Hct
+
+```{r hct fig}
+# need to scrub data
+dat_for_rehab1 <- dat_for_rehab %>%
+  dplyr::filter(complete.cases(hematocrit_percent))
+dat_no_rehab1 <- dat_no_rehab %>%
+  dplyr::filter(complete.cases(hematocrit_percent))
+
+# plot
+ggplot() +
+  geom_line(data = dat_no_rehab1,
+            aes(x = day_n,
+             y = hematocrit_percent, 
+             color = tmt,
+             group = individual_ID),
+            alpha = 0.2) +
+  geom_line(data = dat_for_rehab1,
+            aes(x = day_n,
+             y = hematocrit_percent, 
+             color = tmt,
+             group = individual_ID),
+            alpha = 0.2) +
+  stat_smooth(data = dat_no_rehab1,
+            aes(x = day_n,
+             y = hematocrit_percent, 
+             color = tmt,
+             group = tmt),
+            formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.2, 
+              alpha = 1 ) + 
+  stat_smooth(data = dat_for_rehab1,
+            aes(x = day_n,
+             y = hematocrit_percent, 
+             color = tmt,
+             group = tmt),
+            formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.2, 
+              alpha = 1 ) + 
+  geom_point(data = mean_hct,
+             aes(x = day,
+                 y = mean_hct, 
+                 color = tmt,
+                 shape = tmt),
+             size = 4, 
+             alpha = 1) +
+  geom_point(data = mean_hct_rehab,
+             aes(x = day,
+                 y = mean_hct, 
+                 color = tmt,
+                 shape = tmt),
+             size = 4, 
+             alpha = 1) +
+  theme_classic() + 
+  scale_shape_manual(values = c(15:18), name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_color_brewer(palette = "Set2", name = "") +
+  xlab("") + 
+  ylab("Hematocrit (%)") + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  geom_vline(xintercept = 9,
+             linetype = "dashed",
+             color = "darkgrey") +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none"
+        ) -> overall_fig_hct
+overall_fig_hct
+
+# export figure
+ggsave(filename = "overall_fig_hct.jpeg",
+       plot = overall_fig_hct,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 4)
+```
+
+
+
+
+
+## Osmolality
+
+
+```{r osmolality fig}
+# need to scrub data
+dat_for_rehab2 <- dat_for_rehab %>%
+  dplyr::filter(complete.cases(osmolality_mmol_kg_mean))
+dat_no_rehab2 <- dat_no_rehab %>%
+  dplyr::filter(complete.cases(osmolality_mmol_kg_mean))
+
+# plot
+ggplot() + 
+  geom_line(data = dat_no_rehab2,
+            aes(x = day_n,
+             y = osmolality_mmol_kg_mean, 
+             color = tmt,
+             group = individual_ID),
+            alpha = 0.2) +
+  geom_line(data = dat_for_rehab2,
+            aes(x = day_n,
+             y = osmolality_mmol_kg_mean, 
+             color = tmt,
+             group = individual_ID),
+            alpha = 0.2) +
+  stat_smooth(data = dat_no_rehab2,
+            aes(x = day_n,
+             y = osmolality_mmol_kg_mean, 
+             color = tmt,
+             group = tmt),
+            formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.2, 
+              alpha = 1 ) + 
+  stat_smooth(data = dat_for_rehab2,
+            aes(x = day_n,
+             y = osmolality_mmol_kg_mean, 
+             color = tmt,
+             group = tmt),
+            formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.2, 
+              alpha = 1 ) + 
+  geom_point(data = mean_osml,
+             aes(x = day,
+                 y = mean_osml + 3, # slight adjust to center on line 
+                 color = tmt,
+                 shape = tmt),
+             size = 4, 
+             alpha = 1) +
+  geom_point(data = mean_osml_rehab,
+             aes(x = day,
+                 y = mean_osml,
+                 color = tmt,
+                 shape = tmt),
+             size = 4, 
+             alpha = 1) +
+  theme_classic() + 
+  scale_shape_manual(values = c(15:18), name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_color_brewer(palette = "Set2", name = "") +
+  xlab("") + 
+  ylab("Osmolality (mmol / kg)") + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  geom_vline(xintercept = 9,
+             linetype = "dashed",
+             color = "darkgrey") +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "bottom"
+        ) -> overall_fig_osml
+overall_fig_osml
+
+# export figure
+ggsave(filename = "overall_fig_osml.jpeg",
+       plot = overall_fig_osml,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 4)
+```
+
+
+
+## Multi-Figure
+
+```{r arrange figs}
+ggarrange(overall_fig_osml,
+          overall_fig_hct,
+          overall_fig_SMI,
+          ncol = 1, nrow = 3,
+          common.legend = TRUE,
+          legend = "bottom"
+          ) -> overall_multi_fig
+overall_multi_fig
+# export figure
+ggsave(filename = "overall_multi_fig.jpeg",
+       plot = overall_multi_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 12)
+```
+
 
 
 

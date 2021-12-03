@@ -1,0 +1,354 @@
+---
+title: "Climate Water Loss Experiment - Weather Over Time"
+author: "Savannah Weaver"
+date: "2021"
+output: pdf_document
+toc: TRUE
+---
+
+# Packages
+
+```{r setup, include = TRUE, message = FALSE}
+if (!require("tidyverse")) install.packages("tidyverse")
+library("tidyverse") # workflow and plots
+if (!require("weathermetrics")) install.packages("weathermetrics")
+library("weathermetrics") # F to C conversion
+```
+
+# Background
+
+Our analyses of baseline variation in CEWL and plasma osmolality yielded VERY different models for this current project/dataset compared to our last iteration of data collection. In this Rmd, I investigate the weather trends across both studies to assess whether variation, or lack of, in weather may have affected the very different results we got.
+
+
+# Load Data
+
+```{r load and format data}
+weather_dat <- read.csv("./data/weather_long_term.csv", sep = ';') %>%
+  mutate(temperature_F = as.numeric(temperature_F),
+         wind_speed_mph = as.numeric(wind_speed_mph),
+         RH_percent = as.numeric(RH_percent),
+         solar_radiation_W_m2 = as.numeric(solar_radiation_W_m2),
+         date_time = as.POSIXct(paste(date, time), 
+                                format = "%m/%d/%y %I:%M %p"),
+         temp_C = fahrenheit.to.celsius(temperature_F, round = 2),
+         temp_K = temp_C + 273.15,
+         e_s_kPa = 0.611*exp((2500000/461.5)*
+                                  ((1/273)-(1/temp_K))),
+         e_a_kPa = e_s_kPa * (RH_percent/100),
+         VPD_kPa = e_s_kPa - e_a_kPa
+         ) %>%
+  dplyr::filter(complete.cases(temp_C)) %>%
+  dplyr::filter(date_time >= "2021-04-01 00:00:00" & 
+                  date_time <= "2021-09-01 00:00:00")
+summary(weather_dat)
+```
+
+
+# Visualize
+
+## Temperature
+
+```{r temp over time}
+ggplot(data = weather_dat, 
+       aes(x = date_time,
+                y = temp_C)) + 
+  # all data
+  geom_line(alpha = 0.6,
+            color = "gray") +
+  # trend over time
+  stat_smooth(formula = y ~ x, 
+              method = "loess", 
+              color = "black",
+              se = F, 
+              size = 2,
+              alpha = 1 ) + 
+  # sampling dates for BOTH studies
+  geom_vline(xintercept = as.POSIXct("2021-04-05 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-04-19 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-04-26 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-05-03 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-05-10 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-05-17 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-06-16 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-06-26 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-07-20 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-08-08 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-08-22 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  # rest is formatting
+  theme_classic() + 
+  xlab("") + 
+  ylab("Temperature (°C)") + 
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 14),
+        legend.text.align = 0,
+        legend.position = "right"
+        ) -> temp_fig
+temp_fig
+
+# export figure
+ggsave(filename = "weather_long_trends_temp.jpeg",
+       plot = temp_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 4)
+```
+
+
+## VPD
+
+```{r VPD over time}
+ggplot(data = weather_dat, 
+       aes(x = date_time,
+                y = VPD_kPa)) + 
+  # all data
+  geom_line(alpha = 0.6,
+            color = "gray") +
+  # trend over time
+  stat_smooth(formula = y ~ x, 
+              method = "loess", 
+              color = "black",
+              se = F, 
+              size = 2,
+              alpha = 1 ) + 
+  # sampling dates for BOTH studies
+  geom_vline(xintercept = as.POSIXct("2021-04-05 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-04-19 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-04-26 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-05-03 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-05-10 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-05-17 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-06-16 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-06-26 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-07-20 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-08-08 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-08-22 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  # rest is formatting
+  theme_classic() + 
+  xlab("") + 
+  ylab("VPD (kPa)") + 
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 14),
+        legend.text.align = 0,
+        legend.position = "right"
+        ) -> VPD_fig
+VPD_fig
+
+# export figure
+ggsave(filename = "weather_long_trends_VPD.jpeg",
+       plot = VPD_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 4)
+```
+
+
+
+## Wind Speed
+
+```{r wind over time}
+ggplot(data = weather_dat, 
+       aes(x = date_time,
+                y = wind_speed_mph)) + 
+  # all data
+  geom_line(alpha = 0.6,
+            color = "gray") +
+  # trend over time
+  stat_smooth(formula = y ~ x, 
+              method = "loess", 
+              color = "black",
+              se = F, 
+              size = 2,
+              alpha = 1 ) + 
+  # sampling dates for BOTH studies
+  geom_vline(xintercept = as.POSIXct("2021-04-05 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-04-19 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-04-26 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-05-03 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-05-10 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-05-17 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-06-16 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-06-26 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-07-20 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-08-08 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-08-22 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  # rest is formatting
+  theme_classic() + 
+  xlab("") + 
+  ylab("Wind Speed (mph)") + 
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 14),
+        legend.text.align = 0,
+        legend.position = "right"
+        ) -> wind_fig
+wind_fig
+
+# export figure
+ggsave(filename = "weather_long_trends_wind.jpeg",
+       plot = wind_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 4)
+```
+
+
+
+
+## Solar Radiation
+
+```{r sorad over time}
+ggplot(data = weather_dat, 
+       aes(x = date_time,
+                y = solar_radiation_W_m2)) + 
+  # all data
+  geom_line(alpha = 0.6,
+            color = "gray") +
+  # trend over time
+  stat_smooth(formula = y ~ x, 
+              method = "loess", 
+              color = "black",
+              se = F, 
+              size = 2,
+              alpha = 1 ) + 
+  # sampling dates for BOTH studies
+  geom_vline(xintercept = as.POSIXct("2021-04-05 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-04-19 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-04-26 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-05-03 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-05-10 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-05-17 00:00:00"), size = 1,
+             color = "lightpink3") +
+  geom_vline(xintercept = as.POSIXct("2021-06-16 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-06-26 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-07-20 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-08-08 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  geom_vline(xintercept = as.POSIXct("2021-08-22 00:00:00"), size = 1,
+             color = "lightskyblue3") +
+  # rest is formatting
+  theme_classic() + 
+  xlab("") + 
+  ylab(bquote('Solar Radiation (W/'*m^2*')')) + 
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 14),
+        legend.text.align = 0,
+        legend.position = "right"
+        ) -> sorad_fig
+sorad_fig
+
+# export figure
+ggsave(filename = "weather_long_trends_sorad.jpeg",
+       plot = sorad_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 4)
+```
+
+
+
+# Stats
+
+```{r var stats}
+variation <- weather_dat %>%
+  mutate(study = as.factor(case_when(date_time >= "2021-04-05 00:00:00" & 
+                                       date_time <= "2021-05-18 00:00:00" ~
+                                       "spring",
+                                     date_time >= "2021-06-16 00:00:00" &
+                                       date_time <= "2021-08-23 00:00:00" ~
+                                       "summer"
+                                       ))) %>%
+  dplyr::filter(complete.cases(study)) %>%
+  group_by(study) %>%
+  summarise(temp_CV = (sd(temp_C)/mean(temp_C)) *100,
+            temp_range = max(temp_C) - min(temp_C),
+            VPD_CV = (sd(VPD_kPa)/mean(VPD_kPa)) *100,
+            VPD_range = max(VPD_kPa) - min(VPD_kPa),
+            wind_CV = (sd(wind_speed_mph)/mean(wind_speed_mph)) *100,
+            wind_range = max(wind_speed_mph) - min(wind_speed_mph),
+            sorad_CV = (sd(solar_radiation_W_m2)/mean(solar_radiation_W_m2)) *100,
+            sorad_range = max(solar_radiation_W_m2) - min(solar_radiation_W_m2)
+            )
+variation
+```
+
+
+Weather variability (CV):
+temp: spring >>> summer
+VPD: spring > summer
+wind: spring < summer
+sorad: spring >>> summer
+
+Range differences are pretty negligible.
+

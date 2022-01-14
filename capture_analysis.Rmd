@@ -28,6 +28,10 @@ if (!require("broom")) install.packages("broom")
 library("broom") # lmer model export
 if (!require("broom.mixed")) install.packages("broom.mixed")
 library("broom.mixed") # lmer model export
+if (!require("AICcmodavg")) install.packages("AICcmodavg")
+library("AICcmodavg") # model selection
+if (!require("car")) install.packages("car")
+library("car") # VIFs
 ```
 
 
@@ -75,11 +79,23 @@ full_dat <- read.csv("./data/mass_hct_notes.csv", # filename
                 hematocrit_percent, 
                 osmolality_mmol_kg_mean,
                 CEWL_g_m2h_mean = CEWL_g_m2h,
+                msmt_temp_C,
+                msmt_RH_percent,
                 cloacal_temp_C
                 ) %>%
           # format date-time-related variables
   mutate(measurement_date = as.Date(measurement_date, 
-                                    format = "%Y-%m-%d")) %>%
+                                    format = "%Y-%m-%d"),
+         # compute vapor pressure deficit
+         msmt_temp_K = msmt_temp_C + 273.15,
+         # find saturation level first
+         e_s_kPa_m = 0.611*exp((2500000/461.5)*
+                                  ((1/273)-(1/msmt_temp_K))),
+         # actual vapor pressure
+         e_a_kPa_m = e_s_kPa_m * (msmt_RH_percent/100),
+         # VPD
+         msmt_VPD_kPa = e_s_kPa_m - e_a_kPa_m
+         ) %>%
   group_by(individual_ID) %>%
           # for each individual, extract capture date
   mutate(capture_date = min(measurement_date),
@@ -376,7 +392,7 @@ capture_dat_plus <- capture_dat %>%
   dplyr::select(capture_date, capture_date_time, individual_ID, # basics
                 mass_g, SVL_mm, SMI, # lizard size
                 hemolyzed, hematocrit_percent, osmolality_mmol_kg_mean, # blood
-                CEWL_g_m2h_mean, cloacal_temp_C, # CEWL
+                CEWL_g_m2h_mean, msmt_temp_C, msmt_VPD_kPa, cloacal_temp_C, # CEWL
                 temp_C_interpol, VPD_kPa_int, wind_mph_interpol, solar_rad_W_sqm_interpol # weather
                 )
 summary(capture_dat_plus)
@@ -447,7 +463,7 @@ plot(capture_dat_plus$solar_rad_W_sqm_interpol,
      capture_dat_plus$osmolality_mmol_kg_mean)
 ```
 
-There does not appear to be a meaningful visual trend for plasma osmolality, so it will be interesting to see how the model selection process goes... There is definitely an increase in osmolality over the course of the season, though.
+There does not appear to be a meaningful visual trend for any predictors of plasma osmolality, so it will be interesting to see how the model selection process goes... There is definitely an increase in osmolality over the course of the season, though.
 
 
 ## CEWL
@@ -486,193 +502,468 @@ It looks like there are meaningful differences in CEWL across individuals/dates 
 # LMMs
 
 
-## Osmolality
+## Hematocrit
 
 
-### Model Selection
+### Models
 
-Since there are large differences in osmolality by date, but we are interested in what's different among dates, rather than the capture date itself, we will include that as a random effect in the model.
+First, start with a full model with every probable potential predictor in it, then check for multicollinearity.
 
-```{r osmolality model 1}
-osml_mod1 <- lm(data = capture_dat_plus,
+Hematocrit did not vary by capture day, so we are using simple linear models rather than linear mixed-effects models.
+
+```{r hct model 1}
+hct_mod1 <- lm(data = capture_dat_plus,
                           # response variable
-                          osmolality_mmol_kg_mean ~ 
+                          hematocrit_percent ~ 
                           # body size
                           mass_g + SVL_mm + SMI +
-                          # blood sample traits
-                          hemolyzed + hematocrit_percent + 
                           # weather at the time of capture
                           temp_C_interpol * VPD_kPa_int +
-                          wind_mph_interpol + solar_rad_W_sqm_interpol +
-                          capture_date)
-summary(osml_mod1)
-drop1(osml_mod1)
+                          wind_mph_interpol + solar_rad_W_sqm_interpol
+                            )
+hct_mod1_VIFs <- data.frame(VIF = car::vif(hct_mod1)) %>%
+  arrange(desc(VIF))
+hct_mod1_VIFs
 ```
 
-The model would improve the most (based on lower AIC) if we drop hematocrit.
+remove VPD*temp interaction:
 
-```{r osmolality model 2}
-osml_mod2 <- lm(data = capture_dat_plus,
+```{r hct model 2}
+hct_mod2 <- lm(data = capture_dat_plus,
                           # response variable
-                          osmolality_mmol_kg_mean ~ 
+                          hematocrit_percent ~ 
                           # body size
                           mass_g + SVL_mm + SMI +
-                          # blood sample traits
-                          hemolyzed + 
-                          # weather at the time of capture
-                          temp_C_interpol * VPD_kPa_int +
-                          wind_mph_interpol + solar_rad_W_sqm_interpol +
-                          capture_date)
-summary(osml_mod2)
-drop1(osml_mod2)
-
-# compare to full model
-anova(osml_mod1, osml_mod2)
-```
-
-Next we can drop the interaction between temperature and VPD.
-
-```{r osmolality model 3}
-osml_mod3 <- lm(data = capture_dat_plus,
-                          # response variable
-                          osmolality_mmol_kg_mean ~ 
-                          # body size
-                          mass_g + SVL_mm + SMI +
-                          # blood
-                          hemolyzed +
                           # weather at the time of capture
                           temp_C_interpol + VPD_kPa_int +
-                          wind_mph_interpol + solar_rad_W_sqm_interpol +
-                          capture_date)
-summary(osml_mod3)
-drop1(osml_mod3)
-
-# compare to previous model
-anova(osml_mod2, osml_mod3)
+                          wind_mph_interpol + solar_rad_W_sqm_interpol
+                            )
+hct_mod2_VIFs <- data.frame(VIF = car::vif(hct_mod2)) %>%
+  arrange(desc(VIF))
+hct_mod2_VIFs
+drop1(hct_mod2)
 ```
 
 
-Drop temperature.
+drop SVL:
 
-```{r osmolality model 4}
-osml_mod4 <- lm(data = capture_dat_plus,
+```{r hct model 3}
+hct_mod3 <- lm(data = capture_dat_plus,
                           # response variable
-                          osmolality_mmol_kg_mean ~ 
+                          hematocrit_percent ~ 
                           # body size
-                          mass_g + SVL_mm + SMI +
-                          # blood
-                          hemolyzed +
+                          mass_g + SMI +
+                          # weather at the time of capture
+                          temp_C_interpol + VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol
+                            )
+hct_mod3_VIFs <- data.frame(VIF = car::vif(hct_mod3)) %>%
+  arrange(desc(VIF))
+hct_mod3_VIFs
+drop1(hct_mod3)
+```
+
+
+drop temperature:
+
+```{r hct model 4}
+hct_mod4 <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # body size
+                          mass_g + SMI +
                           # weather at the time of capture
                           VPD_kPa_int +
-                          solar_rad_W_sqm_interpol + wind_mph_interpol +
-                          capture_date)
-summary(osml_mod4)
-drop1(osml_mod4)
-
-# compare to previous model
-anova(osml_mod3, osml_mod4)
+                          wind_mph_interpol + solar_rad_W_sqm_interpol
+                            )
+hct_mod4_VIFs <- data.frame(VIF = car::vif(hct_mod4)) %>%
+  arrange(desc(VIF))
+hct_mod4_VIFs
+drop1(hct_mod4)
 ```
+
+VIFs are all below 5 now, so start backwards selection.
+
+Drop mass first:
+
+```{r hct model 5}
+hct_mod5 <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # body size
+                          SMI +
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol
+                            )
+drop1(hct_mod5)
+```
+
 
 Drop VPD:
 
-```{r osmolality model 5}
-osml_mod5 <- lm(data = capture_dat_plus,
+```{r hct model 6}
+hct_mod6 <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # body size
+                          SMI +
+                          # weather at the time of capture
+                          wind_mph_interpol + solar_rad_W_sqm_interpol
+                            )
+drop1(hct_mod6)
+```
+
+Drop solar:
+
+```{r hct model 7}
+hct_mod7 <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # body size
+                          SMI +
+                          # weather at the time of capture
+                          wind_mph_interpol
+                            )
+drop1(hct_mod7)
+```
+
+Drop SMI:
+
+```{r hct model 8}
+hct_mod8 <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # weather at the time of capture
+                          wind_mph_interpol
+                            )
+```
+
+
+Finally, null model:
+
+```{r hct null model}
+hct_mod_null <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 1)
+```
+
+
+### Selection
+
+Compare models 4-8 and the null model.
+
+```{r hct mod compare}
+hct_models <- list(hct_mod4, hct_mod5, hct_mod6, hct_mod7, 
+                   hct_mod8, hct_mod_null)
+
+#specify model names
+hct_mod_names <- c('(model 4) ~ Wind-C, SMI, Solar-C, VPD-C, Mass', 
+                       '(model 5) ~ Wind-C, SMI, Solar-C, VPD-C', 
+                       '(model 6) ~ Wind-C, SMI, Solar-C',
+                       '(model 7) ~ Wind-C, SMI', 
+                       '(model 8) ~ Wind-C', 
+                       'null model')
+#calculate AIC of each model
+hct_AICc <- data.frame(aictab(cand.set = hct_models, 
+                                 modnames = hct_mod_names))
+hct_AICc
+```
+
+
+The best models are models 6 and 5.
+
+
+### LM Conditions
+
+Check that the best model meets the criteria for linear regression and has no collinearity.
+
+```{r hct model assumptions}
+vif(hct_mod6)
+plot(hct_mod6)
+simple.eda(residuals(hct_mod6))
+shapiro.test(residuals(hct_mod6))
+vif(hct_mod5)
+plot(hct_mod5)
+simple.eda(residuals(hct_mod5))
+shapiro.test(residuals(hct_mod5))
+```
+
+Everything is almost perfect.
+
+
+### Export
+
+```{r}
+write.csv(hct_AICc, "./results_statistics/capture_hct_mod_rankings.csv")
+write.csv(broom.mixed::tidy(hct_mod6), 
+          "./results_statistics/capture_hct_best_mod1.csv")
+write.csv(broom.mixed::tidy(hct_mod5), 
+          "./results_statistics/capture_hct_best_mod2.csv")
+```
+
+
+## Osmolality
+
+
+### Models
+
+Since there are large differences in osmolality by date, but we are interested in what's different among dates, rather than the capture date itself, we will include that as a random effect in the model.
+
+We would also include whether or not a blood sample is hemolyzed as a random effect, but only 11 of the almost 150 samples were hemolyzed, so we will assume that any potential effects will be undetectable and/or overshadowed. We do not have concern about using those points.
+
+First, start with a full model with every probable potential predictor in it, then check for multicollinearity.
+
+```{r osmolality model 1}
+osml_mod1 <- lme4::lmer(data = capture_dat_plus,
                           # response variable
                           osmolality_mmol_kg_mean ~ 
                           # body size
                           mass_g + SVL_mm + SMI +
-                          # blood
-                          hemolyzed +
+                          # blood sample traits
+                          hematocrit_percent + 
                           # weather at the time of capture
-                          solar_rad_W_sqm_interpol + wind_mph_interpol +
-                          capture_date)
+                          temp_C_interpol * VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+osml_mod1_VIFs <- data.frame(VIF = car::vif(osml_mod1)) %>%
+  arrange(desc(VIF))
+osml_mod1_VIFs
+```
+
+VPD and temperature introduce a lot of collinearity, so start by dropping their interaction:
+
+```{r osmolality model 2}
+osml_mod2 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          mass_g + SVL_mm + SMI +
+                          # blood sample traits
+                          hematocrit_percent + 
+                          # weather at the time of capture
+                          temp_C_interpol + VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+osml_mod2_VIFs <- data.frame(VIF = car::vif(osml_mod2)) %>%
+  arrange(desc(VIF))
+osml_mod2_VIFs
+drop1(osml_mod2)
+```
+
+Drop mass next, since it's extremely collinear and we get slightly better AIC by dropping mass compared to SVL:
+
+```{r osmolality model 3}
+osml_mod3 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm + SMI +
+                          # blood sample traits
+                          hematocrit_percent + 
+                          # weather at the time of capture
+                          temp_C_interpol + VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+osml_mod3_VIFs <- data.frame(VIF = car::vif(osml_mod3)) %>%
+  arrange(desc(VIF))
+osml_mod3_VIFs
+drop1(osml_mod3)
+```
+
+Temperature is still introducing a lot of multicollinearity, so drop:
+
+```{r osmolality model 4}
+osml_mod4 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm + SMI +
+                          # blood sample traits
+                          hematocrit_percent + 
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+osml_mod4_VIFs <- data.frame(VIF = car::vif(osml_mod4)) %>%
+  arrange(desc(VIF))
+osml_mod4_VIFs
+summary(osml_mod4)
+drop1(osml_mod4)
+```
+
+
+Great, VIFs are well-within acceptable ranges. Now we can start backwards model selection.
+
+Start by dropping wind:
+
+```{r osmolality model 5}
+osml_mod5 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm + SMI +
+                          # blood sample traits
+                          hematocrit_percent + 
+                          # weather at the time of capture
+                          VPD_kPa_int + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
 summary(osml_mod5)
 drop1(osml_mod5)
-
-# compare to previous model
-anova(osml_mod4, osml_mod5)
 ```
 
-Drop whether a sample is hemolyzed:
+Drop hematocrit:
 
 ```{r osmolality model 6}
-osml_mod6 <- lm(data = capture_dat_plus,
+osml_mod6 <- lme4::lmer(data = capture_dat_plus,
                           # response variable
                           osmolality_mmol_kg_mean ~ 
                           # body size
-                          mass_g + SVL_mm + SMI +
+                          SVL_mm + SMI +
                           # weather at the time of capture
-                          solar_rad_W_sqm_interpol + wind_mph_interpol +
-                          capture_date)
+                          VPD_kPa_int + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
 summary(osml_mod6)
 drop1(osml_mod6)
-
-# compare to previous model
-anova(osml_mod5, osml_mod6)
 ```
 
-Drop body condition (SMI):
+Drop SMI:
 
 ```{r osmolality model 7}
-osml_mod7 <- lm(data = capture_dat_plus,
-                          # response variable
-                          osmolality_mmol_kg_mean ~ 
-                          # body size
-                          mass_g + SVL_mm +
-                          # weather at the time of capture
-                          solar_rad_W_sqm_interpol + wind_mph_interpol +
-                          capture_date)
-summary(osml_mod7)
-drop1(osml_mod7)
-```
-
-Drop mass:
-
-```{r osmolality model 8}
-osml_mod8 <- lm(data = capture_dat_plus,
+osml_mod7 <- lme4::lmer(data = capture_dat_plus,
                           # response variable
                           osmolality_mmol_kg_mean ~ 
                           # body size
                           SVL_mm +
                           # weather at the time of capture
-                          solar_rad_W_sqm_interpol + wind_mph_interpol +
-                          capture_date)
-summary(osml_mod8)
-drop1(osml_mod8)
+                          VPD_kPa_int + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(osml_mod7)
+drop1(osml_mod7)
 ```
 
-Model 8 is the best model!
+Drop VPD:
+
+```{r osmolality model 8}
+osml_mod8 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm +
+                          # weather at the time of capture
+                          solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(osml_mod8)
+```
+
+Drop SVL:
+
+```{r osmolality model 9}
+osml_mod9 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # weather at the time of capture
+                          solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(osml_mod9)
+```
+
+Lastly, compute null model:
+
+```{r osmolality null model}
+osml_mod_null <- lme4::lmer(data = capture_dat_plus,
+                          osmolality_mmol_kg_mean ~ 1 +
+                          (1|capture_date))
+summary(osml_mod_null)
+```
+
+
+### Selection
+
+Compare models 4-9 and null. 
+
+```{r osml mod compare}
+osml_models <- list(osml_mod4, osml_mod5, osml_mod6,
+                    osml_mod7, osml_mod8, osml_mod9,
+                    osml_mod_null)
+#specify model names
+osml_mod_names <- c('(model 4) ~ Solar-C, SVL, VPD-C, SMI, Hct, Wind-C', 
+                       '(model 5) ~ Solar-C, SVL, VPD-C, SMI, Hct', 
+                       '(model 6) ~ Solar-C, SVL, VPD-C, SMI',
+                       '(model 7) ~ Solar-C, SVL, VPD-C', 
+                       '(model 8) ~ Solar-C, SVL', 
+                       '(model 9) ~ Solar-C', 
+                       'null model')
+#calculate AIC of each model
+osml_AICc <- data.frame(aictab(cand.set = osml_models, 
+                                 modnames = osml_mod_names))
+osml_AICc
+```
+
 
 
 
 ### LM Conditions
 
-Check residual plots:
+Check residual plots and VIFs
 
-```{rosml model assumptions}
-plot(osml_mod8)
-simple.eda(residuals(osml_mod8))
-shapiro.test(residuals(osml_mod8))
+```{r osml model assumptions}
+vif(osml_mod6)
+plot(osml_mod6)
+simple.eda(residuals(osml_mod6))
+shapiro.test(residuals(osml_mod6))
+vif(osml_mod7)
+plot(osml_mod7)
+simple.eda(residuals(osml_mod7))
+shapiro.test(residuals(osml_mod7))
 ```
 
-There is no clear pattern in the residuals ~ fitted plot, so linearity seems satisfied. Equal error variance seems fine. Normality seems fine, even though the Shapiro-Wilk normality test is significant.
+There is no clear pattern in the residuals ~ fitted plot, so linearity seems satisfied. slight fanning, but equal error variance seems fine. Normality seems fine, even though the Shapiro-Wilk normality test is significant. VIFs essentially negligible.
 
 
-### Conclusion
+### Export
+
+
+First, re-run for p-values:
+
+
+```{r osmolality best models}
+osml_mod6p <- lmerTest::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm + SMI +
+                          # weather at the time of capture
+                          VPD_kPa_int + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(osml_mod6p)
+
+osml_mod7p <- lmerTest::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm +
+                          # weather at the time of capture
+                          VPD_kPa_int + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(osml_mod7p)
+```
+
 
 Save the model output.
 
 ```{r best osml model}
-osml_best_mod_results <- broom.mixed::tidy(osml_mod8)
-write.csv(osml_best_mod_results,
-          "./results_statistics/capture_osml_best_model.csv")
+write.csv(broom.mixed::tidy(osml_mod6p),
+          "./results_statistics/capture_osml_best_model1.csv")
+write.csv(broom.mixed::tidy(osml_mod7p),
+          "./results_statistics/capture_osml_best_model2.csv")
+write.csv(osml_AICc, "./results_statistics/capture_osml_mod_rankings.csv")
 ```
 
 
 To report in paper:
 
-The best model to predict the variation in baseline plasma osmolality included SVL, solar radiation and wind speed at the time of capture, and date as fixed effects. The final model had acceptable LM conditions.
-During model selection, each reduced model was only 1-2-delta-AIC better than the previous model. The full model included mass, SVL, SMI, whether the blood sample was hemolyzed, percent hematocrit, and temperature, VPD, wind speed, and solar radiation at the time of capture, with date as a random effect.
+The best models to predict the variation in baseline plasma osmolality included SVL, SMI, VPD, and solar radiation at the time of capture as fixed effects. Date was included as a random effect. The final model had acceptable LM conditions. The full model included mass, SVL, SMI, percent hematocrit, and temperature, VPD, wind speed, and solar radiation at the time of capture, with date as a random effect.
 
 
 
@@ -681,12 +972,14 @@ During model selection, each reduced model was only 1-2-delta-AIC better than th
 It looks like there are meaningful differences in CEWL across individuals/dates (probably confounded), and based on cloacal temp, capture temp, capture VPD, capture wind, and capture solar radiation.
 
 
-### Model Selection
+### Models
 
-Start with the full model of all potential predictor variables. We will again include date as a random effect.
+Start with the full model of all potential predictor variables. We will again include date as a random effect. Individual ID is not included as a random effect bc each lizard only has one set of capture observations.
+
+When we have this many variables, it's extremely important to start with checking for multicollinearity.
 
 ```{r CEWL model 1}
-CEWL_mod1 <- lm(data = capture_dat_plus,
+CEWL_mod1 <- lme4::lmer(data = capture_dat_plus,
                           # response variable
                           CEWL_g_m2h_mean ~ 
                           # essential covariate
@@ -695,18 +988,23 @@ CEWL_mod1 <- lm(data = capture_dat_plus,
                           mass_g + SVL_mm + SMI +
                           # blood
                           osmolality_mmol_kg_mean + hematocrit_percent + 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
                           # weather at the time of capture
                           temp_C_interpol * VPD_kPa_int +
                           wind_mph_interpol + solar_rad_W_sqm_interpol +
-                          capture_date)
-summary(CEWL_mod1)
+                          (1|capture_date))
+CEWL_mod1_VIFs <- data.frame(VIF = car::vif(CEWL_mod1)) %>%
+  arrange(desc(VIF))
+CEWL_mod1_VIFs
 drop1(CEWL_mod1)
 ```
 
-We will start with dropping hematocrit.
+
+Just as for osmolality, VPD and temperature introduce a lot of collinearity. Start with dropping their interaction:
 
 ```{r CEWL model 2}
-CEWL_mod2 <- lm(data = capture_dat_plus,
+CEWL_mod2 <- lme4::lmer(data = capture_dat_plus,
                           # response variable
                           CEWL_g_m2h_mean ~ 
                           # essential covariate
@@ -714,152 +1012,326 @@ CEWL_mod2 <- lm(data = capture_dat_plus,
                           # body size
                           mass_g + SVL_mm + SMI +
                           # blood
-                          osmolality_mmol_kg_mean + 
+                          osmolality_mmol_kg_mean + hematocrit_percent + 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
                           # weather at the time of capture
-                          temp_C_interpol * VPD_kPa_int +
+                          temp_C_interpol + VPD_kPa_int +
                           wind_mph_interpol + solar_rad_W_sqm_interpol +
-                          capture_date)
-summary(CEWL_mod2)
+                          (1|capture_date))
+CEWL_mod2_VIFs <- data.frame(VIF = car::vif(CEWL_mod2)) %>%
+  arrange(desc(VIF))
+CEWL_mod2_VIFs
 drop1(CEWL_mod2)
-anova(CEWL_mod1, CEWL_mod2)
 ```
 
-I'm shocked that AIC suggests dropping cloacal temperature. We know it's important, so I will retain it despite the supposed benefits to model fit.
-
-Instead, we will try dropping body condition because it's slightly less helpful than its collinear variables SVL and mass.
+MUCH better. Drop SVL next:
 
 ```{r CEWL model 3}
-CEWL_mod3 <- lm(data = capture_dat_plus,
+CEWL_mod3 <- lme4::lmer(data = capture_dat_plus,
                           # response variable
                           CEWL_g_m2h_mean ~ 
                           # essential covariate
                           cloacal_temp_C +
                           # body size
-                          mass_g + SVL_mm +
+                          mass_g + SMI +
                           # blood
-                          osmolality_mmol_kg_mean + 
+                          osmolality_mmol_kg_mean + hematocrit_percent + 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
                           # weather at the time of capture
-                          temp_C_interpol * VPD_kPa_int +
+                          temp_C_interpol + VPD_kPa_int +
                           wind_mph_interpol + solar_rad_W_sqm_interpol +
-                          capture_date)
-summary(CEWL_mod3)
+                          (1|capture_date))
+CEWL_mod3_VIFs <- data.frame(VIF = car::vif(CEWL_mod3)) %>%
+  arrange(desc(VIF))
+CEWL_mod3_VIFs
 drop1(CEWL_mod3)
-anova(CEWL_mod2, CEWL_mod3)
 ```
 
-Drop SVL next:
+
+Next drop temperature at the time of capture:
 
 ```{r CEWL model 4}
-CEWL_mod4 <- lm(data = capture_dat_plus,
+CEWL_mod4 <- lme4::lmer(data = capture_dat_plus,
                           # response variable
                           CEWL_g_m2h_mean ~ 
                           # essential covariate
                           cloacal_temp_C +
                           # body size
-                          mass_g +
+                          mass_g + SMI +
                           # blood
-                          osmolality_mmol_kg_mean + 
+                          osmolality_mmol_kg_mean + hematocrit_percent + 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
                           # weather at the time of capture
-                          temp_C_interpol * VPD_kPa_int +
+                          VPD_kPa_int +
                           wind_mph_interpol + solar_rad_W_sqm_interpol +
-                          capture_date)
+                          (1|capture_date))
+CEWL_mod4_VIFs <- data.frame(VIF = car::vif(CEWL_mod4)) %>%
+  arrange(desc(VIF))
+CEWL_mod4_VIFs
 summary(CEWL_mod4)
 drop1(CEWL_mod4)
-anova(CEWL_mod3, CEWL_mod4)
 ```
 
 
-Drop mass:
+Great, VIFs are minimal and we're ready to start backwards selection!
+
+Start with dropping SMI:
 
 ```{r CEWL model 5}
-CEWL_mod5 <- lm(data = capture_dat_plus,
+CEWL_mod5 <- lme4::lmer(data = capture_dat_plus,
                           # response variable
                           CEWL_g_m2h_mean ~ 
                           # essential covariate
                           cloacal_temp_C +
+                          # body size
+                          mass_g + 
                           # blood
-                          osmolality_mmol_kg_mean + 
+                          osmolality_mmol_kg_mean + hematocrit_percent + 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
                           # weather at the time of capture
-                          temp_C_interpol * VPD_kPa_int +
+                          VPD_kPa_int +
                           wind_mph_interpol + solar_rad_W_sqm_interpol +
-                          capture_date)
+                          (1|capture_date))
 summary(CEWL_mod5)
-anova(CEWL_mod4, CEWL_mod5)
 drop1(CEWL_mod5)
 ```
 
-Try dropping capture date:
+next drop cloacal temperature (What?!):
 
 ```{r CEWL model 6}
-CEWL_mod6 <- lm(data = capture_dat_plus,
+CEWL_mod6 <- lme4::lmer(data = capture_dat_plus,
                           # response variable
                           CEWL_g_m2h_mean ~ 
-                          # essential covariate
-                          cloacal_temp_C +
+                          # body size
+                          mass_g + 
                           # blood
-                          osmolality_mmol_kg_mean + 
+                          osmolality_mmol_kg_mean + hematocrit_percent + 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
                           # weather at the time of capture
-                          temp_C_interpol * VPD_kPa_int +
-                          wind_mph_interpol + solar_rad_W_sqm_interpol
-                )
+                          VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
 summary(CEWL_mod6)
-anova(CEWL_mod5, CEWL_mod6)
 drop1(CEWL_mod6)
 ```
 
-Drop wind:
+
+next drop hematocrit:
 
 ```{r CEWL model 7}
-CEWL_mod7 <- lm(data = capture_dat_plus,
+CEWL_mod7 <- lme4::lmer(data = capture_dat_plus,
                           # response variable
                           CEWL_g_m2h_mean ~ 
-                          # essential covariate
-                          cloacal_temp_C +
+                          # body size
+                          mass_g + 
                           # blood
-                          osmolality_mmol_kg_mean + 
+                          osmolality_mmol_kg_mean +
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
                           # weather at the time of capture
-                          temp_C_interpol * VPD_kPa_int +
-                          solar_rad_W_sqm_interpol)
+                          VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
 summary(CEWL_mod7)
-anova(CEWL_mod6, CEWL_mod7)
 drop1(CEWL_mod7)
 ```
 
-This is the best model! Technically, the best model would not have cloacal temperature included, but it's an essential covariate to CEWL.
+
+next drop solar radiation:
+
+```{r CEWL model 8}
+CEWL_mod8 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # body size
+                          mass_g + 
+                          # blood
+                          osmolality_mmol_kg_mean +
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol +
+                          (1|capture_date))
+summary(CEWL_mod8)
+drop1(CEWL_mod8)
+```
+
+
+next drop mass:
+
+```{r CEWL model 9}
+CEWL_mod9 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # blood
+                          osmolality_mmol_kg_mean +
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol +
+                          (1|capture_date))
+summary(CEWL_mod9)
+drop1(CEWL_mod9)
+```
+
+next drop VPD:
+
+```{r CEWL model 10}
+CEWL_mod10 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # blood
+                          osmolality_mmol_kg_mean +
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          wind_mph_interpol +
+                          (1|capture_date))
+summary(CEWL_mod10)
+# can't test drop1 bc of NA's 
+```
+
+based on t-values, wind should be dropped next:
+
+```{r CEWL model 11}
+CEWL_mod11 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # blood
+                          osmolality_mmol_kg_mean +
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          (1|capture_date))
+summary(CEWL_mod11)
+drop1(CEWL_mod11)
+```
+
+drop osmolality:
+
+```{r CEWL model 12}
+CEWL_mod12 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          (1|capture_date))
+summary(CEWL_mod12)
+drop1(CEWL_mod12)
+```
+
+
+drop VPD at the time of msmt:
+
+```{r CEWL model 13}
+CEWL_mod13 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # microclimate at the time of msmt
+                          msmt_temp_C +
+                          (1|capture_date))
+summary(CEWL_mod13)
+```
+
+And finally, null model:
+
+```{r CEWL model null}
+CEWL_mod_null <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 1 +
+                          (1|capture_date))
+summary(CEWL_mod_null)
+```
+
+
+
+### Selection
+
+compare models 4-13 and the null
+
+```{r CEWL mod compare}
+CEWL_models <- list(CEWL_mod4, CEWL_mod5, CEWL_mod6, CEWL_mod7, 
+                    CEWL_mod8, CEWL_mod9, CEWL_mod10, CEWL_mod11,
+                    CEWL_mod12, CEWL_mod13, CEWL_mod_null)
+
+#specify model names
+CEWL_mod_names <- c('(model 4) ~ Temp-M, VPD-M, Osml, Wind-C, VPD-C, Mass, Solar-C, Hct, Temp-Clo, SMI', 
+                    '(model 5) ~ Temp-M, VPD-M, Osml, Wind-C, VPD-C, Mass, Solar-C, Hct, Temp-Clo', 
+                    '(model 6) ~ Temp-M, VPD-M, Osml, Wind-C, VPD-C, Mass, Solar-C, Hct', 
+                       '(model 7) ~ Temp-M, VPD-M, Osml, Wind-C, VPD-C, Mass, Solar-C', 
+                       '(model 8) ~ Temp-M, VPD-M, Osml, Wind-C, VPD-C, Mass',
+                       '(model 9) ~ Temp-M, VPD-M, Osml, Wind-C, VPD-C', 
+                       '(model 10) ~ Temp-M, VPD-M, Osml, Wind-C', 
+                       '(model 11) ~ Temp-M, VPD-M, Osml',
+                      '(model 12) ~ Temp-M, VPD-M',
+                      '(model 13) ~ Temp-M',
+                      'null model')
+#calculate AIC of each model
+CEWL_AICc <- data.frame(aictab(cand.set = CEWL_models, 
+                                 modnames = CEWL_mod_names))
+CEWL_AICc
+```
+
+
+The single best model is model 9, which included Temp-M, VPD-M, Osml, Wind-C, VPD-C.
+
 
 
 ### LM Conditions
 
-Check that the best model meets the criteria for linear regression.
+Check that the best model meets the criteria for linear regression and has no collinearity.
 
 ```{r CEWL model assumptions}
-plot(CEWL_mod7)
-simple.eda(residuals(CEWL_mod7))
-shapiro.test(residuals(CEWL_mod7))
+vif(CEWL_mod9)
+plot(CEWL_mod9)
+simple.eda(residuals(CEWL_mod9))
+shapiro.test(residuals(CEWL_mod9))
 ```
 
-There is some slight fanning in the residuals ~ fitted plot, suggesting equal error variance is not perfect, but overall, all LNE conditions appear to be met.
+There is some slight fanning in the residuals ~ fitted plot, suggesting equal error variance is not perfect, but overall, all LNE conditions appear to be met and VIFs are very low.
 
 
-### Conclusion
+### Export
 
-Save the model output.
+First, re-run the best model using lmerTest for p-values.
+
+```{r CEWL model 9 p}
+CEWL_mod9p <- lmerTest::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # blood
+                          osmolality_mmol_kg_mean +
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol +
+                          (1|capture_date))
+summary(CEWL_mod9p)
+```
+
+Save the best CEWL model output.
 
 ```{r best CEWL model}
-CEWL_best_mod_results <- broom.mixed::tidy(CEWL_mod7)
-write.csv(CEWL_best_mod_results,
+write.csv(broom.mixed::tidy(CEWL_mod9p),
           "./results_statistics/capture_CEWL_best_model.csv")
+write.csv(CEWL_AICc, 
+          "./results_statistics/capture_CEWL_mod_rankings.csv")
 ```
 
 
 To report in paper:
 
-The best model to predict CEWL included cloacal temperature, plasma osmolality, temperature, VPD, and solar radiation at the time of capture, and the interaction between temp*VPD. The final model met all linear regression conditions for linearity, normality, and equal error variance.
-During model selection, each reduced model was only 1-2-delta-AIC better than the previous model. The full model included cloacal temperature, mass, SVL, SMI, plasma osmolality, percent hematocrit, and temperature, VPD, wind speed, and solar radiation at the time of capture, with date as a random effect. The effect of cloacal temperature was not significant and should have been dropped from the model based on AIC, but the literature and our previous study suggest that cloacal temperature is an strong covariate of CEWL, so we retained it in the reduced model despite nonsignificance.
+The best model to predict CEWL included plasma osmolality, temperature and VPD at the time of measurement, and VPD and wind at the time of capture. The final model met all linear regression conditions for linearity, normality, and equal error variance, and there was no multicollinearity.
 
 
-
-# Model Figures
+# Pub Figures
 
 ## Osmolality ~ SVL
 

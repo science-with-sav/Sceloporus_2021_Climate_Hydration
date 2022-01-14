@@ -802,7 +802,9 @@ Unfortunately, CVs are still skewed to the right, but overall, CVs are much lowe
 ```{r get replicate means}
 CEWL_final <- outliers_omitted %>%
   group_by(date, individual_ID) %>%
-  summarise(CEWL_g_m2h = mean(CEWL_g_m2h)) %>%
+  summarise(CEWL_g_m2h = mean(CEWL_g_m2h),
+            msmt_temp_C = mean(msmt_temp_C),
+            msmt_RH_percent = mean(msmt_RH_percent)) %>%
   left_join(cloacal_temp_C, by = c('date', 'individual_ID')) %>%
   dplyr::filter(complete.cases(CEWL_g_m2h, cloacal_temp_C))
 head(CEWL_final)

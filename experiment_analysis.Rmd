@@ -24,6 +24,8 @@ if (!require("broom")) install.packages("broom")
 library("broom") # lmer model export
 if (!require("broom.mixed")) install.packages("broom.mixed")
 library("broom.mixed") # lmer model export
+if (!require("car")) install.packages("car")
+library("car") # VIFs
 ```
 
 

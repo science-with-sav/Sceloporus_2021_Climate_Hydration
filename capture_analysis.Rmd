@@ -971,6 +971,7 @@ The best models to predict the variation in baseline plasma osmolality included 
 
 It looks like there are meaningful differences in CEWL across individuals/dates (probably confounded), and based on cloacal temp, capture temp, capture VPD, capture wind, and capture solar radiation.
 
+*I didn't calculate holding time*!!!!!!!!!!!!!!!!!!!
 
 ### Models
 
@@ -1333,36 +1334,175 @@ The best model to predict CEWL included plasma osmolality, temperature and VPD a
 
 # Pub Figures
 
-## Osmolality ~ SVL
+## Custom Colors
 
-```{r osml SVL fig}
-capture_dat_plus %>% 
-  ggplot() + 
-  geom_point(aes(x = SVL_mm,
-                 y = osmolality_mmol_kg_mean), 
-             size = 1, 
+```{r}
+lizard_color = "turquoise"
+VPD_color = "blue"
+temp_color = "gray"
+solar_color = "orange"
+wind_color = "orange"
+date_color = "gray"
+osml_color = "red"
+```
+
+
+
+## Hct ~ SMI
+
+```{r hct SMI fig}
+ggplot(capture_dat_plus) + 
+  aes(x = SMI,
+      y = hematocrit_percent) +
+  geom_point(size = 1, 
              alpha = 0.4) + 
-  stat_smooth(aes(x = SVL_mm, 
-                  y = osmolality_mmol_kg_mean), 
-              formula = y ~ x, 
+  stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
               size = 1.6, 
+              color = lizard_color,
+              alpha = 1) + 
+  theme_classic() + 
+  xlab("Body Condition (g)") + 
+  ylab("Hematocrit (%)") + 
+  #ylab("") +
+  #xlim() +
+  ylim(20,60) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_hct_SMI_fig
+cap_hct_SMI_fig
+```
+
+
+
+## Hct ~ VPD at Capture
+
+```{r hct VPD fig}
+ggplot(capture_dat_plus) + 
+  aes(x = VPD_kPa_int,
+      y = hematocrit_percent) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = VPD_color,
+              size = 1.6, 
               alpha = 1 ) + 
+  theme_classic() + 
+  xlab("VPD at Capture (kPa)") + 
+  ylab("Hematocrit (%)") + 
+  #ylab("") +
+  #xlim() +
+  ylim(20,60) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_hct_VPD_fig
+cap_hct_VPD_fig
+```
+
+
+
+## Hct ~ Wind Speed at Capture
+
+```{r hct wind fig}
+ggplot(capture_dat_plus) + 
+  aes(x = wind_mph_interpol,
+      y = hematocrit_percent)+
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = wind_color,
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("Wind Speed at Capture (mph)") + 
+  ylab("Hematocrit (%)") + 
+  #ylab("") +
+  #xlim() +
+  ylim(20, 60) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_hct_wind_fig
+cap_hct_wind_fig
+```
+
+
+
+
+## Hct ~ Solar Radiation at Capture
+
+```{r hct sorad fig}
+ggplot(capture_dat_plus) + 
+  aes(x = solar_rad_W_sqm_interpol,
+      y = hematocrit_percent) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = solar_color,
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab(bquote('Solar Radiation (W/'*m^2*')')) + 
+  ylab("Hematocrit (%)") + 
+  #ylab("") +
+  ylim(20, 60) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_hct_sorad_fig
+cap_hct_sorad_fig
+```
+
+
+## Osmolality ~ SVL
+
+```{r osml SVL fig}
+ggplot(capture_dat_plus) + 
+  aes(x = SVL_mm,
+      y = osmolality_mmol_kg_mean) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.6, 
+              color = lizard_color,
+              alpha = 1) + 
   theme_classic() + 
   xlab("Snout-Vent Length (mm)") + 
   ylab("Plasma Osmolality (mmol/kg)") + 
   #ylab("") +
   #xlim() +
-  #ylim() +
-  #annotate("text", x = , y = , 
-   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
-    #       parse = TRUE,
-     #      size = 6) +
-  #annotate("text", x = , y = , 
-   #        label = "paste(italic(p), \" < 0.0001\")", 
-    #       parse = TRUE,
-     #      size = 6) +
+  ylim(300,400) +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 22),
@@ -1373,46 +1513,94 @@ capture_dat_plus %>%
         #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
         ) -> cap_osml_SVL_fig
 cap_osml_SVL_fig
-# export figure
-#ggsave(filename = "cap_osml_mass_fig.jpeg",
- #      plot = cap_osml_mass_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 6, height = 4)
 ```
 
 
-## Osmolality ~ Solar Radiation
+## Osmolality ~ SMI
 
-```{r osml sorad fig}
-capture_dat_plus %>% 
-  ggplot() + 
-  geom_point(aes(x = solar_rad_W_sqm_interpol,
-                 y = osmolality_mmol_kg_mean), 
-             size = 1, 
+```{r osml SMI fig}
+ggplot(capture_dat_plus) + 
+  aes(x = SMI,
+      y = osmolality_mmol_kg_mean) +
+  geom_point(size = 1, 
              alpha = 0.4) + 
-  stat_smooth(aes(x = solar_rad_W_sqm_interpol, 
-                  y = osmolality_mmol_kg_mean), 
-              formula = y ~ x, 
+  stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
+              size = 1.6, 
+              color = lizard_color,
+              alpha = 1) + 
+  theme_classic() + 
+  xlab("Body Condition (g)") + 
+  ylab("Plasma Osmolality (mmol/kg)") + 
+  #ylab("") +
+  #xlim() +
+  ylim(300,400) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_osml_SMI_fig
+cap_osml_SMI_fig
+```
+
+
+## Osmolality ~ VPD at Capture
+
+```{r osml VPD fig}
+ggplot(capture_dat_plus) + 
+  aes(x = VPD_kPa_int,
+      y = osmolality_mmol_kg_mean) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = VPD_color,
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("VPD at Capture (kPa)") + 
+  ylab("Plasma Osmolality (mmol/kg)") + 
+  #ylab("") +
+  #xlim() +
+  ylim(300,400) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_osml_VPD_fig
+cap_osml_VPD_fig
+```
+
+
+## Osmolality ~ Solar Radiation at Capture
+
+```{r osml sorad fig}
+ggplot(capture_dat_plus) + 
+  aes(x = solar_rad_W_sqm_interpol,
+      y = osmolality_mmol_kg_mean) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = solar_color,
               size = 1.6, 
               alpha = 1 ) + 
   theme_classic() + 
   xlab(bquote('Solar Radiation (W/'*m^2*')')) + 
   ylab("Plasma Osmolality (mmol/kg)") + 
   #ylab("") +
-  #xlim() +
-  #ylim() +
-  #annotate("text", x = , y = , 
-   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
-    #       parse = TRUE,
-     #      size = 6) +
-  #annotate("text", x = , y = , 
-   #        label = "paste(italic(p), \" < 0.0001\")", 
-    #       parse = TRUE,
-     #      size = 6) +
+  ylim(300,400) +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 22),
@@ -1423,38 +1611,25 @@ capture_dat_plus %>%
         #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
         ) -> cap_osml_sorad_fig
 cap_osml_sorad_fig
-# export figure
-#ggsave(filename = "cap_osml_mass_fig.jpeg",
- #      plot = cap_osml_mass_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 6, height = 4)
 ```
 
 
 ## Osmolality ~ Date
 
 ```{r osml date fig}
-capture_dat_plus %>% 
-  ggplot() + 
-  geom_point(aes(x = capture_date,
-                 y = osmolality_mmol_kg_mean), 
-             size = 1, 
-             alpha = 0.4) + 
-  stat_smooth(aes(x = capture_date, 
-                  y = osmolality_mmol_kg_mean), 
-              formula = y ~ x, 
-              method = "lm", 
-              se = F, 
-              size = 1.6, 
-              alpha = 1 ) + 
+ggplot(capture_dat_plus) + 
+  aes(x = as.factor(capture_date),
+      y = osmolality_mmol_kg_mean,
+      group = as.factor(capture_date)) +
+  geom_boxplot() +
+  geom_jitter(size = 1, 
+              alpha = 0.4) + 
   theme_classic() + 
   xlab("Date") + 
   ylab("Plasma Osmolality (mmol/kg)") + 
   #ylab("") +
   #xlim() +
-  #ylim() +
+  ylim(300, 400) +
   #annotate("text", x = , y = , 
    #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
     #       parse = TRUE,
@@ -1473,14 +1648,12 @@ capture_dat_plus %>%
         #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
         ) -> cap_osml_date_fig
 cap_osml_date_fig
-# export figure
-#ggsave(filename = "cap_osml_mass_fig.jpeg",
- #      plot = cap_osml_mass_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 6, height = 4)
 ```
+
+
+
+
+
 
 
 
@@ -1488,33 +1661,23 @@ cap_osml_date_fig
 ## CEWL ~ Cloacal Temperature
 
 ```{r CEWL cloacal temp fig}
-capture_dat_plus %>% 
-  ggplot() + 
-  geom_point(aes(x = cloacal_temp_C,
-                 y = CEWL_g_m2h_mean), 
-             size = 1, 
+ggplot(capture_dat_plus) + 
+  aes(x = cloacal_temp_C,
+      y = CEWL_g_m2h_mean) +
+  geom_point(size = 1, 
              alpha = 0.4) + 
-  stat_smooth(aes(x = cloacal_temp_C, 
-                  y = CEWL_g_m2h_mean), 
-              formula = y ~ x, 
+  stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
+              color = temp_color,
               size = 1.6, 
-              alpha = 1 ) + 
+              alpha = 1) + 
   theme_classic() + 
   xlab("Cloacal Temperature (°C)") + 
   ylab(bquote('CEWL (g/'*m^2*'h)')) + 
   #ylab("") +
   #xlim() +
-  #ylim() +
-  #annotate("text", x = , y = , 
-   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
-    #       parse = TRUE,
-     #      size = 6) +
-  #annotate("text", x = , y = , 
-   #        label = "paste(italic(p), \" < 0.0001\")", 
-    #       parse = TRUE,
-     #      size = 6) +
+  ylim(0, 40) +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 22),
@@ -1525,46 +1688,29 @@ capture_dat_plus %>%
         #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
         ) -> cap_CEWL_clotemp_fig
 cap_CEWL_clotemp_fig
-# export figure
-#ggsave(filename = "cap_osml_mass_fig.jpeg",
- #      plot = cap_osml_mass_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 6, height = 4)
 ```
 
 
 ## CEWL ~ Plasma Osmolality
 
 ```{r CEWL osml fig}
-capture_dat_plus %>% 
-  ggplot() + 
-  geom_point(aes(x = osmolality_mmol_kg_mean,
-                 y = CEWL_g_m2h_mean), 
-             size = 1, 
+ggplot(capture_dat_plus) + 
+  aes(x = osmolality_mmol_kg_mean,
+                 y = CEWL_g_m2h_mean) +
+  geom_point(size = 1, 
              alpha = 0.4) + 
-  stat_smooth(aes(x = osmolality_mmol_kg_mean, 
-                  y = CEWL_g_m2h_mean), 
-              formula = y ~ x, 
+  stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
+              color = osml_color,
               size = 1.6, 
-              alpha = 1 ) + 
+              alpha = 1) + 
   theme_classic() + 
   xlab("Plasma Osmolality (mmol/kg)") + 
   ylab(bquote('CEWL (g/'*m^2*'h)')) + 
   #ylab("") +
-  #xlim() +
-  #ylim() +
-  #annotate("text", x = , y = , 
-   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
-    #       parse = TRUE,
-     #      size = 6) +
-  #annotate("text", x = , y = , 
-   #        label = "paste(italic(p), \" < 0.0001\")", 
-    #       parse = TRUE,
-     #      size = 6) +
+  xlim(300, 400) +
+  ylim(0, 40) +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 22),
@@ -1575,47 +1721,30 @@ capture_dat_plus %>%
         #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
         ) -> cap_CEWL_osml_fig
 cap_CEWL_osml_fig
-# export figure
-#ggsave(filename = "cap_osml_mass_fig.jpeg",
- #      plot = cap_osml_mass_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 6, height = 4)
 ```
 
 
 
-## CEWL ~ Temperature at Capture
+## CEWL ~ Temperature at Measurement
 
 ```{r CEWL temp fig}
-capture_dat_plus %>% 
-  ggplot() + 
-  geom_point(aes(x = temp_C_interpol,
-                 y = CEWL_g_m2h_mean), 
-             size = 1, 
+ggplot(capture_dat_plus) + 
+  aes(x = msmt_temp_C,
+      y = CEWL_g_m2h_mean) +
+  geom_point(size = 1, 
              alpha = 0.4) + 
-  stat_smooth(aes(x = temp_C_interpol, 
-                  y = CEWL_g_m2h_mean), 
-              formula = y ~ x, 
+  stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
+              color = temp_color,
               size = 1.6, 
-              alpha = 1 ) + 
+              alpha = 1) + 
   theme_classic() + 
-  xlab("Temperature at Capture (°C)") + 
+  xlab("Temperature at Measurement (°C)") + 
   ylab(bquote('CEWL (g/'*m^2*'h)')) + 
   #ylab("") +
   #xlim() +
-  #ylim() +
-  #annotate("text", x = , y = , 
-   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
-    #       parse = TRUE,
-     #      size = 6) +
-  #annotate("text", x = , y = , 
-   #        label = "paste(italic(p), \" < 0.0001\")", 
-    #       parse = TRUE,
-     #      size = 6) +
+  ylim(0, 40) +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 22),
@@ -1626,46 +1755,29 @@ capture_dat_plus %>%
         #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
         ) -> cap_CEWL_temp_fig
 cap_CEWL_temp_fig
-# export figure
-#ggsave(filename = "cap_osml_mass_fig.jpeg",
- #      plot = cap_osml_mass_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 6, height = 4)
 ```
 
 
-## CEWL ~ VPD at Capture
+## CEWL ~ VPD at Measurement
 
-```{r CEWL VPD fig}
-capture_dat_plus %>% 
-  ggplot() + 
-  geom_point(aes(x = VPD_kPa_int,
-                 y = CEWL_g_m2h_mean), 
-             size = 1, 
+```{r CEWL VPD-m fig}
+ggplot(capture_dat_plus) + 
+  aes(x = msmt_VPD_kPa,
+      y = CEWL_g_m2h_mean) +
+  geom_point(size = 1, 
              alpha = 0.4) + 
-  stat_smooth(aes(x = VPD_kPa_int, 
-                  y = CEWL_g_m2h_mean), 
-              formula = y ~ x, 
+  stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
+              color = VPD_color,
               size = 1.6, 
               alpha = 1 ) + 
   theme_classic() + 
-  xlab("Vapor Pressure Deficit (kPa)") + 
+  xlab("VPD at Measurement (kPa)") + 
   ylab(bquote('CEWL (g/'*m^2*'h)')) + 
   #ylab("") +
   #xlim() +
-  #ylim() +
-  #annotate("text", x = , y = , 
-   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
-    #       parse = TRUE,
-     #      size = 6) +
-  #annotate("text", x = , y = , 
-   #        label = "paste(italic(p), \" < 0.0001\")", 
-    #       parse = TRUE,
-     #      size = 6) +
+  ylim(0, 40) +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 22),
@@ -1674,40 +1786,95 @@ capture_dat_plus %>%
                                  size = 16),
         #axis.text.y = element_blank(),
         #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
-        ) -> cap_CEWL_VPD_fig
-cap_CEWL_VPD_fig
-# export figure
-#ggsave(filename = "cap_osml_mass_fig.jpeg",
- #      plot = cap_osml_mass_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 6, height = 4)
+        ) -> cap_CEWL_VPDm_fig
+cap_CEWL_VPDm_fig
+```
+
+
+
+
+## CEWL ~ VPD at Capture
+
+```{r CEWL VPD-c fig}
+ggplot(capture_dat_plus) + 
+  aes(x = VPD_kPa_int,
+      y = CEWL_g_m2h_mean) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = VPD_color,
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("VPD at Capture (kPa)") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  #xlim() +
+  ylim(0, 40) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_VPDc_fig
+cap_CEWL_VPDc_fig
+```
+
+
+## CEWL ~ Wind at Capture
+
+```{r CEWL wind fig}
+ggplot(capture_dat_plus) + 
+  aes(x = wind_mph_interpol,
+      y = CEWL_g_m2h_mean)+
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = wind_color,
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("Wind Speed at Capture (mph)") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  #xlim() +
+  ylim(0, 40) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_wind_fig
+cap_CEWL_wind_fig
 ```
 
 
 ## CEWL ~ Date
 
 ```{r CEWL date fig}
-capture_dat_plus %>% 
-  ggplot() + 
-  geom_point(aes(x = capture_date,
-                 y = CEWL_g_m2h_mean), 
-             size = 1, 
-             alpha = 0.4) + 
-  stat_smooth(aes(x = capture_date, 
-                  y = CEWL_g_m2h_mean), 
-              formula = y ~ x, 
-              method = "lm", 
-              se = F, 
-              size = 1.6, 
-              alpha = 1 ) + 
+ggplot(capture_dat_plus) + 
+  aes(x = as.factor(capture_date),
+      y = CEWL_g_m2h_mean,
+      group = as.factor(capture_date)) +
+  geom_boxplot() +
+  geom_jitter(size = 1, 
+              alpha = 0.4) + 
   theme_classic() + 
   xlab("Date") + 
   ylab(bquote('CEWL (g/'*m^2*'h)')) + 
   #ylab("") +
   #xlim() +
-  #ylim() +
+  ylim(0, 40) +
   #annotate("text", x = , y = , 
    #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
     #       parse = TRUE,
@@ -1726,20 +1893,79 @@ capture_dat_plus %>%
         #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
         ) -> cap_CEWL_date_fig
 cap_CEWL_date_fig
-# export figure
-#ggsave(filename = "cap_osml_mass_fig.jpeg",
- #      plot = cap_osml_mass_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 6, height = 4)
 ```
 
 
 
 
+## Figure Arrangements
+
+```{r FIG ARRANGE}
+# hematocrit
+ggarrange(cap_hct_sorad_fig, cap_hct_VPD_fig,
+          cap_hct_SMI_fig, cap_hct_wind_fig,
+          ncol = 2, nrow = 2,
+          legend = "none"
+          ) -> cap_hct_multi_fig
+cap_hct_multi_fig
+# export figure
+ggsave(filename = "cap_hct_multi_fig.jpeg",
+       plot = cap_hct_multi_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 12, height = 8)
 
 
+# osmolality
+ggarrange(cap_osml_sorad_fig, cap_osml_VPD_fig,
+          cap_osml_SMI_fig, cap_osml_SVL_fig,
+          ncol = 2, nrow = 2,
+          legend = "none"
+          ) -> cap_osml_multi_fig
+cap_osml_multi_fig
+# export figure
+ggsave(filename = "cap_osml_multi_fig.jpeg",
+       plot = cap_osml_multi_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 12, height = 8)
+
+
+
+# CEWL
+ggarrange(cap_CEWL_VPDm_fig, cap_CEWL_VPDc_fig,
+          cap_CEWL_temp_fig, cap_CEWL_wind_fig,
+          cap_CEWL_osml_fig, cap_CEWL_clotemp_fig,
+          ncol = 2, nrow = 3,
+          legend = "none"
+          ) -> cap_CEWL_multi_fig
+cap_CEWL_multi_fig
+# export figure
+ggsave(filename = "cap_CEWL_multi_fig",
+       plot = cap_CEWL_multi_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 12, height = 16)
+
+
+
+# date differences
+ggarrange(cap_osml_date_fig, cap_CEWL_date_fig,
+          ncol = 1, nrow = 2,
+          legend = "none"
+          ) -> cap_date_diffs_multi_fig
+cap_date_diffs_multi_fig
+# export figure
+ggsave(filename = "cap_date_diffs_multi_fig.jpeg",
+       plot = cap_date_diffs_multi_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 8)
+```
 
 
 

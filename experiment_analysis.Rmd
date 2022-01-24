@@ -194,15 +194,13 @@ There are slight differences, but overall the starting values across groups are 
 
 We predicted that there would be effects of day, humidity, and temperature, but we only expect those interactions with day to have an effect because we're observing changes over time.
 
-So, each full model will include the following: day_n, day_n:humidity_tmt, day_n:temp_tmt, and day_n:humidity_tmt:temp_tmt. Then I'll test each possible sub-combination
+So, each full model will include the following: day_n, day_n:humidity_tmt, day_n:temp_tmt, and day_n:humidity_tmt:temp_tmt. Then I'll test whether dropping any variables will improve the model.
 
 ## SMI
 
 ### Building
 
-Sort based on number of predictors:
-
-#### 4
+Models are named based on the number of predictors.
 
 ```{r SMI exp model 4}
 SMI_mod4 <- lme4::lmer(data = dat_no_rehab,
@@ -211,9 +209,11 @@ SMI_mod4 <- lme4::lmer(data = dat_no_rehab,
                          day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
 car::vif(SMI_mod4) # check collinearity 
+summary(SMI_mod4)
+drop1(SMI_mod4)
 ```
 
-#### 3a
+This is the best model based on AIC, but we will check whether we can drop anything and still maintain predictive power.
 
 ```{r SMI exp model 3a}
 SMI_mod3a <- lme4::lmer(data = dat_no_rehab,
@@ -222,9 +222,10 @@ SMI_mod3a <- lme4::lmer(data = dat_no_rehab,
                          day_n:humidity_tmt + day_n:temp_tmt +
                          (1|trial_number/individual_ID))
 car::vif(SMI_mod3a) # check collinearity 
+anova(SMI_mod4, SMI_mod3a)
 ```
 
-#### 3b
+We lose significant predictive power if we drop the three-way interaction.
 
 ```{r SMI exp model 3b}
 SMI_mod3b <- lme4::lmer(data = dat_no_rehab,
@@ -233,9 +234,10 @@ SMI_mod3b <- lme4::lmer(data = dat_no_rehab,
                          day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
 car::vif(SMI_mod3b) # check collinearity 
+anova(SMI_mod4, SMI_mod3b)
 ```
 
-#### 3c
+Seemingly, there is no difference between models 4 and 3b.
 
 ```{r SMI exp model 3c}
 SMI_mod3c <- lme4::lmer(data = dat_no_rehab,
@@ -244,9 +246,10 @@ SMI_mod3c <- lme4::lmer(data = dat_no_rehab,
                          day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
 car::vif(SMI_mod3c) # check collinearity 
+anova(SMI_mod4, SMI_mod3c)
 ```
 
-#### 3d
+Seemingly, there is no difference between models 4 and 3b.
 
 ```{r SMI exp model 3d}
 SMI_mod3d <- lme4::lmer(data = dat_no_rehab,
@@ -255,147 +258,26 @@ SMI_mod3d <- lme4::lmer(data = dat_no_rehab,
                          day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
 car::vif(SMI_mod3d) # check collinearity 
+anova(SMI_mod4, SMI_mod3d)
 ```
 
+Seemingly, there is no difference between models 4 and 3b.
 
-#### 2a
-
-```{r SMI exp model 2a}
-SMI_mod2a <- lme4::lmer(data = dat_no_rehab,
-                       SMI ~ day_n + 
-                         day_n:humidity_tmt + 
-                         (1|trial_number/individual_ID))
-```
-
-#### 2b
-
-```{r SMI exp model 2b}
-SMI_mod2b <- lme4::lmer(data = dat_no_rehab,
-                       SMI ~ day_n + 
-                         day_n:temp_tmt +   
-                         (1|trial_number/individual_ID))
-```
-
-#### 2c
-
-```{r SMI exp model 2c}
-SMI_mod2c <- lme4::lmer(data = dat_no_rehab,
-                       SMI ~ day_n +
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-```
-
-#### 2d
-
-```{r SMI exp model 2d}
-SMI_mod2d <- lme4::lmer(data = dat_no_rehab,
-                       SMI ~ 
-                         day_n:humidity_tmt + day_n:temp_tmt +
-                         (1|trial_number/individual_ID))
-```
-
-#### 2e
-
-```{r SMI exp model 2e}
-SMI_mod2e <- lme4::lmer(data = dat_no_rehab,
-                       SMI ~ 
-                         day_n:humidity_tmt + 
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-```
-
-#### 2f
-
-```{r SMI exp model 2f}
-SMI_mod2f <- lme4::lmer(data = dat_no_rehab,
-                       SMI ~ 
-                         day_n:temp_tmt +
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-```
-
-#### 1
-
-single-predictor effects
-                   
-```{r SMI exp model 1 variables}
-SMI_mod1a <- lme4::lmer(data = dat_no_rehab, SMI ~ 
-                          day_n +
-                         (1|trial_number/individual_ID))
-SMI_mod1b <- lme4::lmer(data = dat_no_rehab, SMI ~ day_n + 
-                         day_n:humidity_tmt + 
-                         (1|trial_number/individual_ID))
-SMI_mod1c <- lme4::lmer(data = dat_no_rehab, SMI ~ 
-                          day_n:temp_tmt + 
-                         (1|trial_number/individual_ID))
-SMI_mod1d <- lme4::lmer(data = dat_no_rehab, SMI ~
-                          day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-```
-
-#### null model
-
-```{r SMI exp model NULL}
-SMI_mod_null <- lme4::lmer(data = dat_no_rehab, SMI ~ 1 +
-                         (1|trial_number/individual_ID))
-```
+All the variables in the full models had huge t-values and we lose significant predictive power without the three-way interaction. So, the full model is the best model to predict SMI/ Body Condition.
 
 
-### Selection
-
-Compare all models:
-
-```{r SMI mod compare}
-SMI_models <- list(SMI_mod4, 
-                   SMI_mod3a, SMI_mod3b, SMI_mod3c, SMI_mod3d, 
-                   SMI_mod2a, SMI_mod2b, SMI_mod2c,
-                   SMI_mod2d, SMI_mod2e, SMI_mod2f,
-                   SMI_mod1a, SMI_mod1b, SMI_mod1c, SMI_mod1d,
-                   SMI_mod_null)
-
-#specify model names
-EXP_mod_names <- data.frame(predictors = 
-                 c('Day, Day:Humd, Day:Temp, Day:Humd:Temp', #4
-                   'Day, Day:Humd, Day:Temp', #3a
-                   'Day, Day:Humd, Day:Humd:Temp', #3b
-                   'Day, Day:Temp, Day:Humd:Temp', #3c
-                   'Day:Humd, Day:Temp, Day:Humd:Temp', #3d
-                   'Day, Day:Humd', #2a
-                   'Day, Day:Temp', #2b
-                   'Day, Day:Humd:Temp', #2c
-                   'Day:Humd, Day:Temp', #2d
-                   'Day:Humd, Day:Humd:Temp', #2e
-                   'Day:Temp, Day:Humd:Temp', #2f
-                   'Day', #1a
-                   'Day:Humd', #1b
-                   'Day:Temp', #1c
-                   'Day:Humd:Temp', #1d
-                   'Null'))
-rownames(EXP_mod_names) <- c('4', '3a', '3b', '3c', '3d',
-                             '2a', '2b', '2c', '2d', '2e', '2f',
-                             '1a', '1b', '1c', '1d', 'null')
-
-#calculate AIC of each model
-SMI_AICc <- data.frame(aictab(cand.set = SMI_models,
-                              modnames = EXP_mod_names)) %>%
-  mutate(response = "Body Condition (g)")
-SMI_AICc
-```
 
 
-SMI is explained equally well by the top two models: 2d and 3a
+
 
 ### Assumptions
 
 Check linear regression assumptions/conditions:
 
 ```{r SMI exp model assumptions}
-plot(SMI_mod2d)
-simple.eda(residuals(SMI_mod2d))
-shapiro.test(residuals(SMI_mod2d))
-plot(SMI_mod3a)
-simple.eda(residuals(SMI_mod3a))
-shapiro.test(residuals(SMI_mod3a))
+plot(SMI_mod4)
+simple.eda(residuals(SMI_mod4))
+shapiro.test(residuals(SMI_mod4))
 ```
 
 Normality is very violated, but equal error variance and linearity look fantastic, so I think it's okay.
@@ -407,20 +289,12 @@ Save best model stats with p-values:
 
 ```{r best SMI exp model}
 SMI_mod_best1 <- lmerTest::lmer(data = dat_no_rehab, 
-                                SMI ~ 
+                                SMI ~ day_n +
                                  day_n:humidity_tmt + day_n:temp_tmt +
+                                  day_n:humidity_tmt:temp_tmt +
                                  (1|trial_number/individual_ID))
 summary(SMI_mod_best1)
-
-SMI_mod_best2 <- lmerTest::lmer(data = dat_no_rehab, 
-                                SMI ~ 
-                                 day_n + 
-                                  day_n:humidity_tmt + day_n:temp_tmt +
-                                 (1|trial_number/individual_ID))
-summary(SMI_mod_best2)
-
 SMI_stats <- broom.mixed::tidy(SMI_mod_best1) %>%
-  rbind(broom.mixed::tidy(SMI_mod_best2)) %>%
   mutate(response = "Body Condition (g)")
 ```
 
@@ -430,7 +304,6 @@ SMI_stats <- broom.mixed::tidy(SMI_mod_best1) %>%
 
 ### Building
 
-#### 4
 
 ```{r hct exp model 4}
 hct_mod4 <- lme4::lmer(data = dat_no_rehab,
@@ -439,10 +312,11 @@ hct_mod4 <- lme4::lmer(data = dat_no_rehab,
                          day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
 car::vif(hct_mod4) # check collinearity 
+summary(hct_mod4)
+drop1(hct_mod4)
 ```
 
-
-#### 3a
+It seems like it could be beneficial to drop variables, so test each 1-variable drop:
 
 ```{r hct exp model 3a}
 hct_mod3a <- lme4::lmer(data = dat_no_rehab,
@@ -451,167 +325,73 @@ hct_mod3a <- lme4::lmer(data = dat_no_rehab,
                          day_n:humidity_tmt + day_n:temp_tmt +
                          (1|trial_number/individual_ID))
 car::vif(hct_mod3a) # check collinearity 
+anova(hct_mod4, hct_mod3a)
 ```
 
-#### 3b
+We do NOT lose predictive power by dropping the three-way interaction from the hematocrit model, so we should definitely drop it.
 
-```{r hct exp model 3b}
-hct_mod3b <- lme4::lmer(data = dat_no_rehab,
-                       hematocrit_percent ~ 
-                         day_n + 
-                         day_n:humidity_tmt +
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(hct_mod3b) # check collinearity 
-```
-
-#### 3c
-
-```{r hct exp model 3c}
-hct_mod3c <- lme4::lmer(data = dat_no_rehab,
-                       hematocrit_percent ~ day_n + 
-                         day_n:temp_tmt +
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(hct_mod3c) # check collinearity 
-```
-
-#### 3d
-
-```{r hct exp model 3d}
-hct_mod3d <- lme4::lmer(data = dat_no_rehab,
-                       hematocrit_percent ~ 
-                         day_n:humidity_tmt + day_n:temp_tmt +
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(hct_mod3d) # check collinearity 
-```
-
-#### 2a
+Test whether we should drop any of the remaining variables:
 
 ```{r hct exp model 2a}
 hct_mod2a <- lme4::lmer(data = dat_no_rehab,
-                       hematocrit_percent ~ day_n + 
-                         day_n:humidity_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(hct_mod2a) # check collinearity 
-```
-
-#### 2b
-
-```{r hct exp model 2b}
-hct_mod2b <- lme4::lmer(data = dat_no_rehab,
-                       hematocrit_percent ~ day_n + 
-                         day_n:temp_tmt +   
-                         (1|trial_number/individual_ID))
-car::vif(hct_mod2b) # check collinearity 
-```
-
-#### 2c
-
-```{r hct exp model 2c}
-hct_mod2c <- lme4::lmer(data = dat_no_rehab,
-                       hematocrit_percent ~ day_n +
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(hct_mod2c) # check collinearity 
-```
-
-#### 2d
-
-```{r hct exp model 2d}
-hct_mod2d <- lme4::lmer(data = dat_no_rehab,
                        hematocrit_percent ~ 
                          day_n:humidity_tmt + day_n:temp_tmt +
                          (1|trial_number/individual_ID))
-car::vif(hct_mod2d) # check collinearity 
+anova(hct_mod3a, hct_mod2a)
 ```
 
+Not necessaril different or better.
 
-#### 2e
-
-```{r hct exp model 2e}
-hct_mod2e <- lme4::lmer(data = dat_no_rehab,
+```{r hct exp model 2b}
+hct_mod2b <- lme4::lmer(data = dat_no_rehab,
                        hematocrit_percent ~ 
+                         day_n + day_n:temp_tmt +
+                         (1|trial_number/individual_ID))
+anova(hct_mod3a, hct_mod2b)
+```
+
+We do NOT lose predictive power if we drop humidity.
+
+```{r hct exp model 2c}
+hct_mod2c <- lme4::lmer(data = dat_no_rehab,
+                       hematocrit_percent ~ 
+                         day_n + 
                          day_n:humidity_tmt + 
-                         day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
-car::vif(hct_mod2e) # check collinearity 
+anova(hct_mod3a, hct_mod2c)
 ```
 
-#### 2f
+We lose a very significant amount of predictive power if we drop temperature.
 
-```{r hct exp model 2f}
-hct_mod2f <- lme4::lmer(data = dat_no_rehab,
-                       hematocrit_percent ~ 
-                         day_n:temp_tmt +
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(hct_mod2f) # check collinearity 
-```
-
-
-#### 1
-test each single effect model:
-                   
-```{r hct exp model 1s}
-hct_mod1a <- lme4::lmer(data = dat_no_rehab, 
-                        hematocrit_percent ~ 
-                          day_n +
-                         (1|trial_number/individual_ID))
-hct_mod1b <- lme4::lmer(data = dat_no_rehab, 
-                        hematocrit_percent ~ 
-                          day_n:humidity_tmt +
-                         (1|trial_number/individual_ID))
-hct_mod1c <- lme4::lmer(data = dat_no_rehab, 
-                        hematocrit_percent ~ 
-                          day_n:temp_tmt +
-                         (1|trial_number/individual_ID))
-hct_mod1d <- lme4::lmer(data = dat_no_rehab, 
-                        hematocrit_percent ~
-                          day_n:humidity_tmt:temp_tmt +
-                         (1|trial_number/individual_ID))
-```
-
-#### null model
-
-```{r hct exp model NULL}
-hct_mod_null <- lme4::lmer(data = dat_no_rehab, hematocrit_percent ~ 1 +
-                         (1|trial_number/individual_ID))
-```
 
 
 ### Selection
 
-Compare all models:
+Compare models with/without three-way interaction and humidity:
 
 ```{r hct mod compare}
-hct_models <- list(hct_mod4, 
-                   hct_mod3a, hct_mod3b, hct_mod3c, hct_mod3d, 
-                   hct_mod2a, hct_mod2b, hct_mod2c,
-                   hct_mod2d, hct_mod2e, hct_mod2f,
-                   hct_mod1a, hct_mod1b, hct_mod1c, hct_mod1d,
-                   hct_mod_null)
+hct_models <- list(hct_mod4, hct_mod3a, hct_mod2b)
 
+EXP_mod_names1 <- data.frame(predictors = 
+                 c('Day, Day:Humd, Day:Temp, Day:Humd:Temp', #4
+                   'Day, Day:Humd, Day:Temp', #3a
+                   'Day, Day:Temp' #2b
+                   ))
+rownames(EXP_mod_names1) <- c('4', '3a', '2b')
 #calculate AIC of each model
 hct_AICc <- data.frame(aictab(cand.set = hct_models, 
-                                 modnames = EXP_mod_names)) %>%
-  mutate(response = "Hematocrit (%)")
+                                 modnames = EXP_mod_names1)) %>%
+  mutate(response = "Hematocrit (%")
 hct_AICc
 ```
 
-
-Explained equally well by the top 2 models: 1c (Day:Temp) and 2b (Day, Day:Temp)
-
+Model 2b with only predictors Day and Day*Temp is the best by a good margin.
 
 ### Assumptions
 
 Check linear regression assumptions/conditions:
 
 ```{r hct exp model assumptions}
-plot(hct_mod1c)
-simple.eda(residuals(hct_mod1c))
-shapiro.test(residuals(hct_mod1c))
 plot(hct_mod2b)
 simple.eda(residuals(hct_mod2b))
 shapiro.test(residuals(hct_mod2b))
@@ -628,18 +408,10 @@ Save best model stats (1c, 2b) with p-values:
 ```{r best hct exp models}
 hct_mod_best1 <- lmerTest::lmer(data = dat_no_rehab,
                         hematocrit_percent ~ 
-                         day_n:temp_tmt +
-                         (1|trial_number/individual_ID))
-summary(hct_mod_best1)
-
-hct_mod_best2 <- lmerTest::lmer(data = dat_no_rehab,
-                        hematocrit_percent ~ 
                          day_n + day_n:temp_tmt +
                          (1|trial_number/individual_ID))
-summary(hct_mod_best2)
-
+summary(hct_mod_best1)
 hct_stats <- broom.mixed::tidy(hct_mod_best1) %>%
-  rbind(broom.mixed::tidy(hct_mod_best2)) %>%
   mutate(response = "Hematocrit (%)")
 ```
 
@@ -654,7 +426,6 @@ hct_stats <- broom.mixed::tidy(hct_mod_best1) %>%
 
 ### Building
 
-#### 4
 
 ```{r osml exp model 4}
 osml_mod4 <- lme4::lmer(data = dat_no_rehab,
@@ -663,10 +434,12 @@ osml_mod4 <- lme4::lmer(data = dat_no_rehab,
                          day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
 car::vif(osml_mod4) # check collinearity 
+summary(osml_mod4)
+drop1(osml_mod4)
 ```
 
+Dropping the three-way interaction slightly improves AIC, so test that:
 
-#### 3a
 
 ```{r osml exp model 3a}
 osml_mod3a <- lme4::lmer(data = dat_no_rehab,
@@ -675,159 +448,67 @@ osml_mod3a <- lme4::lmer(data = dat_no_rehab,
                          day_n:humidity_tmt + day_n:temp_tmt +
                          (1|trial_number/individual_ID))
 car::vif(osml_mod3a) # check collinearity 
+anova(osml_mod4, osml_mod3a)
 ```
 
-#### 3b
+We do NOT lose significant predictive power, so the three-way interaction should be dropped.
 
-```{r osml exp model 3b}
-osml_mod3b <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ day_n + 
-                         day_n:humidity_tmt +
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(osml_mod3b) # check collinearity 
-```
-
-#### 3c
-
-```{r osml exp model 3c}
-osml_mod3c <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ day_n + 
-                         day_n:temp_tmt +
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(osml_mod3c) # check collinearity 
-```
-
-#### 3d
-
-```{r osml exp model 3d}
-osml_mod3d <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ 
-                         day_n:humidity_tmt + day_n:temp_tmt +
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(osml_mod3d) # check collinearity 
-```
-
-#### 2a
-
-```{r osml exp model 2a}
-osml_mod2a <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ day_n + 
-                         day_n:humidity_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(osml_mod2a) # check collinearity 
-```
-
-#### 2b
+Test whether we should drop any remaining variables:
 
 ```{r osml exp model 2b}
 osml_mod2b <- lme4::lmer(data = dat_no_rehab,
                        osmolality_mmol_kg_mean ~ day_n + 
-                         day_n:temp_tmt +   
+                         day_n:humidity_tmt +
                          (1|trial_number/individual_ID))
-car::vif(osml_mod2b) # check collinearity 
+anova(osml_mod3a, osml_mod2b)
 ```
 
-#### 2c
+We lose significant predictive power if we drop temperature.
 
 ```{r osml exp model 2c}
 osml_mod2c <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ day_n +
-                         day_n:humidity_tmt:temp_tmt + 
+                       osmolality_mmol_kg_mean ~ day_n + 
+                         day_n:temp_tmt +
                          (1|trial_number/individual_ID))
-car::vif(osml_mod2c) # check collinearity 
+anova(osml_mod3a, osml_mod2c) 
 ```
 
+We do NOT lose significant predictive power if we drop humidity.
 
-#### 2d
 
 ```{r osml exp model 2d}
 osml_mod2d <- lme4::lmer(data = dat_no_rehab,
                        osmolality_mmol_kg_mean ~ 
                          day_n:humidity_tmt + day_n:temp_tmt +
                          (1|trial_number/individual_ID))
-car::vif(osml_mod2d) # check collinearity 
+anova(osml_mod3a, osml_mod2d)
 ```
 
-#### 2e
-
-```{r osml exp model 2e}
-osml_mod2e <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ 
-                         day_n:humidity_tmt + 
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(osml_mod2e) # check collinearity 
-```
-
-#### 2f
-
-```{r osml exp model 2f}
-osml_mod2f <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ 
-                         day_n:temp_tmt +
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(osml_mod2f) # check collinearity 
-```
-
-
-
-
-#### 1
-
-```{r osml exp model 1}
-osml_mod1a <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ 
-                         day_n +
-                         (1|trial_number/individual_ID))
-osml_mod1b <- lme4::lmer(data = dat_no_rehab, 
-                         osmolality_mmol_kg_mean ~ 
-                           day_n:humidity_tmt +
-                         (1|trial_number/individual_ID))
-osml_mod1c <- lme4::lmer(data = dat_no_rehab, 
-                         osmolality_mmol_kg_mean ~ 
-                           day_n:temp_tmt +
-                         (1|trial_number/individual_ID))
-osml_mod1d <- lme4::lmer(data = dat_no_rehab, 
-                         osmolality_mmol_kg_mean ~ 
-                           day_n:humidity_tmt:temp_tmt +
-                         (1|trial_number/individual_ID))
-```
-
-
-#### null
-
-```{r osml exp model NULL}
-osml_mod_null <- lme4::lmer(data = dat_no_rehab, 
-                            osmolality_mmol_kg_mean ~ 1 +
-                         (1|trial_number/individual_ID))
-```
+We don't necessarily lose any predictive power without day.
 
 
 ### Selection
 
-Compare all models:
+Compare with/without three-way interaction and humidity:
 
 ```{r osml mod compare}
-osml_models <- list(osml_mod4, 
-                   osml_mod3a, osml_mod3b, osml_mod3c, osml_mod3d, 
-                   osml_mod2a, osml_mod2b, osml_mod2c,
-                   osml_mod2d, osml_mod2e, osml_mod2f,
-                   osml_mod1a, osml_mod1b, osml_mod1c, osml_mod1d,
-                   osml_mod_null)
+osml_models <- list(osml_mod4, osml_mod3a, osml_mod2c)
 
+EXP_mod_names2 <- data.frame(predictors = 
+                 c('Day, Day:Humd, Day:Temp, Day:Humd:Temp', #4
+                   'Day, Day:Humd, Day:Temp', #3a
+                   'Day, Day:Temp' #2c
+                   ))
+rownames(EXP_mod_names2) <- c('4', '3a', '2c')
 #calculate AIC of each model
 osml_AICc <- data.frame(aictab(cand.set = osml_models, 
-                                 modnames = EXP_mod_names)) %>%
+                                 modnames = EXP_mod_names2)) %>%
   mutate(response = "Plasma Osmolality (mmol/kg)")
 osml_AICc
 ```
 
 
-... ?all? the models are best model?! Ity seems like 2e is the fewest variables with the most significant relationships, so we will present that one.
+They're all pretty equal, with the full model having SLIGHTLY lower AIC. Since they're all equal, we will use the one with the fewest predictor variables, only day and day*temp.
 
 
 ### Assumptions
@@ -835,9 +516,9 @@ osml_AICc
 Check linear regression assumptions/conditions:
 
 ```{r osml exp model assumptions}
-plot(osml_mod2e)
-simple.eda(residuals(osml_mod2e))
-shapiro.test(residuals(osml_mod2e))
+plot(osml_mod2c)
+simple.eda(residuals(osml_mod2c))
+shapiro.test(residuals(osml_mod2c))
 ```
 
 All assumptions are OKAY.
@@ -851,11 +532,30 @@ Save best model stats with p-values:
 ```{r best osml exp models}
 osml_mod_best1 <- lmerTest::lmer(data = dat_no_rehab,
                         osmolality_mmol_kg_mean ~ 
-                         day_n:humidity_tmt + 
-                         day_n:humidity_tmt:temp_tmt + 
+                          day_n + day_n:temp_tmt + 
                          (1|trial_number/individual_ID))
 summary(osml_mod_best1)
 osml_stats <- broom.mixed::tidy(osml_mod_best1) %>%
+  mutate(response = "Plasma Osmolality (mmol/kg)")
+```
+
+
+Also save the other two equally good models:
+
+```{r good osml exp models}
+osml_mod_best2 <- lmerTest::lmer(data = dat_no_rehab,
+                        osmolality_mmol_kg_mean ~ 
+                          day_n + day_n:temp_tmt + day_n:humidity_tmt +
+                         (1|trial_number/individual_ID))
+summary(osml_mod_best2)
+osml_mod_best3 <- lmerTest::lmer(data = dat_no_rehab,
+                        osmolality_mmol_kg_mean ~ 
+                          day_n + day_n:temp_tmt + day_n:humidity_tmt +
+                          day_n:humidity_tmt:temp_tmt +
+                         (1|trial_number/individual_ID))
+summary(osml_mod_best3)
+osml_stats_extra <- broom.mixed::tidy(osml_mod_best3) %>%
+  rbind(broom.mixed::tidy(osml_mod_best2)) %>%
   mutate(response = "Plasma Osmolality (mmol/kg)")
 ```
 
@@ -867,8 +567,6 @@ osml_stats <- broom.mixed::tidy(osml_mod_best1) %>%
 
 ### Building
 
-#### 4
-
 ```{r CEWL exp model 4}
 dat_no_rehab_rm <- dat_no_rehab %>%
   dplyr::filter(complete.cases(.))
@@ -878,11 +576,15 @@ CEWL_mod4 <- lme4::lmer(data = dat_no_rehab_rm,
                          day_n:humidity_tmt + day_n:temp_tmt +
                          day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
+summary(CEWL_mod4)
+drop1(CEWL_mod4)
 car::vif(CEWL_mod4) # check collinearity 
 ```
 
 
-#### 3a
+All variables have really big t-values and AIC cannot be improved by dropping anything.
+
+But, check 1-variable drops:
 
 ```{r CEWL exp model 3a}
 CEWL_mod3a <- lme4::lmer(data = dat_no_rehab_rm,
@@ -890,10 +592,11 @@ CEWL_mod3a <- lme4::lmer(data = dat_no_rehab_rm,
                          day_n + 
                          day_n:humidity_tmt + day_n:temp_tmt +
                          (1|trial_number/individual_ID))
+anova(CEWL_mod4, CEWL_mod3a)
 car::vif(CEWL_mod3a) # check collinearity 
 ```
 
-#### 3b
+We lose significant predictive power, so we should NOT drop the three-way interaction.
 
 ```{r CEWL exp model 3b}
 CEWL_mod3b <- lme4::lmer(data = dat_no_rehab_rm,
@@ -901,10 +604,11 @@ CEWL_mod3b <- lme4::lmer(data = dat_no_rehab_rm,
                          day_n:humidity_tmt +
                          day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
+anova(CEWL_mod4, CEWL_mod3b)
 car::vif(CEWL_mod3b) # check collinearity 
 ```
 
-#### 3c
+Probably don't drop day*temp.
 
 ```{r CEWL exp model 3c}
 CEWL_mod3c <- lme4::lmer(data = dat_no_rehab_rm,
@@ -912,10 +616,11 @@ CEWL_mod3c <- lme4::lmer(data = dat_no_rehab_rm,
                          day_n:temp_tmt +
                          day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
+anova(CEWL_mod4, CEWL_mod3c)
 car::vif(CEWL_mod3c) # check collinearity 
 ```
 
-#### 3d
+Probably don't drop day*humidity.
 
 ```{r CEWL exp model 3d}
 CEWL_mod3d <- lme4::lmer(data = dat_no_rehab_rm,
@@ -923,122 +628,37 @@ CEWL_mod3d <- lme4::lmer(data = dat_no_rehab_rm,
                          day_n:humidity_tmt + day_n:temp_tmt +
                          day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
+anova(CEWL_mod4, CEWL_mod3d)
 car::vif(CEWL_mod3d) # check collinearity 
 ```
 
-#### 2a
+Try dropping cloacal temperature:
 
-```{r CEWL exp model 2a}
-CEWL_mod2a <- lme4::lmer(data = dat_no_rehab_rm,
-                       CEWL_g_m2h_mean ~ cloacal_temp_C +  day_n + 
-                         day_n:humidity_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(CEWL_mod2a) # check collinearity 
-```
-
-#### 2b
-
-```{r CEWL exp model 2b}
-CEWL_mod2b <- lme4::lmer(data = dat_no_rehab_rm,
-                       CEWL_g_m2h_mean ~ cloacal_temp_C +  day_n + 
-                         day_n:temp_tmt +   
-                         (1|trial_number/individual_ID))
-car::vif(CEWL_mod2b) # check collinearity 
-```
-
-#### 2c
-
-```{r CEWL exp model 2c}
-CEWL_mod2c <- lme4::lmer(data = dat_no_rehab_rm,
-                       CEWL_g_m2h_mean ~ cloacal_temp_C +  day_n +
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(CEWL_mod2c) # check collinearity 
-```
-
-
-#### 2d
-
-```{r CEWL exp model 2d}
-CEWL_mod2d <- lme4::lmer(data = dat_no_rehab_rm,
-                       CEWL_g_m2h_mean ~ cloacal_temp_C +  
+```{r CEWL exp model 3e}
+CEWL_mod3e <- lme4::lmer(data = dat_no_rehab_rm,
+                       CEWL_g_m2h_mean ~ day_n +  
                          day_n:humidity_tmt + day_n:temp_tmt +
-                         (1|trial_number/individual_ID))
-car::vif(CEWL_mod2d) # check collinearity 
-```
-
-#### 2e
-
-```{r CEWL exp model 2e}
-CEWL_mod2e <- lme4::lmer(data = dat_no_rehab_rm,
-                       CEWL_g_m2h_mean ~ cloacal_temp_C +  
-                         day_n:humidity_tmt + 
                          day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
-car::vif(CEWL_mod2e) # check collinearity 
+anova(CEWL_mod4, CEWL_mod3e)
 ```
 
-#### 2f
-
-```{r CEWL exp model 2f}
-CEWL_mod2f <- lme4::lmer(data = dat_no_rehab_rm,
-                       CEWL_g_m2h_mean ~ cloacal_temp_C +  
-                         day_n:temp_tmt +
-                         day_n:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-car::vif(CEWL_mod2f) # check collinearity 
-```
-
-
-
-
-#### 1
-
-```{r CEWL exp model 1}
-CEWL_mod1a <- lme4::lmer(data = dat_no_rehab_rm,
-                       CEWL_g_m2h_mean ~ cloacal_temp_C +  
-                         day_n +
-                         (1|trial_number/individual_ID))
-CEWL_mod1b <- lme4::lmer(data = dat_no_rehab_rm, 
-                         CEWL_g_m2h_mean ~ cloacal_temp_C +  
-                           day_n:humidity_tmt +
-                         (1|trial_number/individual_ID))
-CEWL_mod1c <- lme4::lmer(data = dat_no_rehab_rm, 
-                         CEWL_g_m2h_mean ~ cloacal_temp_C +  
-                           day_n:temp_tmt +
-                         (1|trial_number/individual_ID))
-CEWL_mod1d <- lme4::lmer(data = dat_no_rehab_rm, 
-                         CEWL_g_m2h_mean ~ cloacal_temp_C +  
-                           day_n:humidity_tmt:temp_tmt +
-                         (1|trial_number/individual_ID))
-```
-
-
-#### null
-
-```{r CEWL exp model NULL}
-CEWL_mod_null <- lme4::lmer(data = dat_no_rehab_rm, 
-                            CEWL_g_m2h_mean ~ cloacal_temp_C +  1 +
-                         (1|trial_number/individual_ID))
-```
-
-
+Do NOT drop cloacal temperature.
 
 
 
 ### Selection
 
-Compare all models:
+Compare dropping day/temperature/humidity with the full model:
 
 ```{r CEWL mod compare}
-CEWL_models <- list(CEWL_mod4, 
-                   CEWL_mod3a, CEWL_mod3b, CEWL_mod3c, CEWL_mod3d, 
-                   CEWL_mod2a, CEWL_mod2b, CEWL_mod2c,
-                   CEWL_mod2d, CEWL_mod2e, CEWL_mod2f,
-                   CEWL_mod1a, CEWL_mod1b, CEWL_mod1c, CEWL_mod1d,
-                   CEWL_mod_null)
-CEWL_mod_names <- EXP_mod_names %>%
-  mutate(predictors = paste(predictors, "BodyTemp", sep = ", "))
+CEWL_models <- list(CEWL_mod4, CEWL_mod3b, CEWL_mod3c, CEWL_mod3d)
+CEWL_mod_names <- data.frame(predictors = 
+                 c('Day, Day:Humd, Day:Temp, Day:Humd:Temp, BodyTemp', #4
+                   'Day, Day:Humd, Day:Humd:Temp, BodyTemp', #3b
+                   'Day, Day:Temp, Day:Humd:Temp, BodyTemp', #3c
+                   'Day:Humd, Day:Temp, Day:Humd:Temp, BodyTemp' #3d
+                   ))
 
 #calculate AIC of each model
 CEWL_AICc <- data.frame(aictab(cand.set = CEWL_models, 
@@ -1047,9 +667,7 @@ CEWL_AICc <- data.frame(aictab(cand.set = CEWL_models,
 CEWL_AICc
 ```
 
-Predicted equally well by the top 8 models...
-
-Every variable in the full model has a significant relationship, so we will present that model.
+Predicted equally well by ALL of them. Since t-values were so high for every variable, we'll stick to the FULL model.
 
 
 ### Assumptions
@@ -1096,10 +714,12 @@ experiment_stats <- CEWL_stats %>%
 write.csv(experiment_stats, 
           "./results_statistics/exp_best_models.csv")
 
-AICc_ranks <- CEWL_AICc %>%
-  rbind(osml_AICc) %>%
-  rbind(hct_AICc) %>%
-  rbind(SMI_AICc)
+experiment_stats_osml_equally_good <- osml_stats_extra
+write.csv(experiment_stats_osml_equally_good, 
+          "./results_statistics/exp_best_models_osml_additional.csv")
+
+AICc_ranks <- osml_AICc %>%
+  rbind(hct_AICc)
 write.csv(AICc_ranks, "./results_statistics/exp_model_rankings.csv")
 ```
 
@@ -1115,6 +735,8 @@ write.csv(AICc_ranks, "./results_statistics/exp_model_rankings.csv")
 ## SMI
 
 ### Building
+
+These models are just named in order.
 
 ```{r SMI rehydration model 1}
 SMI_rmod1 <- lme4::lmer(data = dat_for_rehab,
@@ -1135,6 +757,7 @@ SMI_rmod2 <- lme4::lmer(data = dat_for_rehab,
                          (1|trial_number/individual_ID))
 summary(SMI_rmod2)
 drop1(SMI_rmod2)
+anova()
 ```
 
 
@@ -1651,19 +1274,16 @@ write.csv(osml_rAICc, "./results_statistics/rehydration_osml_mod_rankings.csv")
 # exp SMI
 exp_predict_SMI <- dat_no_rehab %>%
   dplyr::filter(complete.cases(SMI)) %>%
-  mutate(SMI_est = predict(SMI_mod_best))
+  mutate(SMI_est = predict(SMI_mod_best1))
 # exp hct
 exp_predict_hct <- dat_no_rehab %>%
   dplyr::filter(complete.cases(hematocrit_percent)) %>%
   mutate(hct_est1 = predict(hct_mod_best1),
-         hct_est2 = predict(hct_mod_best2),
-         hct_est3 = predict(hct_mod_best3))
+         hct_est2 = predict(hct_mod_best2))
 # exp osml
 exp_predict_osml <- dat_no_rehab %>%
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
-  mutate(osml_est1 = predict(osml_mod_best1),
-         osml_est2 = predict(osml_mod_best2),
-         osml_est3 = predict(osml_mod_best3))
+  mutate(osml_est1 = predict(osml_mod_best1))
 # exp CEWL
 exp_predict_CEWL <- dat_no_rehab %>%
   dplyr::filter(complete.cases(CEWL_g_m2h_mean)) %>%
@@ -1684,7 +1304,7 @@ rhyd_predict_hct <- dat_for_rehab %>%
 # rehydration osml
 rhyd_predict_osml <- dat_for_rehab %>%
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
-  mutate(osml_est = predict(osml_rmod_best))# %>%
+  mutate(osml_est = predict(osml_rmod_best1))# %>%
   #dplyr::filter(day_n == 10)
 ```
 
@@ -1704,16 +1324,12 @@ exp_predict_SMI_means <- exp_predict_SMI %>%
 exp_predict_hct_means <- exp_predict_hct %>%
   dplyr::filter(day_n %in% c(0, 8)) %>%
   group_by(day_n, tmt) %>%
-  summarise(mean_hct_est1 = mean(hct_est1),
-            mean_hct_est2 = mean(hct_est2),
-            mean_hct_est3 = mean(hct_est3))
+  summarise(mean_hct_est1 = mean(hct_est1))
 # exp osml
 exp_predict_osml_means <- exp_predict_osml %>%
   dplyr::filter(day_n %in% c(0, 8)) %>%
   group_by(day_n, tmt) %>%
-  summarise(mean_osml_est1 = mean(osml_est1),
-            mean_osml_est2 = mean(osml_est2),
-            mean_osml_est3 = mean(osml_est3))
+  summarise(mean_osml_est1 = mean(osml_est1))
 # exp CEWL
 exp_predict_CEWL_means <- exp_predict_CEWL %>%
   dplyr::filter(day_n %in% c(0, 8)) %>%
@@ -2236,16 +1852,16 @@ ggplot() +
               se = F, 
               size = 1.2, 
               alpha = 1 ) + 
-  stat_smooth(data = dat_for_rehab2,
-              aes(x = day_n,
-                  y = osmolality_mmol_kg_mean, 
-                  color = tmt,
-                  group = tmt),
-              formula = y ~ x, 
-              method = "lm", 
-              se = F, 
-              size = 1.2, 
-              alpha = 1 ) + 
+  #stat_smooth(data = dat_for_rehab2,
+   #           aes(x = day_n,
+    #              y = osmolality_mmol_kg_mean, 
+     #             color = tmt,
+      #            group = tmt),
+       #       formula = y ~ x, 
+        #      method = "lm", 
+         #     se = F, 
+          #    size = 1.2, 
+           #   alpha = 1 ) + 
   geom_point(data = actual_osml_means,
              aes(x = day_n,
                  y = mean_osml,
@@ -2255,10 +1871,14 @@ ggplot() +
              alpha = 1) +
   theme_classic() + 
   scale_shape_manual(values = c(15:18), name = "") +
-  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8#, 10
+                                )
+                     ) +
+  xlim(0,8) +
+  ylim(300,450) +
   scale_color_brewer(palette = "Set2", name = "") +
-  xlab("") + 
-  ylab("Osmolality (mmol/kg)") + 
+  xlab("Acclimation Day") + 
+  ylab("Plasma Osmolality (mmol/kg)") + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
   geom_vline(xintercept = 9,
              linetype = "dashed",
@@ -2441,6 +2061,28 @@ CEWL_fig
 
 
 ## Multi-Figures
+
+
+```{r quickie}
+ggarrange(CEWL_fig, osml_fig,
+          ncol = 1, nrow = 2,
+          labels = c("A", "B"),
+          hjust = -1,
+          vjust = c(2,-1),
+          font.label = list(size = 20),
+          common.legend = TRUE,
+          legend = "bottom"
+          ) -> CSU_RC_fig
+ggarr
+CSU_RC_fig
+# export figure
+ggsave(filename = "CSU_RC_fig.jpeg",
+       plot = CSU_RC_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 10)
+```
 
 body condition & blood:
 

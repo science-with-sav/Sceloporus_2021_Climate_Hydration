@@ -116,6 +116,10 @@ write.csv(full_dat, "./data/full_exp_data.csv")
 ```
 
 
+
+
+
+
 ## Format
 
 Extract only the data from capture day (1 row of observations for each individual) and format the data classes properly for analysis.
@@ -161,6 +165,23 @@ summary(capture_dat)
 ```
 
 
+
+
+Also do some summary stats for permit reporting:
+
+```{r}
+step1 <- full_dat %>%
+  group_by(individual_ID) %>%
+  summarize(capture_date = mean(capture_date))
+  
+permit_stats <- capture_dat %>%
+  group_by(capture_date) %>%
+  summarise(n = n()) %>%
+  mutate(sex = "M")
+permit_stats
+sum(permit_stats$n)
+write.csv(permit_stats, "./data/collection_summary.csv")
+```
 
 
 ## Variable Summary

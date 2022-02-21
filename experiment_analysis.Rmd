@@ -695,6 +695,7 @@ CEWL_mod_best <- lmerTest::lmer(data = dat_no_rehab,
                          day_n:humidity_tmt + day_n:temp_tmt +
                          day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
+length(unique(dat_no_rehab$individual_ID))
 summary(CEWL_mod_best)
 CEWL_stats <- broom.mixed::tidy(CEWL_mod_best) %>%
   mutate(response = "CEWL (g/m2h)")
@@ -757,7 +758,6 @@ SMI_rmod2 <- lme4::lmer(data = dat_for_rehab,
                          (1|trial_number/individual_ID))
 summary(SMI_rmod2)
 drop1(SMI_rmod2)
-anova()
 ```
 
 
@@ -1566,6 +1566,45 @@ SMI_fig_min
 
 
 
+### CSU Presentation
+
+```{r mass prez version}
+ggplot() + 
+  geom_smooth(data = dat_no_rehab,
+              aes(x = day_n,
+                  y = mass_g, 
+                  color = tmt,
+                  group = tmt),
+              formula = y ~ x, 
+              method = "lm", 
+              se = T, 
+              size = 1.2, 
+              alpha = 0.2) + 
+  theme_classic() + 
+  #scale_shape_manual(values = c(15:18), name = "") +
+  scale_x_continuous(limits = c(0,8),
+                     breaks = c(0, 2, 4, 6, 8)) +
+  scale_color_brewer(palette = "Set2", name = "") +
+  xlab("Acclimation Day") + 
+  ylab("Lizard Mass (g)") + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none"
+) -> SMI_CSU_fig
+SMI_CSU_fig
+```
+
+
+
 ## Hct 
 
 ### Predict
@@ -1958,6 +1997,101 @@ osml_fig_min
 
 
 
+### CSU Presentation
+
+
+```{r osmolality CSU Prez fig}
+ggplot() + 
+  stat_smooth(data = dat_no_rehab2,
+              aes(x = day_n,
+                  y = osmolality_mmol_kg_mean, 
+                  color = tmt,
+                  fill = tmt,
+                  group = tmt),
+              formula = y ~ x, 
+              method = "lm", 
+              se = T, 
+              size = 2, 
+              alpha = 0.1) + 
+  theme_classic() + 
+  #scale_shape_manual(values = c(15:18), name = "") +
+  scale_x_continuous(limits = c(0,8), 
+                     breaks = c(0, 2, 4, 6, 8)) +
+  scale_color_brewer(palette = "Set2", name = "") +
+  scale_fill_brewer(palette = "Set2", name = "") +
+  xlab("Acclimation Day") + 
+  #ylim(340,370) + #CANNOT put ylimits in bc gets rid of pts that are used to make lines
+  ylab("Plasma Osmolality\n(mmol/kg)") + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 30),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 20),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none"
+        ) -> osml_CSU_fig
+osml_CSU_fig
+ggsave(filename = "CSU_osml_fig.jpeg",
+       plot = osml_CSU_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 9, height = 6)
+```
+
+
+### Predict FAKE
+
+```{r}
+
+```
+
+
+### Ending Values Boxplot
+
+```{r}
+end_vals <- dat_2 %>%
+  dplyr::filter(day_n == 8)
+
+summary(aov(data = end_vals, 
+             osmolality_mmol_kg_mean ~ temp_tmt * humidity_tmt))
+
+ggplot(data = end_vals) +
+  geom_boxplot(aes(x = tmt,
+                   y = osmolality_mmol_kg_mean, 
+                   color = tmt), 
+               size = 1) + 
+  theme_classic() + 
+  scale_color_brewer(palette = "Set2", name = "") +
+  xlab("") + 
+  ylab("Final Plasma Osmolality\n(mmol/kg)") + 
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 30),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 20),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none"
+        ) -> osml_end_boxplot
+osml_end_boxplot
+ggsave(filename = "osml_end_boxplot.jpeg",
+       plot = osml_end_boxplot,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 9, height = 6)
+```
+
+
 
 ## CEWL
 
@@ -2054,6 +2188,105 @@ ggplot() +
         #legend.position = c(0.25,0.85)
         ) -> CEWL_fig
 CEWL_fig
+```
+
+
+
+### CSU Presentation
+
+
+```{r CEWL CSU prez fig}
+ggplot() + 
+  stat_smooth(data = dat_3,
+              aes(x = day_n,
+                  y = CEWL_g_m2h_mean, 
+                  color = tmt,
+                  fill = tmt,
+                  group = tmt),
+              formula = y ~ x, 
+              method = "lm", 
+              se = T, 
+              size = 2, 
+              alpha = 0.2) + 
+  theme_classic() + 
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
+  scale_color_brewer(palette = "Set2", name = "") +
+  scale_fill_brewer(palette = "Set2", name = "") +
+  xlab("Acclimation Day") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 30),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 20),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none"
+        #legend.position = c(0.25,0.85)
+        ) -> CEWL_CSU_pres_fig
+CEWL_CSU_pres_fig
+
+ggsave(filename = "CEWL_CSU_pres_fig.jpeg",
+       plot = CEWL_CSU_pres_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 8, height = 6)
+```
+
+
+
+
+### Predict FAKE
+
+```{r}
+
+```
+
+
+### Ending Values Boxplot
+
+```{r}
+end_vals_CEWL <- dat_3 %>%
+  dplyr::filter(day_n == 8)
+
+summary(aov(data = end_vals_CEWL, 
+             CEWL_g_m2h_mean ~ temp_tmt * humidity_tmt))
+
+
+ggplot(data = end_vals_CEWL) +
+  geom_boxplot(aes(x = tmt,
+                   y = CEWL_g_m2h_mean, 
+                   color = tmt), 
+               size = 1) + 
+  theme_classic() + 
+  scale_color_brewer(palette = "Set2", name = "") +
+  xlab("") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 30),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 20),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none"
+        ) -> CEWL_end_boxplot
+CEWL_end_boxplot
+
+ggsave(filename = "CEWL_end_boxplot.jpeg",
+       plot = CEWL_end_boxplot,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 8, height = 6)
 ```
 
 

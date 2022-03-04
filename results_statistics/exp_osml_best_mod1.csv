@@ -1,9 +1,0 @@
-"","effect","group","term","estimate","std.error","statistic","df","p.value"
-"1","fixed",NA,"(Intercept)",351.093642954465,2.41463222407437,145.402533542785,9.6731251140159,1.75792307314723e-17
-"2","fixed",NA,"day_n:humidity_tmtHumid",0.428168111308512,0.53938478353981,0.793808287468886,383.290431357556,0.427798205992057
-"3","fixed",NA,"day_n:humidity_tmtDry",1.44681189612437,0.543405149321775,2.66249206127351,382.763433867681,0.00808357580884369
-"4","fixed",NA,"day_n:humidity_tmtHumid:temp_tmtCool",-0.63263401491927,0.660927641140671,-0.957191038080099,290.984000345102,0.339265420331012
-"5","fixed",NA,"day_n:humidity_tmtDry:temp_tmtCool",-1.5737817650008,0.668599910359598,-2.35384680825691,290.479007895057,0.0192463494236515
-"6","ran_pars","individual_ID:trial_number","sd__(Intercept)",3.42028463231056,NA,NA,NA,NA
-"7","ran_pars","trial_number","sd__(Intercept)",3.44902001172744,NA,NA,NA,NA
-"8","ran_pars","Residual","sd__Observation",23.1363043046928,NA,NA,NA,NA

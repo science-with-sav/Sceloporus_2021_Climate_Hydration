@@ -34,7 +34,7 @@ library("AICcmodavg") # model selection
 
 # Background and Goals
 
-This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus and in Poly Canyon. This R file analyzes the effect of experimental climate treatments on their body condition, osmotic balance, and osmoregulation. Please refer to **doi:** for the published scientific journal article and full details.
+This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus then acclimated to 4 different climate treatments. This R file analyzes the effect of experimental climate treatments on lizard body condition, osmotic balance, and osmoregulation. Please refer to **doi:** for the published scientific journal article and full details.
 
 
 # Data
@@ -139,6 +139,13 @@ dat$tmt <- factor(dat$tmt,
 summary(dat)
 ```
 
+should match this still:
+cool dry  :231     
+cool humid:238  
+hot dry   :237  
+hot humid :230
+                    
+                    
 
 Make sub-dataframes without rehab data / with only rehab-related data:
 
@@ -340,7 +347,7 @@ hct_mod2a <- lme4::lmer(data = dat_no_rehab,
 anova(hct_mod3a, hct_mod2a)
 ```
 
-Not necessaril different or better.
+Not necessarily different or better.
 
 ```{r hct exp model 2b}
 hct_mod2b <- lme4::lmer(data = dat_no_rehab,
@@ -381,7 +388,7 @@ rownames(EXP_mod_names1) <- c('4', '3a', '2b')
 #calculate AIC of each model
 hct_AICc <- data.frame(aictab(cand.set = hct_models, 
                                  modnames = EXP_mod_names1)) %>%
-  mutate(response = "Hematocrit (%")
+  mutate(response = "Hematocrit (%)")
 hct_AICc
 ```
 
@@ -725,6 +732,111 @@ write.csv(AICc_ranks, "./results_statistics/exp_model_rankings.csv")
 ```
 
 
+**CEWL and body condition were best-predicted by the FULL model. Hematocrit was best-predicted by a reduced model, with delta-AIC of the other models >3.7 (AICc_ranks / exp_model_rankings). Osmolality was predicted equally well by the full and reduced model, so we present the reduced model with the least number of variables (AICc_ranks / exp_model_rankings). The other equally-good models are in exp_best_models_osml_additional.**
+
+
+
+
+# Effect Estimates (from coefficients)
+
+I want to know what the change in the response variables was per day for each treatment group, on average.
+
+So, first make a matrix expressing the 4 treatment groups with 0s (is not) and 1s (it is). For example, if the baseline states (1s) express Cool and Dry, then hot-dry would have a 0 for temperature and 1 for humidity.
+
+```{r}
+tmt_matrix <- data.frame(tmt = c("Hot Humid", "Hot Dry", 
+                                 "Cool Humid", "Cool Dry"),
+                         temp_state = c(0,0,1,1),
+                         humid_state = c(0,1,0,1))
+tmt_matrix
+
+5*test
+```
+
+
+Next, get all the coefficients:
+
+```{r}
+# CEWL
+CEWL_day_n <- experiment_stats %>% 
+  dplyr::filter(response == "CEWL (g/m2h)") %>% 
+  dplyr::filter(term == "day_n") %>%
+  dplyr::select(estimate)
+CEWL_day_n_humidity_tmtDry <- experiment_stats %>% 
+  dplyr::filter(response == "CEWL (g/m2h)") %>% 
+  dplyr::filter(term == "day_n:humidity_tmtDry") %>%
+  dplyr::select(estimate)
+CEWL_day_n_temp_tmtCool <- experiment_stats %>% 
+  dplyr::filter(response == "CEWL (g/m2h)") %>% 
+  dplyr::filter(term == "day_n:temp_tmtCool") %>%
+  dplyr::select(estimate)
+CEWL_day_n_humidity_tmtDry_temp_tmtCool <- experiment_stats %>% 
+  dplyr::filter(response == "CEWL (g/m2h)") %>% 
+  dplyr::filter(term == "day_n:humidity_tmtDry:temp_tmtCool") %>%
+  dplyr::select(estimate)
+
+# plasma osmolality
+osml_day_n <- experiment_stats %>% 
+  dplyr::filter(response == "Plasma Osmolality (mmol/kg)") %>% 
+  dplyr::filter(term == "day_n") %>%
+  dplyr::select(estimate)
+osml_day_n_temp_tmtCool <- experiment_stats %>% 
+  dplyr::filter(response == "Plasma Osmolality (mmol/kg)") %>% 
+  dplyr::filter(term == "day_n:temp_tmtCool") %>%
+  dplyr::select(estimate)
+
+# hematocrit
+hct_day_n <- experiment_stats %>% 
+  dplyr::filter(response == "Hematocrit (%)") %>% 
+  dplyr::filter(term == "day_n") %>%
+  dplyr::select(estimate)
+hct_day_n_temp_tmtCool <- experiment_stats %>% 
+  dplyr::filter(response == "Hematocrit (%)") %>% 
+  dplyr::filter(term == "day_n:temp_tmtCool") %>%
+  dplyr::select(estimate)
+
+# body condition
+SMI_day_n <- experiment_stats %>% 
+  dplyr::filter(response == "Body Condition (g)") %>% 
+  dplyr::filter(term == "day_n") %>%
+  dplyr::select(estimate)
+SMI_day_n_humidity_tmtDry <- experiment_stats %>% 
+  dplyr::filter(response == "Body Condition (g)") %>% 
+  dplyr::filter(term == "day_n:humidity_tmtDry") %>%
+  dplyr::select(estimate)
+SMI_day_n_temp_tmtCool <- experiment_stats %>% 
+  dplyr::filter(response == "Body Condition (g)") %>% 
+  dplyr::filter(term == "day_n:temp_tmtCool") %>%
+  dplyr::select(estimate)
+SMI_day_n_humidity_tmtDry_temp_tmtCool <- experiment_stats %>% 
+  dplyr::filter(response == "Body Condition (g)") %>% 
+  dplyr::filter(term == "day_n:humidity_tmtDry:temp_tmtCool") %>%
+  dplyr::select(estimate)
+```
+
+
+
+
+Now, use the character states to calculate estimated rates of change per day for each tmt group:
+
+```{r}
+response_per_day <- tmt_matrix %>%
+  mutate(CEWL_per_day = CEWL_day_n[[1]] + 
+           CEWL_day_n_humidity_tmtDry[[1]]*humid_state + 
+           CEWL_day_n_temp_tmtCool[[1]]*temp_state +
+           CEWL_day_n_humidity_tmtDry_temp_tmtCool[[1]]*humid_state*temp_state,
+         osml_per_day = osml_day_n[[1]] +
+           osml_day_n_temp_tmtCool[[1]]*temp_state,
+         hct_per_day = hct_day_n[[1]] + 
+           hct_day_n_temp_tmtCool[[1]]*temp_state,
+         SMI_per_day = SMI_day_n[[1]] + 
+           SMI_day_n_humidity_tmtDry[[1]]*humid_state + 
+           SMI_day_n_temp_tmtCool[[1]]*temp_state +
+           SMI_day_n_humidity_tmtDry_temp_tmtCool[[1]]*humid_state*temp_state)
+```
+
+
+
 
 
 
@@ -742,89 +854,54 @@ These models are just named in order.
 ```{r SMI rehydration model 1}
 SMI_rmod1 <- lme4::lmer(data = dat_for_rehab,
                        SMI ~ 
-                         type*humidity_tmt*temp_tmt +
+                         type + 
+                         type:humidity_tmt + type:temp_tmt +
+                         type:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
 summary(SMI_rmod1)
 drop1(SMI_rmod1)
 ```
 
-Remove three-way interaction and day*humidity interaction.
+Remove three-way interaction and see if we lose significant predictive power.
 
 ```{r SMI rehydration model 2}
 SMI_rmod2 <- lme4::lmer(data = dat_for_rehab,
                        SMI ~ 
-                         type*humidity_tmt*temp_tmt -
-                         type:humidity_tmt:temp_tmt +
+                         type + 
+                         type:humidity_tmt + type:temp_tmt +
                          (1|trial_number/individual_ID))
 summary(SMI_rmod2)
+anova(SMI_rmod1, SMI_rmod2)
 drop1(SMI_rmod2)
 ```
 
+We do not lose predictive power, so we're better-off without the 3-way interaction.
 
-try each 2-interaction model:
 
-```{r SMI rehydration model 2abc}
+
+try dropping either tmt effect:
+
+```{r SMI rehydration model 2ab}
 SMI_rmod2a <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ type*(humidity_tmt + temp_tmt) +
+                       SMI ~ type + 
+                         type:temp_tmt +
                          (1|trial_number/individual_ID))
+drop1(SMI_rmod2a)
 SMI_rmod2b <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ (type + humidity_tmt)*temp_tmt +
+                       SMI ~ type + 
+                         type:humidity_tmt + 
                          (1|trial_number/individual_ID))
-SMI_rmod2c <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ (type + temp_tmt) * humidity_tmt +
-                         (1|trial_number/individual_ID))
+drop1(SMI_rmod2b)
 ```
 
-Drop to only one interaction:
+rehab effect only:
 
-```{r SMI rehydration model 3abc}
-SMI_rmod3a <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ type*humidity_tmt + temp_tmt +
-                         (1|trial_number/individual_ID))
-SMI_rmod3b <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~  humidity_tmt + type*temp_tmt +
-                         (1|trial_number/individual_ID))
-SMI_rmod3c <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ type + temp_tmt * humidity_tmt +
-                         (1|trial_number/individual_ID))
-```
-
-No interactions:
-
-```{r SMI rehydration model 4}
-SMI_rmod4 <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ type + temp_tmt + humidity_tmt +
-                         (1|trial_number/individual_ID))
-```
-
-
-try each 2-variable combination:
-
-```{r SMI rehydration model 4abc}
-SMI_rmod4a <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ type + humidity_tmt +
-                         (1|trial_number/individual_ID))
-SMI_rmod4b <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~  type + temp_tmt +
-                         (1|trial_number/individual_ID))
-SMI_rmod4c <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ temp_tmt + humidity_tmt +
-                         (1|trial_number/individual_ID))
-```
-
-try each single variable:
-
-```{r SMI rehydration model 5abc}
-SMI_rmod5a <- lme4::lmer(data = dat_for_rehab,
+```{r SMI rehydration model 3}
+SMI_rmod3 <- lme4::lmer(data = dat_for_rehab,
                        SMI ~ type +
                          (1|trial_number/individual_ID))
-SMI_rmod5b <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~  temp_tmt +
-                         (1|trial_number/individual_ID))
-SMI_rmod5c <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ humidity_tmt +
-                         (1|trial_number/individual_ID))
 ```
+
 
 
 Lastly, null model:
@@ -844,28 +921,16 @@ Compare all models:
 
 ```{r SMI rehydration mod compare}
 SMI_rmodels <- list(SMI_rmod1, 
-                   SMI_rmod2, SMI_rmod2a, SMI_rmod2b, SMI_rmod2c, 
-                              SMI_rmod3a, SMI_rmod3b, SMI_rmod3c, 
-                   SMI_rmod4, SMI_rmod4a, SMI_rmod4b, SMI_rmod4c, 
-                              SMI_rmod5a, SMI_rmod5b, SMI_rmod5c, 
+                   SMI_rmod2, SMI_rmod2a, SMI_rmod2b, 
+                   SMI_rmod3, 
                    SMI_rmod_null)
 
 #specify model names
-REHYD_mod_names <- c('(model 1) ~ Rhyd, Humd, Temp, Rhyd:Humd, Rhyd:Temp, Humd:Temp, Rhyd:Humd:Temp',
-                   '(model 2) ~ Rhyd, Humd, Temp, Rhyd:Humd, Rhyd:Temp, Humd:Temp',
-                   '(model 2a) ~ Rhyd, Humd, Temp, Rhyd:Humd, Rhyd:Temp',
-                   '(model 2b) ~ Rhyd, Humd, Temp, Rhyd:Temp, Humd:Temp',
-                   '(model 2c) ~ Rhyd, Humd, Temp, Rhyd:Humd, Humd:Temp',
-                   '(model 3a) ~ Rhyd, Humd, Temp, Rhyd:Humd',
-                   '(model 3b) ~ Rhyd, Humd, Temp, Rhyd:Temp',
-                   '(model 3c) ~ Rhyd, Humd, Temp, Humd:Temp',
-                   '(model 4) ~ Rhyd, Humd, Temp',
-                   '(model 4a) ~ Rhyd, Humd',
-                   '(model 4b) ~ Rhyd, Temp',
-                   '(model 4c) ~ Humd, Temp',
-                   '(model 5a) ~ Rhyd',
-                   '(model 5b) ~ Temp',
-                   '(model 5c) ~ Humd',
+REHYD_mod_names <- c('(model 1) ~ Rhyd, Rhyd:Humd, Rhyd:Temp, Rhyd:Humd:Temp',
+                   '(model 2) ~ Rhyd, Rhyd:Humd, Rhyd:Temp',
+                   '(model 2a) ~ Rhyd, Rhyd:Temp',
+                   '(model 2b) ~ Rhyd, Rhyd:Humd',
+                   '(model 3) ~ Rhyd',
                    'null model')
 
 #calculate AIC of each model
@@ -875,7 +940,7 @@ SMI_rAICc
 ```
 
 
-Models 3b and 4b tied for best model.
+Models 2a is the best model.
 
 
 ### Assumptions
@@ -883,35 +948,22 @@ Models 3b and 4b tied for best model.
 Check linear regression assumptions/conditions:
 
 ```{r SMI rehydration model assumptions}
-plot(SMI_rmod4b)
-simple.eda(residuals(SMI_rmod4b))
-shapiro.test(residuals(SMI_rmod4b))
-plot(SMI_rmod3b)
-simple.eda(residuals(SMI_rmod3b))
-shapiro.test(residuals(SMI_rmod3b))
+plot(SMI_rmod2a)
+simple.eda(residuals(SMI_rmod2a))
+shapiro.test(residuals(SMI_rmod2a))
 ```
 
 All of the assumptions are met very well.
 
 
-### Export
-
-Save best model stats with p-values:
+### Save
 
 ```{r best SMI rehydration models}
 SMI_rmod_best1 <- lmerTest::lmer(data = dat_for_rehab,
-                       SMI ~  type + temp_tmt +
+                       SMI ~  type + 
+                         type:temp_tmt +
                          (1|trial_number/individual_ID))
 summary(SMI_rmod_best1)
-write.csv(broom.mixed::tidy(SMI_rmod_best1), 
-          "./results_statistics/rehydration_SMI_best_mod1.csv")
-SMI_rmod_best2 <- lmerTest::lmer(data = dat_for_rehab,
-                       SMI ~  humidity_tmt + type*temp_tmt +
-                         (1|trial_number/individual_ID))
-summary(SMI_rmod_best2)
-write.csv(broom.mixed::tidy(SMI_rmod_best2), 
-          "./results_statistics/rehydration_SMI_best_mod2.csv")
-write.csv(SMI_rAICc, "./results_statistics/rehydration_SMI_mod_rankings.csv")
 ```
 
 
@@ -929,89 +981,54 @@ write.csv(SMI_rAICc, "./results_statistics/rehydration_SMI_mod_rankings.csv")
 ```{r hct rehydration model 1}
 hct_rmod1 <- lme4::lmer(data = dat_for_rehab,
                        hematocrit_percent ~ 
-                         type*humidity_tmt*temp_tmt +
+                         type + 
+                         type:humidity_tmt + type:temp_tmt +
+                         type:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
 summary(hct_rmod1)
 drop1(hct_rmod1)
 ```
 
-Remove three-way interaction and day*humidity interaction.
+Remove three-way interaction
 
 ```{r hct rehydration model 2}
 hct_rmod2 <- lme4::lmer(data = dat_for_rehab,
                        hematocrit_percent ~ 
-                         type*humidity_tmt*temp_tmt -
-                         type:humidity_tmt:temp_tmt +
+                         type + 
+                         type:humidity_tmt + type:temp_tmt +
                          (1|trial_number/individual_ID))
 summary(hct_rmod2)
+anova(hct_rmod1, hct_rmod2)
 drop1(hct_rmod2)
 ```
 
 
-try each 2-interaction model:
+try dropping either interaction:
 
-```{r hct rehydration model 2abc}
+```{r hct rehydration model 2ab}
 hct_rmod2a <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ type*(humidity_tmt + temp_tmt) +
+                       hematocrit_percent ~ 
+                         type + 
+                         type:temp_tmt +
                          (1|trial_number/individual_ID))
+drop1(hct_rmod2a)
 hct_rmod2b <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ (type + humidity_tmt)*temp_tmt +
+                       hematocrit_percent ~ 
+                         type + 
+                         type:humidity_tmt +
                          (1|trial_number/individual_ID))
-hct_rmod2c <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ (type + temp_tmt) * humidity_tmt +
-                         (1|trial_number/individual_ID))
+drop1(hct_rmod2b)
 ```
 
-Drop to only one interaction:
+rehab effect only:
 
-```{r hct rehydration model 3abc}
-hct_rmod3a <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ type*humidity_tmt + temp_tmt +
-                         (1|trial_number/individual_ID))
-hct_rmod3b <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~  humidity_tmt + type*temp_tmt +
-                         (1|trial_number/individual_ID))
-hct_rmod3c <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ type + temp_tmt * humidity_tmt +
-                         (1|trial_number/individual_ID))
-```
-
-No interactions:
-
-```{r hct rehydration model 4}
-hct_rmod4 <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ type + temp_tmt + humidity_tmt +
-                         (1|trial_number/individual_ID))
-```
-
-
-try each 2-variable combination:
-
-```{r hct rehydration model 4abc}
-hct_rmod4a <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ type + humidity_tmt +
-                         (1|trial_number/individual_ID))
-hct_rmod4b <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~  type + temp_tmt +
-                         (1|trial_number/individual_ID))
-hct_rmod4c <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ temp_tmt + humidity_tmt +
-                         (1|trial_number/individual_ID))
-```
-
-try each single variable:
-
-```{r hct rehydration model 5abc}
-hct_rmod5a <- lme4::lmer(data = dat_for_rehab,
+```{r hct rehydration model 3}
+hct_rmod3 <- lme4::lmer(data = dat_for_rehab,
                        hematocrit_percent ~ type +
                          (1|trial_number/individual_ID))
-hct_rmod5b <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~  temp_tmt +
-                         (1|trial_number/individual_ID))
-hct_rmod5c <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ humidity_tmt +
-                         (1|trial_number/individual_ID))
 ```
+
+
 
 
 Lastly, null model:
@@ -1031,10 +1048,8 @@ Compare all models:
 
 ```{r hct rehydration mod compare}
 hct_rmodels <- list(hct_rmod1, 
-                   hct_rmod2, hct_rmod2a, hct_rmod2b, hct_rmod2c, 
-                              hct_rmod3a, hct_rmod3b, hct_rmod3c, 
-                   hct_rmod4, hct_rmod4a, hct_rmod4b, hct_rmod4c, 
-                              hct_rmod5a, hct_rmod5b, hct_rmod5c, 
+                   hct_rmod2, hct_rmod2a, hct_rmod2b, 
+                   hct_rmod3,
                    hct_rmod_null)
 
 #calculate AIC of each model
@@ -1044,7 +1059,7 @@ hct_rAICc
 ```
 
 
-There are 3 top models: 1, 2b, and 2
+The top model is model 1, the full model!
 
 
 ### Assumptions
@@ -1055,47 +1070,23 @@ Check linear regression assumptions/conditions:
 plot(hct_rmod1)
 simple.eda(residuals(hct_rmod1))
 shapiro.test(residuals(hct_rmod1))
-plot(hct_rmod2b)
-simple.eda(residuals(hct_rmod2b))
-shapiro.test(residuals(hct_rmod2b))
-plot(hct_rmod2)
-simple.eda(residuals(hct_rmod2))
-shapiro.test(residuals(hct_rmod2))
 ```
 
 conditions are all acceptable
 
 
-### Export
+### Save
 
 Save best model stats with p-values:
 
 ```{r best hct rehydration models}
-# model 1
 hct_rmod_best1 <- lmerTest::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ type*humidity_tmt*temp_tmt +
+                       hematocrit_percent ~ 
+                         type + 
+                         type:humidity_tmt + type:temp_tmt +
+                         type:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
 summary(hct_rmod_best1)
-write.csv(broom.mixed::tidy(hct_rmod_best1), 
-          "./results_statistics/rehydration_hct_best_mod1.csv")
-# model 2b
-hct_rmod_best2 <- lmerTest::lmer(data = dat_for_rehab,
-                         hematocrit_percent ~ 
-                           (type + humidity_tmt)*temp_tmt +
-                         (1|trial_number/individual_ID))
-summary(hct_rmod_best2)
-write.csv(broom.mixed::tidy(hct_rmod_best2), 
-          "./results_statistics/rehydration_hct_best_mod2.csv")
-# model 2
-hct_rmod_best3 <- lmerTest::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ 
-                         type*humidity_tmt*temp_tmt -
-                         type:humidity_tmt:temp_tmt +
-                         (1|trial_number/individual_ID))
-summary(hct_rmod_best3)
-write.csv(broom.mixed::tidy(hct_rmod_best3), 
-          "./results_statistics/rehydration_hct_best_mod3.csv")
-write.csv(hct_rAICc, "./results_statistics/rehydration_hct_mod_rankings.csv")
 ```
 
 
@@ -1109,90 +1100,53 @@ write.csv(hct_rAICc, "./results_statistics/rehydration_hct_mod_rankings.csv")
 ```{r osml rehydration model 1}
 osml_rmod1 <- lme4::lmer(data = dat_for_rehab,
                        osmolality_mmol_kg_mean ~ 
-                         type*humidity_tmt*temp_tmt +
+                         type + 
+                         type:humidity_tmt + type:temp_tmt +
+                         type:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
 summary(osml_rmod1)
 drop1(osml_rmod1)
 ```
 
-Remove three-way interaction and day*humidity interaction.
+Remove three-way interaction.
 
 ```{r osml rehydration model 2}
 osml_rmod2 <- lme4::lmer(data = dat_for_rehab,
                        osmolality_mmol_kg_mean ~ 
-                         type*humidity_tmt*temp_tmt -
-                         type:humidity_tmt:temp_tmt +
+                         type + 
+                         type:humidity_tmt + type:temp_tmt +
                          (1|trial_number/individual_ID))
 summary(osml_rmod2)
+anova(osml_rmod1, osml_rmod2)
 drop1(osml_rmod2)
 ```
 
+We do not need 3-way interaction.
 
-try each 2-interaction model:
+try either 2-way-interaction:
 
-```{r osml rehydration model 2abc}
+```{r osml rehydration model 2ab}
 osml_rmod2a <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ type*(humidity_tmt + temp_tmt) +
+                       osmolality_mmol_kg_mean ~ 
+                         type + type:temp_tmt +
                          (1|trial_number/individual_ID))
+drop1(osml_rmod2a)
 osml_rmod2b <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ (type + humidity_tmt)*temp_tmt +
+                       osmolality_mmol_kg_mean ~ 
+                         type + 
+                         type:humidity_tmt +
                          (1|trial_number/individual_ID))
-osml_rmod2c <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ (type + temp_tmt) * humidity_tmt +
-                         (1|trial_number/individual_ID))
-```
-
-Drop to only one interaction:
-
-```{r osml rehydration model 3abc}
-osml_rmod3a <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ type*humidity_tmt + temp_tmt +
-                         (1|trial_number/individual_ID))
-osml_rmod3b <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~  humidity_tmt + type*temp_tmt +
-                         (1|trial_number/individual_ID))
-osml_rmod3c <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ type + temp_tmt * humidity_tmt +
-                         (1|trial_number/individual_ID))
-```
-
-No interactions:
-
-```{r osml rehydration model 4}
-osml_rmod4 <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ type + temp_tmt + humidity_tmt +
-                         (1|trial_number/individual_ID))
+drop1(osml_rmod2b)
 ```
 
 
-try each 2-variable combination:
+single effect of rehab:
 
-```{r osml rehydration model 4abc}
-osml_rmod4a <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ type + humidity_tmt +
-                         (1|trial_number/individual_ID))
-osml_rmod4b <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~  type + temp_tmt +
-                         (1|trial_number/individual_ID))
-osml_rmod4c <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ temp_tmt + humidity_tmt +
-                         (1|trial_number/individual_ID))
+```{r osml rehydration model 3}
+osml_rmod3 <- lme4::lmer(data = dat_for_rehab,
+                            osmolality_mmol_kg_mean ~ type + 
+                              (1|trial_number/individual_ID))
 ```
-
-try each single variable:
-
-```{r osml rehydration model 5abc}
-osml_rmod5a <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ type +
-                         (1|trial_number/individual_ID))
-osml_rmod5b <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~  temp_tmt +
-                         (1|trial_number/individual_ID))
-osml_rmod5c <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ humidity_tmt +
-                         (1|trial_number/individual_ID))
-```
-
 
 Lastly, null model:
 
@@ -1212,10 +1166,8 @@ Compare all models:
 
 ```{r osml rehydration mod compare}
 osml_rmodels <- list(osml_rmod1, 
-                   osml_rmod2, osml_rmod2a, osml_rmod2b, osml_rmod2c, 
-                              osml_rmod3a, osml_rmod3b, osml_rmod3c, 
-                   osml_rmod4, osml_rmod4a, osml_rmod4b, osml_rmod4c, 
-                              osml_rmod5a, osml_rmod5b, osml_rmod5c, 
+                   osml_rmod2, osml_rmod2a, osml_rmod2b, 
+                   osml_rmod3, 
                    osml_rmod_null)
 
 #calculate AIC of each model
@@ -1238,23 +1190,46 @@ simple.eda(residuals(osml_rmod1))
 shapiro.test(residuals(osml_rmod1))
 ```
 
-These are acceptable.
+The conditions are acceptable.
 
 
-### Export
-
-Save best model stats with p-values:
+### Save
 
 ```{r best osml rehydration model}
 osml_rmod_best1 <- lmerTest::lmer(data = dat_for_rehab,
                        osmolality_mmol_kg_mean ~
-                         humidity_tmt*type*temp_tmt +
+                         type + 
+                         type:humidity_tmt + type:temp_tmt +
+                         type:humidity_tmt:temp_tmt + 
                          (1|trial_number/individual_ID))
 summary(osml_rmod_best1)
-write.csv(broom.mixed::tidy(osml_rmod_best1), 
-          "./results_statistics/rehydration_osml_best_mod.csv")
-write.csv(osml_rAICc, "./results_statistics/rehydration_osml_mod_rankings.csv")
 ```
+
+
+
+## Group Export
+
+
+```{r best rehydration models all vars}
+rehydration_stats <- broom.mixed::tidy(osml_rmod_best1) %>%
+  rbind(broom.mixed::tidy(hct_rmod_best1)) %>%
+  rbind(broom.mixed::tidy(SMI_rmod_best1)) %>%
+  mutate(response = c(rep("Plasma Osmolality (mmol/kg)", 11),
+                      rep("Hematocrit (%)", 11),
+                      rep("Body Condition (g)", 7)))
+write.csv(rehydration_stats, 
+          "./results_statistics/rehydration_best_models.csv")
+
+AICc_ranks_rehy <- osml_rAICc %>%
+  rbind(hct_rAICc) %>%
+  rbind(SMI_rAICc)
+write.csv(AICc_ranks_rehy, 
+          "./results_statistics/rehydration_model_rankings.csv")
+```
+
+
+
+
 
 
 
@@ -1278,8 +1253,7 @@ exp_predict_SMI <- dat_no_rehab %>%
 # exp hct
 exp_predict_hct <- dat_no_rehab %>%
   dplyr::filter(complete.cases(hematocrit_percent)) %>%
-  mutate(hct_est1 = predict(hct_mod_best1),
-         hct_est2 = predict(hct_mod_best2))
+  mutate(hct_est1 = predict(hct_mod_best1))
 # exp osml
 exp_predict_osml <- dat_no_rehab %>%
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
@@ -1466,6 +1440,9 @@ ggplot() +
               se = F, 
               size = 1.2, 
               alpha = 1 ) + 
+  geom_vline(xintercept = 9,
+             linetype = "dashed",
+             color = "darkgrey") +
   stat_smooth(data = dat_for_rehab,
               aes(x = day_n,
                   y = SMI, 
@@ -1481,7 +1458,7 @@ ggplot() +
                  y = mean_SMI,
                  color = tmt,
                  shape = tmt),
-             size = 4, 
+             size = 6, 
              alpha = 1) +
   theme_classic() + 
   scale_shape_manual(values = c(15:18), name = "") +
@@ -1490,9 +1467,6 @@ ggplot() +
   xlab("Day") + 
   ylab("Body Condition (g)") + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
-  geom_vline(xintercept = 9,
-             linetype = "dashed",
-             color = "darkgrey") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 22),
@@ -1503,7 +1477,12 @@ ggplot() +
                                  family = "sans", 
                                  size = 22),
         legend.text.align = 0,
-        legend.position = "none"
+        legend.position = "none",
+        plot.margin = unit(c(0.1, #top
+                             0.1, #right
+                             0.1, #bottom
+                             0.41 #left
+                             ), "cm")
 ) -> SMI_fig
 SMI_fig
 ```
@@ -1604,6 +1583,58 @@ SMI_CSU_fig
 ```
 
 
+### Ending Values Boxplot
+
+```{r SMI ending vals}
+end_vals_SMI <- dat %>%
+  dplyr::filter(day_n == 8)
+
+SMI_aov <- summary(aov(data = end_vals_SMI, 
+             SMI ~ temp_tmt * humidity_tmt))
+SMI_tukey <- TukeyHSD(aov(data = end_vals_SMI, 
+             SMI ~ temp_tmt * humidity_tmt))
+
+ggplot(data = end_vals_SMI) +
+  geom_boxplot(aes(x = tmt,
+                   y = SMI, 
+                   color = tmt), 
+               size = 1) + 
+  theme_classic() + 
+  scale_color_brewer(palette = "Set2", name = "") +
+  xlab("") + 
+  annotate(geom = "text", x = 1, y = 13.8, label = "A", 
+           size = 8) +
+  annotate(geom = "text", x = 2, y = 12.3, label = "A", 
+           size = 8) +
+  annotate(geom = "text", x = 3, y = 14.3, label = "B", 
+           size = 8) +
+  annotate(geom = "text", x = 4, y = 14.5, label = "B", 
+           size = 8) +
+  ylab("Scaled Mass Index (g)") + 
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        axis.text.x = element_blank(),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = unit(c(0, #top
+                             0, #right
+                             0, #bottom
+                             0.74 #left
+                             ), "cm")
+        ) -> SMI_end_boxplot
+SMI_end_boxplot
+```
+
+
+
+
 
 ## Hct 
 
@@ -1697,6 +1728,9 @@ ggplot() +
               se = F, 
               size = 1.2, 
               alpha = 1 ) + 
+  geom_vline(xintercept = 9,
+             linetype = "dashed",
+             color = "darkgrey") +
   stat_smooth(data = dat_for_rehab1,
               aes(x = day_n,
                   y = hematocrit_percent, 
@@ -1712,7 +1746,7 @@ ggplot() +
                  y = mean_hct, 
                  color = tmt,
                  shape = tmt),
-             size = 4, 
+             size = 6, 
              alpha = 1) +
   theme_classic() + 
   scale_shape_manual(values = c(15:18), name = "") +
@@ -1721,9 +1755,6 @@ ggplot() +
   xlab("") + 
   ylab("Hematocrit (%)") + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
-  geom_vline(xintercept = 9,
-             linetype = "dashed",
-             color = "darkgrey") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 22),
@@ -1734,7 +1765,12 @@ ggplot() +
                                  family = "sans", 
                                  size = 22),
         legend.text.align = 0,
-        legend.position = "none"
+        legend.position = "none",
+        plot.margin = unit(c(0.1, #top
+                             0.1, #right
+                             0.1, #bottom
+                             0.41 #left
+                             ), "cm")
         ) -> hct_fig
 hct_fig
 ```
@@ -1796,6 +1832,58 @@ ggplot() +
         ) -> hct_fig_min
 hct_fig_min
 ```
+
+
+
+### Ending Values Boxplot
+
+
+```{r hct ending vals}
+end_vals_hct <- dat_1 %>%
+  dplyr::filter(day_n == 8)
+
+hct_aov <- summary(aov(data = end_vals_hct, 
+             hematocrit_percent ~ temp_tmt * humidity_tmt))
+hct_tukey <- TukeyHSD(aov(data = end_vals_hct, 
+             hematocrit_percent ~ temp_tmt * humidity_tmt))
+
+ggplot(data = end_vals_hct) +
+  geom_boxplot(aes(x = tmt,
+                   y = hematocrit_percent, 
+                   color = tmt), 
+               size = 1) + 
+  theme_classic() + 
+  scale_color_brewer(palette = "Set2", name = "") +
+  xlab("") + 
+  annotate(geom = "text", x = 1, y = 42, label = "A", 
+           size = 8) +
+  annotate(geom = "text", x = 2, y = 45, label = "AB", 
+           size = 8) +
+  annotate(geom = "text", x = 3, y = 53, label = "B", 
+           size = 8) +
+  annotate(geom = "text", x = 4, y = 53, label = "B", 
+           size = 8) +
+  ylab("Final Hematocrit (%)") + 
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = unit(c(0, #top
+                             0, #right
+                             0, #bottom
+                             0.74 #left
+                             ), "cm")
+        ) -> hct_end_boxplot
+hct_end_boxplot
+```
+
 
 
 
@@ -1871,7 +1959,8 @@ dat_2 <- dat %>%
 dat_for_rehab2 <- dat_for_rehab %>%
   dplyr::filter(complete.cases(osmolality_mmol_kg_mean))
 dat_no_rehab2 <- dat_no_rehab %>%
-  dplyr::filter(complete.cases(osmolality_mmol_kg_mean))
+  dplyr::filter(complete.cases(osmolality_mmol_kg_mean)) %>%
+  dplyr::filter(individual_ID %in% dat_for_rehab2$individual_ID)
 
 
 ggplot() + 
@@ -1881,7 +1970,7 @@ ggplot() +
                 color = tmt,
                 group = individual_ID),
             alpha = 0.2) +
-  stat_smooth(data = dat_no_rehab2,
+  stat_smooth(data = dat_no_rehab_rm,
               aes(x = day_n,
                   y = osmolality_mmol_kg_mean, 
                   color = tmt,
@@ -1891,37 +1980,34 @@ ggplot() +
               se = F, 
               size = 1.2, 
               alpha = 1 ) + 
-  #stat_smooth(data = dat_for_rehab2,
-   #           aes(x = day_n,
-    #              y = osmolality_mmol_kg_mean, 
-     #             color = tmt,
-      #            group = tmt),
-       #       formula = y ~ x, 
-        #      method = "lm", 
-         #     se = F, 
-          #    size = 1.2, 
-           #   alpha = 1 ) + 
+  geom_vline(xintercept = 9,
+             linetype = "dashed",
+             color = "darkgrey") +
+  stat_smooth(data = dat_for_rehab2,
+              aes(x = day_n,
+                  y = osmolality_mmol_kg_mean, 
+                  color = tmt,
+                  group = tmt),
+              formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.2, 
+              alpha = 1 ) + 
   geom_point(data = actual_osml_means,
              aes(x = day_n,
                  y = mean_osml,
                  color = tmt,
                  shape = tmt),
-             size = 4, 
+             size = 6, 
              alpha = 1) +
   theme_classic() + 
   scale_shape_manual(values = c(15:18), name = "") +
-  scale_x_continuous(breaks = c(0, 2, 4, 6, 8#, 10
-                                )
-                     ) +
-  xlim(0,8) +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
   ylim(300,450) +
   scale_color_brewer(palette = "Set2", name = "") +
-  xlab("Acclimation Day") + 
+  xlab("") + 
   ylab("Plasma Osmolality (mmol/kg)") + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
-  geom_vline(xintercept = 9,
-             linetype = "dashed",
-             color = "darkgrey") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 22),
@@ -1932,7 +2018,12 @@ ggplot() +
                                  family = "sans", 
                                  size = 22),
         legend.text.align = 0,
-        legend.position = "none"
+        legend.position = "none",
+        plot.margin = unit(c(0.6, #top
+                             0.1, #right
+                             0.1, #bottom
+                             0.1 #left
+                             ), "cm")
         ) -> osml_fig
 osml_fig
 ```
@@ -2054,14 +2145,16 @@ ggsave(filename = "CSU_osml_fig.jpeg",
 
 ### Ending Values Boxplot
 
-```{r}
-end_vals <- dat_2 %>%
+```{r osml ending vals}
+end_vals_osml <- dat_2 %>%
   dplyr::filter(day_n == 8)
 
-summary(aov(data = end_vals, 
+osml_aov <- summary(aov(data = end_vals_osml, 
+             osmolality_mmol_kg_mean ~ temp_tmt * humidity_tmt))
+osml_tukey <- TukeyHSD(aov(data = end_vals_osml, 
              osmolality_mmol_kg_mean ~ temp_tmt * humidity_tmt))
 
-ggplot(data = end_vals) +
+ggplot(data = end_vals_osml) +
   geom_boxplot(aes(x = tmt,
                    y = osmolality_mmol_kg_mean, 
                    color = tmt), 
@@ -2069,26 +2162,39 @@ ggplot(data = end_vals) +
   theme_classic() + 
   scale_color_brewer(palette = "Set2", name = "") +
   xlab("") + 
+  annotate(geom = "text", x = 1, y = 445, label = "A", 
+           size = 8) +
+  annotate(geom = "text", x = 2, y = 420, label = "A", 
+           size = 8) +
+  annotate(geom = "text", x = 3, y = 465, label = "A", 
+           size = 8) +
+  annotate(geom = "text", x = 4, y = 430, label = "A", 
+           size = 8) +
   ylab("Final Plasma Osmolality\n(mmol/kg)") + 
   theme(text = element_text(color = "black", 
                             family = "sans", 
-                            size = 30),
+                            size = 22),
         axis.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 20),
+                                 size = 16),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
                                  size = 22),
         legend.text.align = 0,
-        legend.position = "none"
+        legend.position = "none",
+        plot.margin = unit(c(0, #top
+                             0, #right
+                             0, #bottom
+                             0.01 #left
+                             ), "cm")
         ) -> osml_end_boxplot
 osml_end_boxplot
-ggsave(filename = "osml_end_boxplot.jpeg",
-       plot = osml_end_boxplot,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 9, height = 6)
+#ggsave(filename = "osml_end_boxplot.jpeg",
+ #      plot = osml_end_boxplot,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 9, height = 6)
 ```
 
 
@@ -2165,13 +2271,14 @@ ggplot() +
                  y = mean_CEWL,
                  color = tmt,
                  shape = tmt),
-             size = 4, 
+             size = 6, 
              alpha = 1) +
   theme_classic() + 
   scale_shape_manual(values = c(15:18), name = "") +
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
   scale_color_brewer(palette = "Set2", name = "") +
-  xlab("") + 
+  xlab("Day") + 
+  ylim(0,60) +
   ylab(bquote('CEWL (g/'*m^2*'h)')) + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
   theme(text = element_text(color = "black", 
@@ -2184,10 +2291,16 @@ ggplot() +
                                  family = "sans", 
                                  size = 22),
         legend.text.align = 0,
-        legend.position = "none"
+        legend.position = "bottom"
         #legend.position = c(0.25,0.85)
         ) -> CEWL_fig
 CEWL_fig
+ggsave(filename = "experiment_CEWL_fig.jpeg",
+       plot = CEWL_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 6)
 ```
 
 
@@ -2254,7 +2367,7 @@ ggsave(filename = "CEWL_CSU_pres_fig.jpeg",
 end_vals_CEWL <- dat_3 %>%
   dplyr::filter(day_n == 8)
 
-summary(aov(data = end_vals_CEWL, 
+TukeyHSD(aov(data = end_vals_CEWL, 
              CEWL_g_m2h_mean ~ temp_tmt * humidity_tmt))
 
 
@@ -2266,27 +2379,41 @@ ggplot(data = end_vals_CEWL) +
   theme_classic() + 
   scale_color_brewer(palette = "Set2", name = "") +
   xlab("") + 
-  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  ylab(bquote('Final CEWL (g/'*m^2*'h)')) + 
+  annotate(geom = "text", x = 1, y = 61, label = "A", 
+           size = 8) +
+  annotate(geom = "text", x = 2, y = 48, label = "B", 
+           size = 8) +
+  annotate(geom = "text", x = 3, y = 49, label = "C", 
+           size = 8) +
+  annotate(geom = "text", x = 4, y = 39, label = "B", 
+           size = 8) +
   theme(text = element_text(color = "black", 
                             family = "sans", 
-                            size = 30),
+                            size = 22),
         axis.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 20),
+                                 size = 16),
+        axis.text.x = element_blank(),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
                                  size = 22),
         legend.text.align = 0,
-        legend.position = "none"
+        legend.position = "none",
+        plot.margin = unit(c(0, #top
+                             0, #right
+                             0, #bottom
+                             0.74 #left
+                             ), "cm")
         ) -> CEWL_end_boxplot
 CEWL_end_boxplot
 
-ggsave(filename = "CEWL_end_boxplot.jpeg",
-       plot = CEWL_end_boxplot,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 8, height = 6)
+#ggsave(filename = "CEWL_end_boxplot.jpeg",
+ #      plot = CEWL_end_boxplot,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 8, height = 6)
 ```
 
 
@@ -2295,6 +2422,51 @@ ggsave(filename = "CEWL_end_boxplot.jpeg",
 
 ## Multi-Figures
 
+over time:
+
+```{r arrange figs}
+ggarrange(osml_fig, #osml_fig_min, osml_predict_fig,
+          hct_fig, #hct_fig_min, hct_predict_fig,
+          SMI_fig, #SMI_fig_min, SMI_predict_fig,
+          ncol = 1, nrow = 3,
+          common.legend = TRUE,
+          legend = "bottom"
+          ) -> experiment_multi_fig
+experiment_multi_fig
+# export figure
+ggsave(filename = "experiment_multi_fig.jpeg",
+       plot = experiment_multi_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 14)
+```
+
+
+end values:
+
+```{r}
+ggarrange(CEWL_end_boxplot, 
+          SMI_end_boxplot, 
+          osml_end_boxplot, 
+          hct_end_boxplot,
+          ncol = 2, nrow = 2,
+          common.legend = FALSE
+          ) -> ending_values_multi_fig
+ending_values_multi_fig
+
+ggsave(filename = "exp_ending_values_multi_fig.jpeg",
+       plot = ending_values_multi_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 2400,
+       width = 12, height = 8)
+```
+
+
+
+
+CSU research paper:
 
 ```{r quickie}
 ggarrange(CEWL_fig, osml_fig,
@@ -2306,7 +2478,6 @@ ggarrange(CEWL_fig, osml_fig,
           common.legend = TRUE,
           legend = "bottom"
           ) -> CSU_RC_fig
-ggarr
 CSU_RC_fig
 # export figure
 ggsave(filename = "CSU_RC_fig.jpeg",
@@ -2317,44 +2488,9 @@ ggsave(filename = "CSU_RC_fig.jpeg",
        width = 6, height = 10)
 ```
 
-body condition & blood:
-
-```{r arrange figs}
-ggarrange(osml_fig, osml_fig_min, osml_predict_fig,
-          hct_fig, hct_fig_min, hct_predict_fig,
-          SMI_fig, SMI_fig_min, SMI_predict_fig,
-          ncol = 3, nrow = 3,
-          common.legend = TRUE,
-          legend = "bottom"
-          ) -> experiment_multi_fig
-experiment_multi_fig
-# export figure
-ggsave(filename = "experiment_multi_fig.jpeg",
-       plot = experiment_multi_fig,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 18, height = 14)
-```
 
 
-CEWL:
 
-```{r arrange CEWL figs}
-ggarrange(CEWL_fig, CEWL_predict_fig,
-          ncol = 2, nrow = 1,
-          common.legend = TRUE,
-          legend = "bottom"
-          ) -> experiment_CEWL_fig
-experiment_CEWL_fig
-# export figure
-ggsave(filename = "experiment_CEWL_fig.jpeg",
-       plot = experiment_CEWL_fig,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 10, height = 6)
-```
 
 
 

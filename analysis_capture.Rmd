@@ -1,0 +1,2004 @@
+---
+title: "Climate Water Loss Experiment - Capture Hydration Analysis"
+author: "Savannah Weaver"
+date: "2021"
+output: pdf_document
+toc: TRUE
+---
+
+
+# Packages
+
+```{r setup, include = TRUE, message = FALSE}
+if (!require("tidyverse")) install.packages("tidyverse")
+library("tidyverse") # workflow and plots
+if (!require("zoo")) install.packages("zoo")
+library("zoo") # interpolation using na.approx
+if (!require("weathermetrics")) install.packages("weathermetrics")
+library("weathermetrics") # F to C conversion
+if (!require("lme4")) install.packages("lme4")
+library("lme4") # for LMMs
+if (!require("lmerTest")) install.packages("lmerTest")
+library("lmerTest") # for p-values
+if (!require("UsingR")) install.packages("UsingR")
+library("UsingR") # simple.eda model assumption checker
+if (!require("ggpubr")) install.packages("ggpubr")
+library("ggpubr") # for multi-ggplot figs
+if (!require("broom")) install.packages("broom")
+library("broom") # lmer model export
+if (!require("broom.mixed")) install.packages("broom.mixed")
+library("broom.mixed") # lmer model export
+if (!require("AICcmodavg")) install.packages("AICcmodavg")
+library("AICcmodavg") # model selection
+if (!require("car")) install.packages("car")
+library("car") # VIFs
+```
+
+
+# Background and Goals
+
+This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus and in Poly Canyon. This R file analyzes the state and variation of osmotic balance and regulation at the time of capture. Please refer to **doi:** for the published scientific journal article and full details.
+
+
+# Data
+
+## Load
+
+Read-in and attach all data. Details described later.
+
+```{r load all lizard data}
+        # mass and hematocrit data
+full_dat <- read.csv("./data/mass_hct_notes.csv", # filename
+                             na.strings=c("","NA") # fix empty cells
+                             ) %>%
+        # format date to enable joining by date
+  mutate(measurement_date = as.character(as.Date(measurement_date, 
+                                          format = "%m/%d/%y"))
+         ) %>%
+        # join plasma osmolality data
+  left_join(read.csv("./data/osml_means_clean.csv", # filename
+                             na.strings=c("","NA") # fix empty cells
+            ), by = c("individual_ID", 
+                      "measurement_date" = "date_blood_drawn")
+            ) %>%
+        # join CEWL data
+  left_join(read.csv("./data/CEWL_dat_all_clean.csv", # filename
+                             na.strings=c("","NA") # fix empty cells
+            ), by = c("individual_ID", 
+                      "measurement_date" = "date")
+            ) %>%
+        # select variables of interest only
+  dplyr::select(measurement_date,
+                time_captured,
+                time_processed,
+                time_c_temp,
+                type, day, 
+                individual_ID,
+                mass_g, 
+                hemolyzed,
+                hematocrit_percent, 
+                osmolality_mmol_kg_mean,
+                CEWL_g_m2h_mean = CEWL_g_m2h,
+                msmt_temp_C,
+                msmt_RH_percent,
+                cloacal_temp_C
+                ) %>%
+          # format date-time-related variables
+  mutate(measurement_date = as.Date(measurement_date, 
+                                    format = "%Y-%m-%d"),
+         # compute vapor pressure deficit
+         msmt_temp_K = msmt_temp_C + 273.15,
+         # find saturation level first
+         e_s_kPa_m = 0.611*exp((2500000/461.5)*
+                                  ((1/273)-(1/msmt_temp_K))),
+         # actual vapor pressure
+         e_a_kPa_m = e_s_kPa_m * (msmt_RH_percent/100),
+         # VPD
+         msmt_VPD_kPa = e_s_kPa_m - e_a_kPa_m
+         ) %>%
+  group_by(individual_ID) %>%
+          # for each individual, extract capture date
+  mutate(capture_date = min(measurement_date),
+         day_n = as.numeric(measurement_date - capture_date))
+
+summary(full_dat)
+# check
+unique(full_dat$capture_date)
+```
+
+
+## Export
+
+Export full_dat to be used in 'experiment_analysis'.
+
+```{r export exp data}
+write.csv(full_dat, "./data/full_exp_data.csv")
+```
+
+
+
+
+
+
+## Format
+
+Extract only the data from capture day (1 row of observations for each individual) and format the data classes properly for analysis.
+
+```{r format cap data}
+capture_dat <- full_dat %>%
+          # select only data from capture days
+  dplyr::filter(day_n == 0) %>%
+  left_join(read.csv("./data/tmt_assignments.csv"),
+            by = "individual_ID") %>%
+          # put date and time together
+  mutate(capture_date_time = (paste(capture_date, time_captured)),
+         capture_date_time = as.POSIXct(capture_date_time, 
+                                        format = "%Y-%m-%d %H:%M"),
+          # correctly format time-only variables
+         time_captured = as.POSIXct(time_captured, 
+                                     format = "%H:%M"),
+         time_processed = as.POSIXct(time_processed, 
+                                      format = "%H:%M"),
+         time_c_temp = as.POSIXct(substr(time_c_temp, 12, 16), 
+                                  format = "%H:%M"),
+          # set categorical variables as factors
+         type = as.factor(type),
+         day = as.factor(day),
+         individual_ID = as.factor(individual_ID),
+         hemolyzed = as.factor(hemolyzed),
+          # set numeric measurements as numeric
+         mass_g = as.numeric(mass_g),
+         hematocrit_percent = as.numeric(hematocrit_percent),
+         osmolality_mmol_kg_mean = as.numeric(osmolality_mmol_kg_mean),
+         CEWL_g_m2h_mean = as.numeric(CEWL_g_m2h_mean),
+         cloacal_temp_C = as.numeric(cloacal_temp_C)
+                ) %>%
+  # make sure only complete data included
+  # this removes the data for individuals 304 (recapture) & 254 (escapee)
+  dplyr::filter(complete.cases(osmolality_mmol_kg_mean,
+                               CEWL_g_m2h_mean, cloacal_temp_C)) %>%
+  # remove experiment variables not relevant to capture analysis
+  dplyr::select(-trial_number, -temp_tmt, -humidity_tmt, 
+                -conclusion, -notes, 
+                -shed, -tail_broken, -died)
+summary(capture_dat)
+```
+
+
+
+
+Also do some summary stats for permit reporting:
+
+```{r}
+step1 <- full_dat %>%
+  group_by(individual_ID) %>%
+  summarize(capture_date = mean(capture_date))
+  
+permit_stats <- capture_dat %>%
+  group_by(capture_date) %>%
+  summarise(n = n()) %>%
+  mutate(sex = "M")
+permit_stats
+sum(permit_stats$n)
+write.csv(permit_stats, "./data/collection_summary.csv")
+```
+
+
+## Variable Summary
+
+- measurement_date = date measurements were taken, including capture day
+- collection/capture time for each lizard
+- time_processed = when mass and blood draw were recorded
+- time_c_temp = the time when cloacal temperature was recorded, immediately after CEWL measurements
+- type = whether measurements were during experiment (exp) or after rehydration (post-rehab). For this R script/analysis, I'm only going to use capture day data, which is listed as "exp"
+- day = whether measurements are from capture day or post-experiment, which was recorded in relation to CEWL & cloacal temp data. All observations used for this analysis will be from capture day
+- individual ID for each lizard
+- mass in grams
+- hemolyzed = whether or not red blood cells burst and contaminated plasma
+- hematocrit_percent = percent of blood that's red blood cells (measured in CRITOCAP microhematocrit capillary tubes)
+- osmolality_mmol_kg_mean = the mean of 1-3 technical replicates of plasma osmolality measurements taken from plasma extracted from our blood samples and run on a VAPRO vapor pressure osmometer
+- CEWL_g_m2h_mean = the mean of 3-5 technical replicates, after outliers were omitted, of CEWL measurements taken in the same area of the dorsum
+- cloacal_temp_C = cloacal temperature recorded immediately after CEWL measurements
+- capture_date = date of capture. For this dataset, it should be the same as measurement date
+- day_n = numeric day of measurement. In this dataset, it should always be zero
+- capture_date_time = combination of capture date and time
+- SVL_mm = snout-to-vent length in mm
+
+
+
+## Weather Data
+
+This data was obtained from http://www.itrc.org/databases/precip/ (Adcon Server Data) to test the effect of ambient conditions on CEWL.
+
+Load and format: 
+
+```{r load weather data}
+weather <- read.csv("./data/weather.csv", sep = ';') %>%
+         # add a variable for combined date-time
+  mutate(capture_date_time = as.POSIXct(paste(date, time),
+                                format = "%m/%d/%y %I:%M %p"))
+```
+
+The weather data is only every 15 minutes, but I want to match it to any minute measurement, so I need to interpolate the values for each minute.
+
+First, make a separate dataframe with every minute on each capture day.
+
+```{r every minute data}
+all_times <- data.frame(capture_date_time = c(
+                           # June 16
+                           seq(from = as.POSIXct("2021-06-16 07:00"),
+                               to = as.POSIXct("2021-06-16 19:00"),
+                               by="min"),
+                           # June 26
+                           seq(from = as.POSIXct("2021-06-26 07:00"),
+                               to = as.POSIXct("2021-06-26 19:00"),
+                               by="min"),
+                           # July 20
+                           seq(from = as.POSIXct("2021-07-20 07:00"),
+                               to = as.POSIXct("2021-07-20 19:00"),
+                               by="min"),
+                           # August 8
+                           seq(from = as.POSIXct("2021-08-08 07:00"),
+                               to = as.POSIXct("2021-08-08 19:00"),
+                               by="min"),
+                           # August 22
+                           seq(from = as.POSIXct("2021-08-22 07:00"),
+                               to = as.POSIXct("2021-08-22 19:00"),
+                               by="min")
+                           ))
+
+```
+
+Next, merge the weather data into the times dataframe and interpolate the temperature and humidity between measurements.
+
+```{r merge weather data}
+weather_every_minute <- all_times %>% # time only dataframe
+  # add weather measurements based on matching date-time
+  left_join(weather, by = 'capture_date_time') %>%
+         # convert temperature units F->C
+  mutate(temp_C = fahrenheit.to.celsius(temperature_F, round = 2),
+         # interpolate temperatures
+         temp_C_interpol = na.approx(temp_C),
+         # also get temperature C-> K
+         temp_K_interpol = temp_C_interpol + 273.15,
+         # interpolate humidities
+         RH_percent_interpol = na.approx(relative_humidity_percent),
+         # interpolate Wind Speeds
+         wind_mph_interpol = na.approx(wind_speed_mph),
+         # interpolate solar radiation
+         solar_rad_W_sqm_interpol = na.approx(solar_radiation_W_sqm),
+         # compute vapor pressure deficit
+         # find saturation level first
+         e_s_kPa_int = 0.611*exp((2500000/461.5)*
+                                  ((1/273)-(1/temp_K_interpol))),
+         # actual vapor pressure
+         e_a_kPa_int = e_s_kPa_int * (RH_percent_interpol/100),
+         # VPD
+         VPD_kPa_int = e_s_kPa_int - e_a_kPa_int
+         ) %>%
+  # keep only the relevant variables
+  dplyr::select(capture_date_time, 
+                temp_C_interpol, 
+                RH_percent_interpol, 
+                VPD_kPa_int,
+                wind_mph_interpol, 
+                solar_rad_W_sqm_interpol)
+summary(weather_every_minute)
+```
+
+I will add the weather data in when I add the scaled mass index (computed next) to the dataframe.
+
+
+
+## Compute Scaled Mass Index
+
+This is also known as the body condition index, or log-log residuals.
+
+I calculate as described by: Peig, J., & Green, A. J. (2009). New perspectives for estimating body condition from mass/length data: The scaled mass index as an alternative method. Oikos, 118(12), 1883–1891. https://doi.org/10.1111/j.1600-0706.2009.17643.x
+
+### Step 1: Simple Linear Regression
+
+```{r SMI SLR}
+mass_SVL_SLR <- lm(data = capture_dat, mass_g ~ SVL_mm)
+summary(mass_SVL_SLR)
+```
+
+
+### Step 2: Identify Outliers
+
+```{r SMI equation outliers 1}
+plot(mass_SVL_SLR)
+```
+
+The conditions of linearity, equal error variance, and normality are all satisfied. It doesn't look like any residuals are >3 or <-3.
+
+```{r SMI equation outliers 2}
+boxplot(residuals(mass_SVL_SLR))
+hist(residuals(mass_SVL_SLR))
+```
+
+From the boxplot, there is one individual with a much higher residual than the rest of the distribution. The histogram looks fine, and incredibly normally distributed.
+
+Check average residual value:
+
+```{r SMI equation outliers 3}
+mean(residuals(mass_SVL_SLR))
+median(residuals(mass_SVL_SLR))
+```
+
+The mean is basically zero and the median is pretty close to zero, which is very good.
+
+Check for high leverage points:
+
+```{r SMI equation outliers 4}
+# compute values for observations 
+high_leverage <- data.frame(H = hatvalues(mass_SVL_SLR)) %>% 
+  mutate(row = row_number())
+
+# compute cutoff value 
+h_bar <- (3*sum(high_leverage$H))/nrow(high_leverage)
+
+# add to original dataframe 
+# see which observations have extremely high leverage (if any)
+high_leverage_dat <- capture_dat %>%
+  mutate(row = row_number()) %>%
+  left_join(., high_leverage, by = "row") %>%
+  dplyr::filter(H > h_bar) 
+high_leverage_dat
+```
+
+No points are considered high leverage, which is fantastic.
+
+Check for influential points based on Cook's distance:
+
+```{r SMI equation outliers 5}
+# get Cook's distance 
+cooks <- data.frame(c = cooks.distance(mass_SVL_SLR)) %>% 
+  mutate(row = row_number())
+
+# add to original dataframe 
+influential <- capture_dat %>%
+  mutate(row = row_number()) %>% 
+  left_join(., cooks, by = "row")
+
+# see moderately influential points 
+cook_mod_inf <- influential %>% 
+  dplyr::filter(c>0.5) 
+cook_mod_inf
+```
+
+There are no infuential points based on Cook's distance, so there's nothing to potentially remove.
+
+We could remove the one outlier found using the boxplot, but it's the only one, so we will leave it in the dataset. No points were indicated to be outliers based on residuals or a histogram, and there were no high leverage or influential points. Thus I can create a log-log model using the data as-is. Observation omissions are unlikely to increase generalizability.
+
+
+ 
+### Step 3: log-log Regression
+
+```{r SMI log log regression}
+log_mass_SVL_SLR <- lm(data = capture_dat, 
+                       log(mass_g) ~ log(SVL_mm))
+summary(log_mass_SVL_SLR)
+```
+
+
+### Step 4: Extract Values
+
+compute standardized major axis using the log-log regression equation:
+
+```{r SMI equation}
+r <- sqrt(0.5699) # Pearson's correlection coefficient (sqrt of R-squared)
+b_OLS <- 2.0013 # regression slope
+b_SMA <- b_OLS/r
+```
+
+mean length in capture data:
+
+```{r mean SVL}
+L0 <- mean(capture_dat$SVL_mm)
+```
+
+
+### Step 5: Calculate Scaled Mass Index
+
+(And join weather data.)
+
+```{r join all data}
+capture_dat_plus <- capture_dat %>%
+  # compute SMI
+  mutate(SMI = mass_g * ((L0/SVL_mm) ^ b_SMA)) %>%
+  # join weather data
+  left_join(weather_every_minute, by = c("capture_date_time")) %>%
+  # clean up the dataframe
+  dplyr::select(capture_date, capture_date_time, individual_ID, # basics
+                mass_g, SVL_mm, SMI, # lizard size
+                hemolyzed, hematocrit_percent, osmolality_mmol_kg_mean, # blood
+                CEWL_g_m2h_mean, msmt_temp_C, msmt_VPD_kPa, cloacal_temp_C, # CEWL
+                temp_C_interpol, VPD_kPa_int, wind_mph_interpol, solar_rad_W_sqm_interpol # weather
+                )
+summary(capture_dat_plus)
+```
+
+
+### Check
+
+Look at the difference between regular mass and SMI:
+
+```{r SMI vs mass plot}
+capture_dat_plus %>% 
+  ggplot(data = .) + 
+  geom_point(aes(x = mass_g,
+                 y = SMI, 
+                 ), 
+             size = 1, 
+             alpha = 0.6) + 
+  stat_smooth(aes(x = mass_g, 
+                  y = SMI, 
+                  ), 
+              formula = y ~ x, 
+              method = "lm", 
+              color = "gray",
+              se = F, 
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("Mass") + 
+  ylab("SMI")
+```
+
+
+
+
+
+
+# Quick Plots
+
+Plot very basic graphs to get an idea of what variables to incorporate into models and how.
+
+## Osmolality
+
+```{r basic osml plots}
+plot(capture_dat_plus$individual_ID,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$capture_date,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$mass_g,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$SVL_mm,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$SMI,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$hemolyzed,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$hematocrit_percent,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$CEWL_g_m2h_mean,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$temp_C_interpol,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$VPD_kPa_int,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$wind_mph_interpol,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+plot(capture_dat_plus$solar_rad_W_sqm_interpol,
+     capture_dat_plus$osmolality_mmol_kg_mean)
+```
+
+There does not appear to be a meaningful visual trend for any predictors of plasma osmolality, so it will be interesting to see how the model selection process goes... There is definitely an increase in osmolality over the course of the season, though.
+
+
+## CEWL
+
+```{r basic CEWL plots}
+plot(capture_dat_plus$individual_ID,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$capture_date,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$mass_g,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$SVL_mm,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$SMI,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$hematocrit_percent,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$osmolality_mmol_kg_mean,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$cloacal_temp_C,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$temp_C_interpol,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$VPD_kPa_int,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$wind_mph_interpol,
+     capture_dat_plus$CEWL_g_m2h_mean)
+plot(capture_dat_plus$solar_rad_W_sqm_interpol,
+     capture_dat_plus$CEWL_g_m2h_mean)
+```
+
+It looks like there are meaningful differences in CEWL across individuals/dates (probably confounded), and based on cloacal temp, capture temp, capture VPD, capture wind, and capture solar radiation.
+
+
+
+# LMMs
+
+
+## Hematocrit
+
+
+### Models
+
+First, start with a full model with every probable potential predictor in it, then check for multicollinearity.
+
+Hematocrit did not vary by capture day, so we are using simple linear models rather than linear mixed-effects models.
+
+```{r hct model 1}
+hct_mod1 <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # body size
+                          mass_g + SVL_mm + SMI +
+                          # weather at the time of capture
+                          temp_C_interpol * VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol
+                            )
+hct_mod1_VIFs <- data.frame(VIF = car::vif(hct_mod1)) %>%
+  arrange(desc(VIF))
+hct_mod1_VIFs
+```
+
+remove VPD*temp interaction:
+
+```{r hct model 2}
+hct_mod2 <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # body size
+                          mass_g + SVL_mm + SMI +
+                          # weather at the time of capture
+                          temp_C_interpol + VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol
+                            )
+hct_mod2_VIFs <- data.frame(VIF = car::vif(hct_mod2)) %>%
+  arrange(desc(VIF))
+hct_mod2_VIFs
+drop1(hct_mod2)
+```
+
+
+drop SVL:
+
+```{r hct model 3}
+hct_mod3 <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # body size
+                          mass_g + SMI +
+                          # weather at the time of capture
+                          temp_C_interpol + VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol
+                            )
+hct_mod3_VIFs <- data.frame(VIF = car::vif(hct_mod3)) %>%
+  arrange(desc(VIF))
+hct_mod3_VIFs
+drop1(hct_mod3)
+```
+
+
+drop temperature:
+
+```{r hct model 4}
+hct_mod4 <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # body size
+                          mass_g + SMI +
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol
+                            )
+hct_mod4_VIFs <- data.frame(VIF = car::vif(hct_mod4)) %>%
+  arrange(desc(VIF))
+hct_mod4_VIFs
+drop1(hct_mod4)
+```
+
+VIFs are all below 5 now, so start backwards selection.
+
+Drop mass first:
+
+```{r hct model 5}
+hct_mod5 <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # body size
+                          SMI +
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol
+                            )
+drop1(hct_mod5)
+```
+
+
+Drop VPD:
+
+```{r hct model 6}
+hct_mod6 <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # body size
+                          SMI +
+                          # weather at the time of capture
+                          wind_mph_interpol + solar_rad_W_sqm_interpol
+                            )
+drop1(hct_mod6)
+```
+
+Drop solar:
+
+```{r hct model 7}
+hct_mod7 <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # body size
+                          SMI +
+                          # weather at the time of capture
+                          wind_mph_interpol
+                            )
+drop1(hct_mod7)
+```
+
+Drop SMI:
+
+```{r hct model 8}
+hct_mod8 <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # weather at the time of capture
+                          wind_mph_interpol
+                            )
+```
+
+
+Finally, null model:
+
+```{r hct null model}
+hct_mod_null <- lm(data = capture_dat_plus,
+                          # response variable
+                          hematocrit_percent ~ 1)
+```
+
+
+### Selection
+
+Compare models 4-8 and the null model.
+
+```{r hct mod compare}
+hct_models <- list(hct_mod4, hct_mod5, hct_mod6, hct_mod7, 
+                   hct_mod8, hct_mod_null)
+
+#specify model names
+hct_mod_names <- c('(model 4) ~ Wind-C, SMI, Solar-C, VPD-C, Mass', 
+                       '(model 5) ~ Wind-C, SMI, Solar-C, VPD-C', 
+                       '(model 6) ~ Wind-C, SMI, Solar-C',
+                       '(model 7) ~ Wind-C, SMI', 
+                       '(model 8) ~ Wind-C', 
+                       'null model')
+#calculate AIC of each model
+hct_AICc <- data.frame(aictab(cand.set = hct_models, 
+                                 modnames = hct_mod_names))
+hct_AICc
+```
+
+
+The best models are models 6 and 5.
+
+
+### LM Conditions
+
+Check that the best model meets the criteria for linear regression and has no collinearity.
+
+```{r hct model assumptions}
+vif(hct_mod6)
+plot(hct_mod6)
+simple.eda(residuals(hct_mod6))
+shapiro.test(residuals(hct_mod6))
+vif(hct_mod5)
+plot(hct_mod5)
+simple.eda(residuals(hct_mod5))
+shapiro.test(residuals(hct_mod5))
+```
+
+Everything is almost perfect.
+
+
+### Export
+
+```{r}
+write.csv(hct_AICc, "./results_statistics/capture_hct_mod_rankings.csv")
+write.csv(broom.mixed::tidy(hct_mod6), 
+          "./results_statistics/capture_hct_best_mod1.csv")
+write.csv(broom.mixed::tidy(hct_mod5), 
+          "./results_statistics/capture_hct_best_mod2.csv")
+```
+
+
+## Osmolality
+
+
+### Models
+
+Since there are large differences in osmolality by date, but we are interested in what's different among dates, rather than the capture date itself, we will include that as a random effect in the model.
+
+We would also include whether or not a blood sample is hemolyzed as a random effect, but only 11 of the almost 150 samples were hemolyzed, so we will assume that any potential effects will be undetectable and/or overshadowed. We do not have concern about using those points.
+
+First, start with a full model with every probable potential predictor in it, then check for multicollinearity.
+
+```{r osmolality model 1}
+osml_mod1 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          mass_g + SVL_mm + SMI +
+                          # blood sample traits
+                          hematocrit_percent + 
+                          # weather at the time of capture
+                          temp_C_interpol * VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+osml_mod1_VIFs <- data.frame(VIF = car::vif(osml_mod1)) %>%
+  arrange(desc(VIF))
+osml_mod1_VIFs
+```
+
+VPD and temperature introduce a lot of collinearity, so start by dropping their interaction:
+
+```{r osmolality model 2}
+osml_mod2 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          mass_g + SVL_mm + SMI +
+                          # blood sample traits
+                          hematocrit_percent + 
+                          # weather at the time of capture
+                          temp_C_interpol + VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+osml_mod2_VIFs <- data.frame(VIF = car::vif(osml_mod2)) %>%
+  arrange(desc(VIF))
+osml_mod2_VIFs
+drop1(osml_mod2)
+```
+
+Drop mass next, since it's extremely collinear and we get slightly better AIC by dropping mass compared to SVL:
+
+```{r osmolality model 3}
+osml_mod3 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm + SMI +
+                          # blood sample traits
+                          hematocrit_percent + 
+                          # weather at the time of capture
+                          temp_C_interpol + VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+osml_mod3_VIFs <- data.frame(VIF = car::vif(osml_mod3)) %>%
+  arrange(desc(VIF))
+osml_mod3_VIFs
+drop1(osml_mod3)
+```
+
+Temperature is still introducing a lot of multicollinearity, so drop:
+
+```{r osmolality model 4}
+osml_mod4 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm + SMI +
+                          # blood sample traits
+                          hematocrit_percent + 
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+osml_mod4_VIFs <- data.frame(VIF = car::vif(osml_mod4)) %>%
+  arrange(desc(VIF))
+osml_mod4_VIFs
+summary(osml_mod4)
+drop1(osml_mod4)
+```
+
+
+Great, VIFs are well-within acceptable ranges. Now we can start backwards model selection.
+
+Start by dropping wind:
+
+```{r osmolality model 5}
+osml_mod5 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm + SMI +
+                          # blood sample traits
+                          hematocrit_percent + 
+                          # weather at the time of capture
+                          VPD_kPa_int + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(osml_mod5)
+drop1(osml_mod5)
+```
+
+Drop hematocrit:
+
+```{r osmolality model 6}
+osml_mod6 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm + SMI +
+                          # weather at the time of capture
+                          VPD_kPa_int + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(osml_mod6)
+drop1(osml_mod6)
+```
+
+Drop SMI:
+
+```{r osmolality model 7}
+osml_mod7 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm +
+                          # weather at the time of capture
+                          VPD_kPa_int + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(osml_mod7)
+drop1(osml_mod7)
+```
+
+Drop VPD:
+
+```{r osmolality model 8}
+osml_mod8 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm +
+                          # weather at the time of capture
+                          solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(osml_mod8)
+```
+
+Drop SVL:
+
+```{r osmolality model 9}
+osml_mod9 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # weather at the time of capture
+                          solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(osml_mod9)
+```
+
+Lastly, compute null model:
+
+```{r osmolality null model}
+osml_mod_null <- lme4::lmer(data = capture_dat_plus,
+                          osmolality_mmol_kg_mean ~ 1 +
+                          (1|capture_date))
+summary(osml_mod_null)
+```
+
+
+### Selection
+
+Compare models 4-9 and null. 
+
+```{r osml mod compare}
+osml_models <- list(osml_mod4, osml_mod5, osml_mod6,
+                    osml_mod7, osml_mod8, osml_mod9,
+                    osml_mod_null)
+#specify model names
+osml_mod_names <- c('(model 4) ~ Solar-C, SVL, VPD-C, SMI, Hct, Wind-C', 
+                       '(model 5) ~ Solar-C, SVL, VPD-C, SMI, Hct', 
+                       '(model 6) ~ Solar-C, SVL, VPD-C, SMI',
+                       '(model 7) ~ Solar-C, SVL, VPD-C', 
+                       '(model 8) ~ Solar-C, SVL', 
+                       '(model 9) ~ Solar-C', 
+                       'null model')
+#calculate AIC of each model
+osml_AICc <- data.frame(aictab(cand.set = osml_models, 
+                                 modnames = osml_mod_names))
+osml_AICc
+```
+
+
+
+
+### LM Conditions
+
+Check residual plots and VIFs
+
+```{r osml model assumptions}
+vif(osml_mod6)
+plot(osml_mod6)
+simple.eda(residuals(osml_mod6))
+shapiro.test(residuals(osml_mod6))
+vif(osml_mod7)
+plot(osml_mod7)
+simple.eda(residuals(osml_mod7))
+shapiro.test(residuals(osml_mod7))
+```
+
+There is no clear pattern in the residuals ~ fitted plot, so linearity seems satisfied. slight fanning, but equal error variance seems fine. Normality seems fine, even though the Shapiro-Wilk normality test is significant. VIFs essentially negligible.
+
+
+### Export
+
+
+First, re-run for p-values:
+
+
+```{r osmolality best models}
+osml_mod6p <- lmerTest::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm + SMI +
+                          # weather at the time of capture
+                          VPD_kPa_int + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(osml_mod6p)
+
+osml_mod7p <- lmerTest::lmer(data = capture_dat_plus,
+                          # response variable
+                          osmolality_mmol_kg_mean ~ 
+                          # body size
+                          SVL_mm +
+                          # weather at the time of capture
+                          VPD_kPa_int + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(osml_mod7p)
+```
+
+
+Save the model output.
+
+```{r best osml model}
+write.csv(broom.mixed::tidy(osml_mod6p),
+          "./results_statistics/capture_osml_best_model1.csv")
+write.csv(broom.mixed::tidy(osml_mod7p),
+          "./results_statistics/capture_osml_best_model2.csv")
+write.csv(osml_AICc, "./results_statistics/capture_osml_mod_rankings.csv")
+```
+
+
+To report in paper:
+
+The best models to predict the variation in baseline plasma osmolality included SVL, SMI, VPD, and solar radiation at the time of capture as fixed effects. Date was included as a random effect. The final model had acceptable LM conditions. The full model included mass, SVL, SMI, percent hematocrit, and temperature, VPD, wind speed, and solar radiation at the time of capture, with date as a random effect.
+
+
+
+## CEWL
+
+It looks like there are meaningful differences in CEWL across individuals/dates (probably confounded), and based on cloacal temp, capture temp, capture VPD, capture wind, and capture solar radiation.
+
+*I didn't calculate holding time*!!!!!!!!!!!!!!!!!!!
+
+### Models
+
+Start with the full model of all potential predictor variables. We will again include date as a random effect. Individual ID is not included as a random effect bc each lizard only has one set of capture observations.
+
+When we have this many variables, it's extremely important to start with checking for multicollinearity.
+
+```{r CEWL model 1}
+CEWL_mod1 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # essential covariate
+                          cloacal_temp_C +
+                          # body size
+                          mass_g + SVL_mm + SMI +
+                          # blood
+                          osmolality_mmol_kg_mean + hematocrit_percent + 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          temp_C_interpol * VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+CEWL_mod1_VIFs <- data.frame(VIF = car::vif(CEWL_mod1)) %>%
+  arrange(desc(VIF))
+CEWL_mod1_VIFs
+drop1(CEWL_mod1)
+```
+
+
+Just as for osmolality, VPD and temperature introduce a lot of collinearity. Start with dropping their interaction:
+
+```{r CEWL model 2}
+CEWL_mod2 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # essential covariate
+                          cloacal_temp_C +
+                          # body size
+                          mass_g + SVL_mm + SMI +
+                          # blood
+                          osmolality_mmol_kg_mean + hematocrit_percent + 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          temp_C_interpol + VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+CEWL_mod2_VIFs <- data.frame(VIF = car::vif(CEWL_mod2)) %>%
+  arrange(desc(VIF))
+CEWL_mod2_VIFs
+drop1(CEWL_mod2)
+```
+
+MUCH better. Drop SVL next:
+
+```{r CEWL model 3}
+CEWL_mod3 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # essential covariate
+                          cloacal_temp_C +
+                          # body size
+                          mass_g + SMI +
+                          # blood
+                          osmolality_mmol_kg_mean + hematocrit_percent + 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          temp_C_interpol + VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+CEWL_mod3_VIFs <- data.frame(VIF = car::vif(CEWL_mod3)) %>%
+  arrange(desc(VIF))
+CEWL_mod3_VIFs
+drop1(CEWL_mod3)
+```
+
+
+Next drop temperature at the time of capture:
+
+```{r CEWL model 4}
+CEWL_mod4 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # essential covariate
+                          cloacal_temp_C +
+                          # body size
+                          mass_g + SMI +
+                          # blood
+                          osmolality_mmol_kg_mean + hematocrit_percent + 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+CEWL_mod4_VIFs <- data.frame(VIF = car::vif(CEWL_mod4)) %>%
+  arrange(desc(VIF))
+CEWL_mod4_VIFs
+summary(CEWL_mod4)
+drop1(CEWL_mod4)
+```
+
+
+Great, VIFs are minimal and we're ready to start backwards selection!
+
+Start with dropping SMI:
+
+```{r CEWL model 5}
+CEWL_mod5 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # essential covariate
+                          cloacal_temp_C +
+                          # body size
+                          mass_g + 
+                          # blood
+                          osmolality_mmol_kg_mean + hematocrit_percent + 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(CEWL_mod5)
+drop1(CEWL_mod5)
+```
+
+next drop cloacal temperature (What?!):
+
+```{r CEWL model 6}
+CEWL_mod6 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # body size
+                          mass_g + 
+                          # blood
+                          osmolality_mmol_kg_mean + hematocrit_percent + 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(CEWL_mod6)
+drop1(CEWL_mod6)
+```
+
+
+next drop hematocrit:
+
+```{r CEWL model 7}
+CEWL_mod7 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # body size
+                          mass_g + 
+                          # blood
+                          osmolality_mmol_kg_mean +
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol + solar_rad_W_sqm_interpol +
+                          (1|capture_date))
+summary(CEWL_mod7)
+drop1(CEWL_mod7)
+```
+
+
+next drop solar radiation:
+
+```{r CEWL model 8}
+CEWL_mod8 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # body size
+                          mass_g + 
+                          # blood
+                          osmolality_mmol_kg_mean +
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol +
+                          (1|capture_date))
+summary(CEWL_mod8)
+drop1(CEWL_mod8)
+```
+
+
+next drop mass:
+
+```{r CEWL model 9}
+CEWL_mod9 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # blood
+                          osmolality_mmol_kg_mean +
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol +
+                          (1|capture_date))
+summary(CEWL_mod9)
+drop1(CEWL_mod9)
+```
+
+next drop VPD:
+
+```{r CEWL model 10}
+CEWL_mod10 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # blood
+                          osmolality_mmol_kg_mean +
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          wind_mph_interpol +
+                          (1|capture_date))
+summary(CEWL_mod10)
+# can't test drop1 bc of NA's 
+```
+
+based on t-values, wind should be dropped next:
+
+```{r CEWL model 11}
+CEWL_mod11 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # blood
+                          osmolality_mmol_kg_mean +
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          (1|capture_date))
+summary(CEWL_mod11)
+drop1(CEWL_mod11)
+```
+
+drop osmolality:
+
+```{r CEWL model 12}
+CEWL_mod12 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          (1|capture_date))
+summary(CEWL_mod12)
+drop1(CEWL_mod12)
+```
+
+
+drop VPD at the time of msmt:
+
+```{r CEWL model 13}
+CEWL_mod13 <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # microclimate at the time of msmt
+                          msmt_temp_C +
+                          (1|capture_date))
+summary(CEWL_mod13)
+```
+
+And finally, null model:
+
+```{r CEWL model null}
+CEWL_mod_null <- lme4::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 1 +
+                          (1|capture_date))
+summary(CEWL_mod_null)
+```
+
+
+
+### Selection
+
+compare models 4-13 and the null
+
+```{r CEWL mod compare}
+CEWL_models <- list(CEWL_mod4, CEWL_mod5, CEWL_mod6, CEWL_mod7, 
+                    CEWL_mod8, CEWL_mod9, CEWL_mod10, CEWL_mod11,
+                    CEWL_mod12, CEWL_mod13, CEWL_mod_null)
+
+#specify model names
+CEWL_mod_names <- c('(model 4) ~ Temp-M, VPD-M, Osml, Wind-C, VPD-C, Mass, Solar-C, Hct, Temp-Clo, SMI', 
+                    '(model 5) ~ Temp-M, VPD-M, Osml, Wind-C, VPD-C, Mass, Solar-C, Hct, Temp-Clo', 
+                    '(model 6) ~ Temp-M, VPD-M, Osml, Wind-C, VPD-C, Mass, Solar-C, Hct', 
+                       '(model 7) ~ Temp-M, VPD-M, Osml, Wind-C, VPD-C, Mass, Solar-C', 
+                       '(model 8) ~ Temp-M, VPD-M, Osml, Wind-C, VPD-C, Mass',
+                       '(model 9) ~ Temp-M, VPD-M, Osml, Wind-C, VPD-C', 
+                       '(model 10) ~ Temp-M, VPD-M, Osml, Wind-C', 
+                       '(model 11) ~ Temp-M, VPD-M, Osml',
+                      '(model 12) ~ Temp-M, VPD-M',
+                      '(model 13) ~ Temp-M',
+                      'null model')
+#calculate AIC of each model
+CEWL_AICc <- data.frame(aictab(cand.set = CEWL_models, 
+                                 modnames = CEWL_mod_names))
+CEWL_AICc
+```
+
+
+The single best model is model 9, which included Temp-M, VPD-M, Osml, Wind-C, VPD-C.
+
+
+
+### LM Conditions
+
+Check that the best model meets the criteria for linear regression and has no collinearity.
+
+```{r CEWL model assumptions}
+vif(CEWL_mod9)
+plot(CEWL_mod9)
+simple.eda(residuals(CEWL_mod9))
+shapiro.test(residuals(CEWL_mod9))
+```
+
+There is some slight fanning in the residuals ~ fitted plot, suggesting equal error variance is not perfect, but overall, all LNE conditions appear to be met and VIFs are very low.
+
+
+### Export
+
+First, re-run the best model using lmerTest for p-values.
+
+```{r CEWL model 9 p}
+CEWL_mod9p <- lmerTest::lmer(data = capture_dat_plus,
+                          # response variable
+                          CEWL_g_m2h_mean ~ 
+                          # blood
+                          osmolality_mmol_kg_mean +
+                          # microclimate at the time of msmt
+                          msmt_temp_C + msmt_VPD_kPa +
+                          # weather at the time of capture
+                          VPD_kPa_int +
+                          wind_mph_interpol +
+                          (1|capture_date))
+summary(CEWL_mod9p)
+```
+
+Save the best CEWL model output.
+
+```{r best CEWL model}
+write.csv(broom.mixed::tidy(CEWL_mod9p),
+          "./results_statistics/capture_CEWL_best_model.csv")
+write.csv(CEWL_AICc, 
+          "./results_statistics/capture_CEWL_mod_rankings.csv")
+```
+
+
+To report in paper:
+
+The best model to predict CEWL included plasma osmolality, temperature and VPD at the time of measurement, and VPD and wind at the time of capture. The final model met all linear regression conditions for linearity, normality, and equal error variance, and there was no multicollinearity.
+
+
+# Pub Figures
+
+## Custom Colors
+
+```{r}
+lizard_color = "turquoise"
+VPD_color = "blue"
+temp_color = "gray"
+solar_color = "orange"
+wind_color = "orange"
+date_color = "gray"
+osml_color = "red"
+```
+
+
+
+## Hct ~ SMI
+
+```{r hct SMI fig}
+ggplot(capture_dat_plus) + 
+  aes(x = SMI,
+      y = hematocrit_percent) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.6, 
+              color = lizard_color,
+              alpha = 1) + 
+  theme_classic() + 
+  xlab("Body Condition (g)") + 
+  ylab("Hematocrit (%)") + 
+  #ylab("") +
+  #xlim() +
+  ylim(20,60) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_hct_SMI_fig
+cap_hct_SMI_fig
+```
+
+
+
+## Hct ~ VPD at Capture
+
+```{r hct VPD fig}
+ggplot(capture_dat_plus) + 
+  aes(x = VPD_kPa_int,
+      y = hematocrit_percent) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = VPD_color,
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("VPD at Capture (kPa)") + 
+  ylab("Hematocrit (%)") + 
+  #ylab("") +
+  #xlim() +
+  ylim(20,60) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_hct_VPD_fig
+cap_hct_VPD_fig
+```
+
+
+
+## Hct ~ Wind Speed at Capture
+
+```{r hct wind fig}
+ggplot(capture_dat_plus) + 
+  aes(x = wind_mph_interpol,
+      y = hematocrit_percent)+
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = wind_color,
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("Wind Speed at Capture (mph)") + 
+  ylab("Hematocrit (%)") + 
+  #ylab("") +
+  #xlim() +
+  ylim(20, 60) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_hct_wind_fig
+cap_hct_wind_fig
+```
+
+
+
+
+## Hct ~ Solar Radiation at Capture
+
+```{r hct sorad fig}
+ggplot(capture_dat_plus) + 
+  aes(x = solar_rad_W_sqm_interpol,
+      y = hematocrit_percent) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = solar_color,
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab(bquote('Solar Radiation (W/'*m^2*')')) + 
+  ylab("Hematocrit (%)") + 
+  #ylab("") +
+  ylim(20, 60) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_hct_sorad_fig
+cap_hct_sorad_fig
+```
+
+
+## Osmolality ~ SVL
+
+```{r osml SVL fig}
+ggplot(capture_dat_plus) + 
+  aes(x = SVL_mm,
+      y = osmolality_mmol_kg_mean) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.6, 
+              color = lizard_color,
+              alpha = 1) + 
+  theme_classic() + 
+  xlab("Snout-Vent Length (mm)") + 
+  ylab("Plasma Osmolality (mmol/kg)") + 
+  #ylab("") +
+  #xlim() +
+  ylim(300,400) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_osml_SVL_fig
+cap_osml_SVL_fig
+```
+
+
+## Osmolality ~ SMI
+
+```{r osml SMI fig}
+ggplot(capture_dat_plus) + 
+  aes(x = SMI,
+      y = osmolality_mmol_kg_mean) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1.6, 
+              color = lizard_color,
+              alpha = 1) + 
+  theme_classic() + 
+  xlab("Body Condition (g)") + 
+  ylab("Plasma Osmolality (mmol/kg)") + 
+  #ylab("") +
+  #xlim() +
+  ylim(300,400) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_osml_SMI_fig
+cap_osml_SMI_fig
+```
+
+
+## Osmolality ~ VPD at Capture
+
+```{r osml VPD fig}
+ggplot(capture_dat_plus) + 
+  aes(x = VPD_kPa_int,
+      y = osmolality_mmol_kg_mean) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = VPD_color,
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("VPD at Capture (kPa)") + 
+  ylab("Plasma Osmolality (mmol/kg)") + 
+  #ylab("") +
+  #xlim() +
+  ylim(300,400) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_osml_VPD_fig
+cap_osml_VPD_fig
+```
+
+
+## Osmolality ~ Solar Radiation at Capture
+
+```{r osml sorad fig}
+ggplot(capture_dat_plus) + 
+  aes(x = solar_rad_W_sqm_interpol,
+      y = osmolality_mmol_kg_mean) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = solar_color,
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab(bquote('Solar Radiation (W/'*m^2*')')) + 
+  ylab("Plasma Osmolality (mmol/kg)") + 
+  #ylab("") +
+  ylim(300,400) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_osml_sorad_fig
+cap_osml_sorad_fig
+```
+
+
+## Osmolality ~ Date
+
+```{r osml date fig}
+ggplot(capture_dat_plus) + 
+  aes(x = as.factor(capture_date),
+      y = osmolality_mmol_kg_mean,
+      group = as.factor(capture_date)) +
+  geom_boxplot() +
+  geom_jitter(size = 1, 
+              alpha = 0.4) + 
+  theme_classic() + 
+  xlab("Date") + 
+  ylab("Plasma Osmolality (mmol/kg)") + 
+  #ylab("") +
+  #xlim() +
+  ylim(300, 400) +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(p), \" < 0.0001\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_osml_date_fig
+cap_osml_date_fig
+```
+
+
+
+
+
+
+
+
+
+## CEWL ~ Cloacal Temperature
+
+```{r CEWL cloacal temp fig}
+ggplot(capture_dat_plus) + 
+  aes(x = cloacal_temp_C,
+      y = CEWL_g_m2h_mean) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = temp_color,
+              size = 1.6, 
+              alpha = 1) + 
+  theme_classic() + 
+  xlab("Cloacal Temperature (°C)") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  #xlim() +
+  ylim(0, 40) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_clotemp_fig
+cap_CEWL_clotemp_fig
+```
+
+
+## CEWL ~ Plasma Osmolality
+
+```{r CEWL osml fig}
+ggplot(capture_dat_plus) + 
+  aes(x = osmolality_mmol_kg_mean,
+                 y = CEWL_g_m2h_mean) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = osml_color,
+              size = 1.6, 
+              alpha = 1) + 
+  theme_classic() + 
+  xlab("Plasma Osmolality (mmol/kg)") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  xlim(300, 400) +
+  ylim(0, 40) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_osml_fig
+cap_CEWL_osml_fig
+```
+
+
+
+## CEWL ~ Temperature at Measurement
+
+```{r CEWL temp fig}
+ggplot(capture_dat_plus) + 
+  aes(x = msmt_temp_C,
+      y = CEWL_g_m2h_mean) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = temp_color,
+              size = 1.6, 
+              alpha = 1) + 
+  theme_classic() + 
+  xlab("Temperature at Measurement (°C)") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  #xlim() +
+  ylim(0, 40) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_temp_fig
+cap_CEWL_temp_fig
+```
+
+
+## CEWL ~ VPD at Measurement
+
+```{r CEWL VPD-m fig}
+ggplot(capture_dat_plus) + 
+  aes(x = msmt_VPD_kPa,
+      y = CEWL_g_m2h_mean) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = VPD_color,
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("VPD at Measurement (kPa)") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  #xlim() +
+  ylim(0, 40) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_VPDm_fig
+cap_CEWL_VPDm_fig
+```
+
+
+
+
+## CEWL ~ VPD at Capture
+
+```{r CEWL VPD-c fig}
+ggplot(capture_dat_plus) + 
+  aes(x = VPD_kPa_int,
+      y = CEWL_g_m2h_mean) +
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = VPD_color,
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("VPD at Capture (kPa)") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  #xlim() +
+  ylim(0, 40) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_VPDc_fig
+cap_CEWL_VPDc_fig
+```
+
+
+## CEWL ~ Wind at Capture
+
+```{r CEWL wind fig}
+ggplot(capture_dat_plus) + 
+  aes(x = wind_mph_interpol,
+      y = CEWL_g_m2h_mean)+
+  geom_point(size = 1, 
+             alpha = 0.4) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              color = wind_color,
+              size = 1.6, 
+              alpha = 1 ) + 
+  theme_classic() + 
+  xlab("Wind Speed at Capture (mph)") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  #xlim() +
+  ylim(0, 40) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_wind_fig
+cap_CEWL_wind_fig
+```
+
+
+## CEWL ~ Date
+
+```{r CEWL date fig}
+ggplot(capture_dat_plus) + 
+  aes(x = as.factor(capture_date),
+      y = CEWL_g_m2h_mean,
+      group = as.factor(capture_date)) +
+  geom_boxplot() +
+  geom_jitter(size = 1, 
+              alpha = 0.4) + 
+  theme_classic() + 
+  xlab("Date") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  #ylab("") +
+  #xlim() +
+  ylim(0, 40) +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(R) ^ 2, \" = 0.\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  #annotate("text", x = , y = , 
+   #        label = "paste(italic(p), \" < 0.0001\")", 
+    #       parse = TRUE,
+     #      size = 6) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> cap_CEWL_date_fig
+cap_CEWL_date_fig
+```
+
+
+
+
+## Figure Arrangements
+
+```{r FIG ARRANGE}
+# hematocrit
+ggarrange(cap_hct_sorad_fig, cap_hct_VPD_fig,
+          cap_hct_SMI_fig, cap_hct_wind_fig,
+          ncol = 2, nrow = 2,
+          legend = "none"
+          ) -> cap_hct_multi_fig
+cap_hct_multi_fig
+# export figure
+ggsave(filename = "cap_hct_multi_fig.jpeg",
+       plot = cap_hct_multi_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 12, height = 8)
+
+
+# osmolality
+ggarrange(cap_osml_sorad_fig, cap_osml_VPD_fig,
+          cap_osml_SMI_fig, cap_osml_SVL_fig,
+          ncol = 2, nrow = 2,
+          legend = "none"
+          ) -> cap_osml_multi_fig
+cap_osml_multi_fig
+# export figure
+ggsave(filename = "cap_osml_multi_fig.jpeg",
+       plot = cap_osml_multi_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 12, height = 8)
+
+
+
+# CEWL
+ggarrange(cap_CEWL_VPDm_fig, cap_CEWL_VPDc_fig,
+          cap_CEWL_temp_fig, cap_CEWL_wind_fig,
+          cap_CEWL_osml_fig, cap_CEWL_clotemp_fig,
+          ncol = 2, nrow = 3,
+          legend = "none"
+          ) -> cap_CEWL_multi_fig
+cap_CEWL_multi_fig
+# export figure
+ggsave(filename = "cap_CEWL_multi_fig",
+       plot = cap_CEWL_multi_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 12, height = 16)
+
+
+
+# date differences
+ggarrange(cap_osml_date_fig, cap_CEWL_date_fig,
+          ncol = 1, nrow = 2,
+          legend = "none"
+          ) -> cap_date_diffs_multi_fig
+cap_date_diffs_multi_fig
+# export figure
+ggsave(filename = "cap_date_diffs_multi_fig.jpeg",
+       plot = cap_date_diffs_multi_fig,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 8)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

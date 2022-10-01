@@ -1,0 +1,472 @@
+---
+title: "HOBO Data Logger Climate Treatment Summary"
+author: "Savannah Weaver"
+date: "2021"
+output: pdf_document
+toc: TRUE
+---
+
+# Packages
+
+```{r setup, include = TRUE, message = FALSE}
+`%nin%` = Negate(`%in%`)
+if (!require("tidyverse")) install.packages("tidyverse") 
+library("tidyverse")
+```
+
+**remember to do rehab data separately**
+
+# Load in Data
+
+This data was collected using Onset HOBO temperature and humidity dataloggers during the course of our experiment. See __ for full details. 
+
+The data is in a separate file for each download for each logger, so I need to compile each of those into one dataset. 
+
+To do this, first I compile a list of the filenames I need to read-in.
+
+## File Names
+
+```{r, filenames}
+# make a list of file names of all data to load in
+filenames <- list.files(path = "data/HOBOs")
+```
+
+Next, I make a function that will read in the data from each csv, name and organize the data correctly. 
+
+
+## Function
+
+```{r, create read_HOBO_files function to get each csv data}
+# make a function to read in data from each csv file and add correct identifiers
+read_HOBO_files <- function(filename) {
+  
+  # edit the filename inputted to funtion
+  # to make a unique identifier for each logger
+  name <- substr(filename, 1, nchar(filename)-15)
+  # read in the csv file for this given filename
+  dat <- read.csv(file.path("data/HOBOs", filename),
+                # each csv has headers
+                header = TRUE,
+                # this is what I want to rename the col headers
+                col.names = c("order", "date_time_PST", "temp_C", 
+                              "relative_humidity", "dew_pt_C", 
+                              # the 6,7,8th cols are not data
+                              # logger use info we don't need
+                              "mostly_blank", "mostly_blank", "mostly_blank")
+                ) %>%
+    # select only the cols with data we want
+    # don't need order- just an arbitrary observation identifier
+    # don't need "mostly_blank" cols- unnecessary logger use info
+    # but get the rest of the cols with informative data
+    dplyr::select(date_time_PST, temp_C, relative_humidity, dew_pt_C) %>%
+    # add a column with the name of the HOBO the data is from 
+    dplyr::mutate(HOBO_ID = name)
+  
+  # return the dataframe for that single csv file
+  dat
+}
+```
+
+
+
+## Apply
+
+Finally, I apply the function I made to all of the filenames I compiled, then put all of those dataframes into one dataframe for my analyses.
+
+This will print warnings saying that header and col.names are different lengths, because the data has extra notes on logger usage that we read-in, but get rid of.
+
+```{r, apply read_HOBO_files function}
+# apply function to get data from all csvs
+all_HOBO_data <- lapply(filenames, read_HOBO_files) %>%
+  # paste all data files together into one df by row
+  reduce(rbind) %>% 
+  mutate(date_time_PST = as.POSIXct(date_time_PST, 
+                                    format = "%m/%d/%Y %H:%M:%S")) %>%
+  # remove missing data
+  dplyr::filter(complete.cases(date_time_PST, relative_humidity)) %>%
+  mutate(serial = (substr(HOBO_ID, 7, 15)), # select characters
+         serial = str_trim(serial), # remove trailing white space
+         serial = str_replace_all(serial, "[^A-z0-9]", "_"), # replace any special characters with underscores
+         serial = as.factor(serial), # set class as factor
+         temp_C = as.numeric(temp_C),
+         relative_humidity = as.numeric(relative_humidity),
+         dew_pt_C = as.numeric(dew_pt_C)
+         )
+summary(all_HOBO_data)
+head(all_HOBO_data)
+```
+
+
+
+# Data Wrangling
+
+
+## Dates
+
+I need to subset the data based on the date range for actual experiment days.
+
+Trail 1: June 16-24
+Trail 2: June 26 - July 4
+Trial 3: July 20-28
+Trial 4: August 8-16
+Trial 5: August 22-30
+
+Lizards were usually placed in the chambers late on the first day and taken out early on the last day, so I'll only use from 8 pm on the first day up to 6 am the last day.
+
+```{r}
+t1_days <- seq(as.POSIXct("2021-06-16 20:00:00"),
+               as.POSIXct("2021-06-24 06:00:00"), "1 min")
+t2_days <- seq(as.POSIXct("2021-06-26 20:00:00"),
+               as.POSIXct("2021-07-04 06:00:00"), "1 min")
+t3_days <- seq(as.POSIXct("2021-07-20 20:00:00"),
+               as.POSIXct("2021-07-28 06:00:00"), "1 min")
+t4_days <- seq(as.POSIXct("2021-08-08 20:00:00"),
+               as.POSIXct("2021-08-16 06:00:00"), "1 min")
+t5_days <- seq(as.POSIXct("2021-08-22 20:00:00"),
+               as.POSIXct("2021-08-30 06:00:00"), "1 min")
+exp_dates <- c(t1_days, t2_days, t3_days, t4_days, t5_days)
+```
+
+Subset data:
+
+```{r}
+subset_HOBO_data <- all_HOBO_data %>%
+  dplyr::filter(date_time_PST %in% exp_dates)
+```
+
+
+## Trial & Tmt
+
+```{r}
+# load HOBO assignment data
+HOBO_tmts <- read.csv("./data/HOBO_assignments.csv") %>%
+  dplyr::filter(trial != "5 rehab") %>%
+  mutate(trial = as.factor(trial),
+         serial = as.factor(serial),
+         humidity_tmt = as.factor(humidity_tmt),
+         temp_tmt = as.factor(temp_tmt),
+         tmt = as.factor(paste(temp_tmt, humidity_tmt, sep = "-"))
+         ) %>%
+  dplyr::select(-notes, -in.google.drive.) 
+# combine
+format_HOBO_data <- subset_HOBO_data %>% 
+  mutate(trial = as.factor(case_when(date_time_PST %in% t1_days ~ 1,
+                                     date_time_PST %in% t2_days ~ 2,
+                                     date_time_PST %in% t3_days ~ 3,
+                                     date_time_PST %in% t4_days ~ 4,
+                                     date_time_PST %in% t5_days ~ 5)),
+         date_only = as.Date(date_time_PST)
+         ) %>%
+  left_join(HOBO_tmts, by = c("trial", "serial"))
+summary(format_HOBO_data)
+```
+
+
+
+# Check Data
+
+## Dates
+
+```{r}
+format_HOBO_data %>% 
+  group_by(trial) %>%
+  summarise(min_date = (min(date_time_PST)),
+            max_date = (max(date_time_PST)))
+as.Date("2021-06-16 20:00:00")
+```
+
+
+## Temperature
+
+```{r}
+hist(format_HOBO_data$temp_C)
+format_HOBO_data %>%
+  group_by(trial, serial, tmt) %>%
+  summarise(max(temp_C),
+            mean(temp_C),
+            min(temp_C)
+            ) %>%
+  arrange(tmt)
+```
+
+
+I noted that the treatment assignment for logger 20785311 during trial 1 might have been mistakenly recorded as hot dry instead of cool dry, but the values definitely match hot treatment.
+
+
+```{r}
+format_HOBO_data %>%
+  ggplot() +
+  geom_line(aes(x = date_time_PST,
+                y = temp_C,
+                color = tmt)) + 
+  theme_classic() + 
+  geom_hline(yintercept = 30) + 
+  geom_hline(yintercept = 20)
+```
+
+There's a chance the values <30 for the hot tmt and <20 for the cool tmt are erroneous values.
+
+```{r}
+format_HOBO_data %>%
+  dplyr::filter(temp_tmt == "hot" & temp_C < 30) %>%
+  arrange(temp_C)
+format_HOBO_data %>%
+  dplyr::filter(temp_tmt == "cool" & temp_C < 20) %>%
+  arrange(temp_C)
+```
+
+There are only 10 points <30C for the hot treatment, which is very few compared to the total number of measurements. I think these observations are from when the lizards (thus loggers) were out of the incubators for daily checkups. But, this is still technically characteristic of the environment the lizards experienced, and it's very few points, so I'll leave them.
+
+There are many more points <20C for the cool treatment. The lowest is still ~17C, and most of them are very close to 20. The bottom of the cool incubator tended to get extra cold, so I'm not worried about the validity of these points.
+
+All the temperature observations are valid.
+
+
+
+## Humidity
+
+```{r}
+hist(format_HOBO_data$relative_humidity)
+format_HOBO_data %>%
+  group_by(trial, serial, tmt) %>%
+  summarise(max(relative_humidity),
+            mean(relative_humidity),
+            min(relative_humidity)
+            ) %>%
+  arrange(tmt)
+```
+
+
+
+```{r}
+format_HOBO_data %>%
+  ggplot() +
+  geom_line(aes(x = date_time_PST,
+                y = relative_humidity,
+                color = tmt)) + 
+  theme_classic()
+```
+
+I'm disappointed in the high variability in humidity treatment, but it is what it is.
+
+
+
+# Statistics
+
+
+## Treatment Differences
+
+```{r}
+tmt_only_means <- format_HOBO_data %>%
+  group_by(tmt) %>%
+  summarise(temp_mean = mean(temp_C),
+            temp_SD = sd(temp_C),
+            humidity_mean = mean(relative_humidity),
+            humidity_SD = sd(relative_humidity))
+tmt_only_means
+```
+
+
+
+## Trial Differences
+
+```{r}
+tmt_trial_means <- format_HOBO_data %>%
+  group_by(tmt, trial) %>%
+  summarise(temp_mean = mean(temp_C),
+            temp_SD = sd(temp_C),
+            humidity_mean = mean(relative_humidity),
+            humidity_SD = sd(relative_humidity)) %>%
+  arrange(trial)
+tmt_trial_means
+write.csv(tmt_trial_means, "./results_statistics/HOBO_mean_diffs.csv")
+```
+
+
+
+## Models
+
+Run linear models with pairwise post-hoc tests to determine when and how much climate varied among treatments.
+
+```{r}
+# temperature
+temp_mod <- lm(data = format_HOBO_data, 
+               temp_C ~ tmt * trial)
+a_temp_mod <- aov(temp_mod)
+ph_temp_mod <- TukeyHSD(a_temp_mod)
+summary(temp_mod)
+temp_mod_df <- data.frame(broom::tidy(ph_temp_mod)) %>%
+  arrange(desc(term, adj.p.value))
+write.csv(temp_mod_df, "./results_statistics/HOBO_temp_pairwise_diffs.csv")
+
+# humidity
+humidity_mod <- lm(data = format_HOBO_data, 
+                   relative_humidity ~ tmt * trial)
+a_humid_mod <- aov(humidity_mod)
+ph_humid_mod <- TukeyHSD(a_humid_mod)
+summary(humidity_mod)
+humid_mod_df <- data.frame(broom::tidy(ph_humid_mod)) %>%
+  arrange(desc(term, adj.p.value))
+write.csv(humid_mod_df,
+          "./results_statistics/HOBO_humidity_pairwise_diffs.csv")
+```
+
+
+
+
+## Boxplots
+
+Simple plots looking at the distribution of temperature and humidity for each treatment group:
+
+```{r}
+format_HOBO_data %>%
+  ggplot() +
+  geom_boxplot(aes(x = tmt,
+                   y = temp_C,
+                   fill = tmt)) +
+  theme_classic()
+format_HOBO_data %>%
+  ggplot() +
+  geom_boxplot(aes(x = tmt,
+                   y = relative_humidity,
+                   fill = tmt)) +
+  theme_classic()
+```
+
+
+FANCY boxplot for **temperature**, with ANOVA groups overlaid:
+
+```{r}
+# create ANOVA labels
+anova_labels_temp <- data.frame(tmt = c("cool-dry",
+                                   "cool-humid",
+                                   "hot-dry",
+                                   "hot-humid"
+                                  ),
+                                # c-d, c-h, h-d, h-h
+                           t1 = c("C", "A", "B", "B"),
+                           t2 = c("A", "D", "B", "B"),
+                           t3 = c("A", "A", "B", "B"),
+                           t4 = c("A", "E", "F", "B"),
+                           t5 = c("A", "A", "B", "B"))
+# plot!
+format_HOBO_data %>%
+  ggplot() +
+  geom_boxplot(aes(x = trial,
+                   y = temp_C,
+                   fill = trial)) +
+  theme_classic() + 
+  facet_wrap(~tmt) +
+  xlab("Trial") +
+  ylab("Temperature (°C)") +
+  ylim(18,38) +
+  scale_fill_brewer(palette = "Set2",
+                    name = "Trial") +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 18),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 14),
+        legend.text.align = 0,
+        legend.position = "right") +
+  # trial 1 labels
+  geom_text(data = anova_labels_temp,
+            size = 7,
+            mapping = aes(x = 1, y = c(35,35,20,20), label = t1)) +
+  # trial 2 labels
+  geom_text(data = anova_labels_temp,
+            size = 7,
+            mapping = aes(x = 2, y = c(35,35,20,20), label = t2)) +
+  # trial 3 labels
+  geom_text(data = anova_labels_temp,
+            size = 7,
+            mapping = aes(x = 3, y = c(35,35,20,20), label = t3)) +
+  # trial 4 labels
+  geom_text(data = anova_labels_temp,
+            size = 7,
+            mapping = aes(x = 4, y = c(35,35,20,20), label = t4)) +
+  # trial 5 labels
+  geom_text(data = anova_labels_temp,
+            size = 7,
+            mapping = aes(x = 5, y = c(35,35,20,20), label = t5)
+            ) -> ANOVA_temp_boxplot
+ANOVA_temp_boxplot
+# save
+ggsave(filename = "ANOVA_temp_boxplot.jpeg",
+       plot = ANOVA_temp_boxplot,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 4)
+```
+
+
+FANCY boxplot for **humidity**, with ANOVA groups overlaid:
+
+```{r}
+# create ANOVA labels
+anova_labels_humidity <- data.frame(tmt = c("cool-dry",
+                                   "cool-humid",
+                                   "hot-dry",
+                                   "hot-humid"
+                                  ),
+                                # c-d, c-h, h-d, h-h
+                                t1 = c("A", "B", "B", "C"),
+                                t2 = c("A", "F", "D", "E"),
+                                t3 = c("A", "C", "D", "G"),
+                                t4 = c("A", "H", "D", "E"),
+                                t5 = c("I", "E", "J", "E"))
+# plot!
+format_HOBO_data %>%
+  ggplot() +
+  geom_boxplot(aes(x = trial,
+                   y = relative_humidity,
+                   fill = trial)) +
+  theme_classic() + 
+  facet_wrap(~tmt) +
+  xlab("Trial") +
+  ylab("Relative Humidity (%)") +
+  ylim(0,100) +
+  scale_fill_brewer(palette = "Set2") +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 18),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 14),
+        legend.text.align = 0,
+        legend.position = "right") +
+  # trial 1 labels
+  geom_text(data = anova_labels_humidity,
+            size = 7,
+            mapping = aes(x = 1, y = c(90,10,90,10), label = t1)) +
+  # trial 2 labels
+  geom_text(data = anova_labels_humidity,
+            size = 7,
+            mapping = aes(x = 2, y = c(90,10,90,10), label = t2)) +
+  # trial 3 labels
+  geom_text(data = anova_labels_humidity,
+            size = 7,
+            mapping = aes(x = 3, y = c(90,10,90,10), label = t3)) +
+  # trial 4 labels
+  geom_text(data = anova_labels_humidity,
+            size = 7,
+            mapping = aes(x = 4, y = c(90,10,90,10), label = t4)) +
+  # trial 5 labels
+  geom_text(data = anova_labels_humidity,
+            size = 7,
+            mapping = aes(x = 5, y = c(90,10,90,10), label = t5)
+            ) -> ANOVA_humidity_boxplot
+ANOVA_humidity_boxplot
+# save
+ggsave(filename = "ANOVA_humidity_boxplot.jpeg",
+       plot = ANOVA_humidity_boxplot,
+       path = "./results_figures",
+       device = "jpeg",
+       dpi = 1200,
+       width = 6, height = 4)
+```
+
+
+

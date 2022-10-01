@@ -1,30 +1,30 @@
-"","effect","group","term","estimate","std.error","statistic","df","p.value","response"
-"1","fixed",NA,"(Intercept)",55.9225453140499,9.52325122921661,5.87221149248734,257.75839198016,1.32024103872962e-08,"CEWL (g/m2h)"
-"2","fixed",NA,"cloacal_temp_C",-1.32742373917319,0.356403310288342,-3.72449890574603,260.630787898261,0.000239897334522879,"CEWL (g/m2h)"
-"3","fixed",NA,"day_n",1.73379876409329,0.145062365449657,11.9520921826894,258.141568659767,1.69078272388253e-26,"CEWL (g/m2h)"
-"4","fixed",NA,"day_n:humidity_tmtDry",-1.39785038329048,0.165302522107629,-8.45631612553577,257.223902248051,2.09147945549944e-15,"CEWL (g/m2h)"
-"5","fixed",NA,"day_n:temp_tmtCool",-0.744691214664151,0.164334278166779,-4.53156348737165,256.99436936796,8.97645799580971e-06,"CEWL (g/m2h)"
-"6","fixed",NA,"day_n:humidity_tmtDry:temp_tmtCool",0.6603036417013,0.231181301979422,2.85621560241959,257.003133994345,0.00463761747030253,"CEWL (g/m2h)"
-"7","ran_pars","individual_ID:trial_number","sd__(Intercept)",0,NA,NA,NA,NA,"CEWL (g/m2h)"
-"8","ran_pars","trial_number","sd__(Intercept)",2.79974314583756,NA,NA,NA,NA,"CEWL (g/m2h)"
-"9","ran_pars","Residual","sd__Observation",5.32931443073205,NA,NA,NA,NA,"CEWL (g/m2h)"
-"10","fixed",NA,"(Intercept)",351.101012834922,2.39144552970668,146.815391976745,9.89958384751191,7.41716720628893e-18,"Plasma Osmolality (mmol/kg)"
-"11","fixed",NA,"day_n",0.932370287235954,0.428887676593634,2.17392650365043,347.354779439667,0.0303854564130802,"Plasma Osmolality (mmol/kg)"
-"12","fixed",NA,"day_n:temp_tmtCool",-1.10100546406689,0.47048036170187,-2.34017305224859,293.287542535123,0.0199452454094315,"Plasma Osmolality (mmol/kg)"
-"13","ran_pars","individual_ID:trial_number","sd__(Intercept)",3.48223149336917,NA,NA,NA,NA,"Plasma Osmolality (mmol/kg)"
-"14","ran_pars","trial_number","sd__(Intercept)",3.36381423482973,NA,NA,NA,NA,"Plasma Osmolality (mmol/kg)"
-"15","ran_pars","Residual","sd__Observation",23.1430664158915,NA,NA,NA,NA,"Plasma Osmolality (mmol/kg)"
-"16","fixed",NA,"(Intercept)",38.8409186054183,1.27025683947868,30.5772166685272,4.24212323976336,3.88308505668145e-06,"Hematocrit (%)"
-"17","fixed",NA,"day_n",-1.48653356493554,0.0782355716635445,-19.0007375587213,330.305977793427,6.39247913719685e-55,"Hematocrit (%)"
-"18","fixed",NA,"day_n:temp_tmtCool",0.365961699458447,0.0996111846942923,3.67390168665885,389.733584904595,0.000272271658020995,"Hematocrit (%)"
-"19","ran_pars","individual_ID:trial_number","sd__(Intercept)",3.50747188649011,NA,NA,NA,NA,"Hematocrit (%)"
-"20","ran_pars","trial_number","sd__(Intercept)",2.66966824161196,NA,NA,NA,NA,"Hematocrit (%)"
-"21","ran_pars","Residual","sd__Observation",3.86342628237069,NA,NA,NA,NA,"Hematocrit (%)"
-"22","fixed",NA,"(Intercept)",11.6686344070311,0.229178507107218,50.9150467655858,3.94145452331649,1.05239769346676e-06,"Body Condition (g)"
-"23","fixed",NA,"day_n",-0.239060184056938,0.00605077569125811,-39.5090144231129,696.399320796707,5.24467794272651e-180,"Body Condition (g)"
-"24","fixed",NA,"day_n:humidity_tmtDry",-0.0651288630809818,0.00846016627671037,-7.69829586686401,706.141949505808,4.66116997760005e-14,"Body Condition (g)"
-"25","fixed",NA,"day_n:temp_tmtCool",0.11575022816044,0.00845965234485042,13.682622339782,706.279366924103,5.66985179741996e-38,"Body Condition (g)"
-"26","fixed",NA,"day_n:humidity_tmtDry:temp_tmtCool",0.0318841088991814,0.011963809054707,2.66504662130469,706.269111841331,0.00787359775321273,"Body Condition (g)"
-"27","ran_pars","individual_ID:trial_number","sd__(Intercept)",0.969556680912614,NA,NA,NA,NA,"Body Condition (g)"
-"28","ran_pars","trial_number","sd__(Intercept)",0.474581460714871,NA,NA,NA,NA,"Body Condition (g)"
-"29","ran_pars","Residual","sd__Observation",0.222489725364137,NA,NA,NA,NA,"Body Condition (g)"
+,effect,group,term,estimate,std.error,statistic,df,p.value,response
+1,fixed,NA,(Intercept),55.92,9.52,5.87,257.76,0.00,CEWL (g/m2h)
+2,fixed,NA,cloacal_temp_C,-1.33,0.36,-3.72,260.63,0.00,CEWL (g/m2h)
+3,fixed,NA,day_n,1.73,0.15,11.95,258.14,0.00,CEWL (g/m2h)
+4,fixed,NA,day_n:humidity_tmtDry,-1.40,0.17,-8.46,257.22,0.00,CEWL (g/m2h)
+5,fixed,NA,day_n:temp_tmtCool,-0.74,0.16,-4.53,256.99,0.00,CEWL (g/m2h)
+6,fixed,NA,day_n:humidity_tmtDry:temp_tmtCool,0.66,0.23,2.86,257.00,0.00,CEWL (g/m2h)
+7,ran_pars,individual_ID:trial_number,sd__(Intercept),0.00,NA,NA,NA,NA,CEWL (g/m2h)
+8,ran_pars,trial_number,sd__(Intercept),2.80,NA,NA,NA,NA,CEWL (g/m2h)
+9,ran_pars,Residual,sd__Observation,5.33,NA,NA,NA,NA,CEWL (g/m2h)
+10,fixed,NA,(Intercept),351.10,2.39,146.82,9.90,0.00,Plasma Osmolality (mmol/kg)
+11,fixed,NA,day_n,0.93,0.43,2.17,347.35,0.03,Plasma Osmolality (mmol/kg)
+12,fixed,NA,day_n:temp_tmtCool,-1.10,0.47,-2.34,293.29,0.02,Plasma Osmolality (mmol/kg)
+13,ran_pars,individual_ID:trial_number,sd__(Intercept),3.48,NA,NA,NA,NA,Plasma Osmolality (mmol/kg)
+14,ran_pars,trial_number,sd__(Intercept),3.36,NA,NA,NA,NA,Plasma Osmolality (mmol/kg)
+15,ran_pars,Residual,sd__Observation,23.14,NA,NA,NA,NA,Plasma Osmolality (mmol/kg)
+16,fixed,NA,(Intercept),38.84,1.27,30.58,4.24,0.000004,Hematocrit (%)
+17,fixed,NA,day_n,-1.49,0.08,-19.00,330.31,0.000000,Hematocrit (%)
+18,fixed,NA,day_n:temp_tmtCool,0.37,0.10,3.67,389.73,0.000272,Hematocrit (%)
+19,ran_pars,individual_ID:trial_number,sd__(Intercept),3.51,NA,NA,NA,NA,Hematocrit (%)
+20,ran_pars,trial_number,sd__(Intercept),2.67,NA,NA,NA,NA,Hematocrit (%)
+21,ran_pars,Residual,sd__Observation,3.86,NA,NA,NA,NA,Hematocrit (%)
+22,fixed,NA,(Intercept),11.67,0.23,50.92,3.94,0.000001,Body Condition (g)
+23,fixed,NA,day_n,-0.24,0.01,-39.51,696.40,0.000000,Body Condition (g)
+24,fixed,NA,day_n:humidity_tmtDry,-0.07,0.01,-7.70,706.14,0.000000,Body Condition (g)
+25,fixed,NA,day_n:temp_tmtCool,0.12,0.01,13.68,706.28,0.000000,Body Condition (g)
+26,fixed,NA,day_n:humidity_tmtDry:temp_tmtCool,0.03,0.01,2.67,706.27,0.007874,Body Condition (g)
+27,ran_pars,individual_ID:trial_number,sd__(Intercept),0.97,NA,NA,NA,NA,Body Condition (g)
+28,ran_pars,trial_number,sd__(Intercept),0.47,NA,NA,NA,NA,Body Condition (g)
+29,ran_pars,Residual,sd__Observation,0.22,NA,NA,NA,NA,Body Condition (g)

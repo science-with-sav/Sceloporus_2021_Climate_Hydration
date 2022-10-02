@@ -110,21 +110,12 @@ cloacal_temp_C <- read.csv("./data/c_temps.csv", # filename
 summary(cloacal_temp_C)
 ```
 
-6. Load in and format the tmt assignments so we know which lizards were removed from the experiment.
+6. Load in the tmt assignments so we know which lizards were removed from the experiment.
 
 ```{r load tmt data}
-tmt <- read.csv("./data/tmt_assignments.csv") %>%
+canceled <- read.csv("./data/tmt_assignments.csv") %>%
   # properly format data classes
-  mutate(trial_number = as.factor(trial_number),
-         temp_tmt = as.factor(temp_tmt),
-         humidity_tmt = as.factor(humidity_tmt),
-         individual_ID = as.factor(individual_ID),
-         conclusion = as.factor(conclusion)
-         )
-summary(tmt)
-
-# specifically save a df of canceled ones
-canceled <- tmt %>%
+  mutate(conclusion = as.factor(conclusion)) %>%
   dplyr::filter(conclusion == "canceled") %>%
   dplyr::select(individual_ID)
 canceled

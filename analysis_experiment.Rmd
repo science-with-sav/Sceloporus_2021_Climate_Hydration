@@ -88,30 +88,7 @@ summary(dat)
 
 
 ## Format
-
-Rename some factors:
-
-```{r rename factors}
-dat$humidity_tmt <- factor(dat$humidity_tmt,
-                           levels = c("humid", "dry"),
-                           labels = c("Humid", "Dry"))
-dat$temp_tmt <- factor(dat$temp_tmt,
-                           levels = c("hot", "cool"),
-                           labels = c("Hot", "Cool"))
-dat$tmt <- factor(dat$tmt,
-                           levels = c("hot humid", "hot dry",
-                                      "cool humid", "cool dry"),
-                           labels = c("Hot Humid", "Hot Dry",
-                                      "Cool Humid", "Cool Dry"))
-summary(dat)
-```
-
-should match this still:
-cool dry  :231     
-cool humid:238  
-hot dry   :237  
-hot humid :230
-                    
+   
                     
 
 Make sub-dataframes without rehab data / with only rehab-related data:

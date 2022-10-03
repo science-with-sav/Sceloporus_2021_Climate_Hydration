@@ -264,12 +264,16 @@ capture_dat <- full_dat2 %>%
   # make capture_date_time variable
   mutate(capture_date_time = as.POSIXct(paste(capture_date, time_captured, 
                                               sep = " "),
-                              format = "%Y-%m-%d %H:%M")) %>%
+                              format = "%Y-%m-%d %H:%M"),
+         hold_time_sec = (date_time - capture_date_time),
+         hold_time_min = (hold_time_sec)/60,
+         hold_time_hr = (hold_time_min)/60
+         ) %>%
   # remove experiment variables not relevant to capture analysis
   dplyr::select(-type, -trial_number, -temp_tmt, -humidity_tmt, -tmt,
                 -conclusion, -day_n, -day_factor, 
                 # redundant variables
-                -capture_date, -time_captured, -time_processed,
+                -time_captured, -time_processed,
                 -measurement_date)
 summary(capture_dat)
 ```

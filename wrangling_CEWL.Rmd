@@ -194,7 +194,7 @@ canceled %>% dplyr::filter(individual_ID %nin% rep_check5_msmts$individual_ID)
 rep_check %>% dplyr::filter(individual_ID %in% c(254, 304))
 
 # check why canceled
-tmt %>% dplyr::filter(individual_ID %in% c(254, 304))
+canceled %>% dplyr::filter(individual_ID %in% c(254, 304))
 ```
 
 
@@ -280,7 +280,7 @@ Look at the weird data one at a time, starting with sets with too many replicate
 ```{r weird msmts 02}
 rep_check_2 %>%
   dplyr::filter(individual_ID == 302)
-tmt %>%
+canceled %>%
   dplyr::filter(individual_ID == 302)
 ```
 
@@ -289,7 +289,7 @@ Individual 302 has two sets of replicates from his capture day. One set is proba
 ```{r weird msmts 03}
 all_CEWL_data %>%
   dplyr::filter(individual_ID == 303)
-tmt %>%
+canceled %>%
   dplyr::filter(individual_ID == 303)
 ```
 
@@ -320,7 +320,7 @@ Next:
 ```{r weird msmts 06}
 rep_check_2 %>%
   dplyr::filter(individual_ID == 237)
-tmt %>%
+canceled %>%
   dplyr::filter(individual_ID == 237)
 ```
 
@@ -331,7 +331,7 @@ Interestingly, a closeby number is missing some measurements:
 ```{r weird msmts 07}
 rep_check_2 %>%
   dplyr::filter(individual_ID == 239)
-tmt %>%
+canceled %>%
   dplyr::filter(individual_ID == 239)
 ```
 

@@ -30,6 +30,7 @@ weather_dat <- read.csv("./data/weather_long_term.csv", sep = ';') %>%
          solar_radiation_W_m2 = as.numeric(solar_radiation_W_m2),
          date_time = as.POSIXct(paste(date, time), 
                                 format = "%m/%d/%y %I:%M %p"),
+         date = as.Date(date, format = "%m/%d/%y"),
          temp_C = fahrenheit.to.celsius(temperature_F, round = 2),
          temp_K = temp_C + 273.15,
          e_s_kPa = 0.611*exp((2500000/461.5)*
@@ -40,8 +41,23 @@ weather_dat <- read.csv("./data/weather_long_term.csv", sep = ';') %>%
   dplyr::filter(complete.cases(temp_C)) %>%
   dplyr::filter(date_time >= "2021-04-01 00:00:00" & 
                   date_time <= "2021-09-01 00:00:00")
-summary(weather_dat)
+ summary(weather_dat)
 ```
+
+
+get average daily values:
+
+```{r}
+weather_dat_daily <- weather_dat %>%
+  group_by(date) %>%
+  summarise(temp_C = mean(temp_C),
+            VPD_kPa = mean(VPD_kPa),
+            RH_percent = mean(RH_percent),
+            wind_speed_mph = mean(wind_speed_mph),
+            solar_radiation_W_m2 = mean(solar_radiation_W_m2)
+            )
+```
+
 
 
 # Visualize
@@ -320,6 +336,9 @@ ggsave(filename = "weather_long_trends_sorad.jpeg",
 
 # Stats
 
+
+## Variability
+
 ```{r var stats}
 variation <- weather_dat %>%
   mutate(study = as.factor(case_when(date_time >= "2021-04-05 00:00:00" & 
@@ -351,4 +370,64 @@ wind: spring < summer
 sorad: spring >>> summer
 
 Range differences are pretty negligible.
+
+
+## SLR ~ Date
+
+Try a simple linear model of weather ~ date:
+
+```{r}
+summary(lm(data = weather_dat_daily, temp_C ~ date))
+summary(lm(data = weather_dat_daily, VPD_kPa ~ date))
+summary(lm(data = weather_dat_daily, wind_speed_mph ~ date))
+summary(lm(data = weather_dat_daily, solar_radiation_W_m2 ~ date))
+```
+
+
+
+Of the 4 weather variables, mean daily values correlated with date for only temperature (estimate = 0.05, SE = 0.004, df = 152, p < 0.0001) and wind speed (estimate = -0.005, SE = 0.002, df = 152, p = 0.007).
+
+
+
+
+
+
+## Daily Humidity
+
+```{r}
+mean_humid_VPD <- weather_dat %>%
+  # filter to be only for study 2
+  dplyr::filter(date > "2021-06-15") %>%
+  # get daytime values only, 6 am to 8 pm
+  dplyr::filter(as.numeric(substr(date_time, 12, 13)) < 20 &
+                  as.numeric(substr(date_time, 12, 13)) > 6) %>%
+  # get by date first
+  group_by(date) %>%
+  summarise(VPD_kPa = mean(VPD_kPa),
+            RH_percent = mean(RH_percent)) %>%
+  # mean across dates
+  summarise(mean_VPD = mean(VPD_kPa),
+            sd_VPD = sd(VPD_kPa),
+            mean_RH = mean(RH_percent),
+            sd_RH = sd(RH_percent))
+mean_humid_VPD
+```
+
+
+Mean daily relative humidity during the CWL 2021 study was 73±9%!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -43,6 +43,7 @@ This data was collected June - August by Master's student Savannah Weaver, advis
 ```{r}
 dat <- read_rds("./data/analysis_data_capture.RDS")
 summary(dat)
+mean(dat$RH_percent_interpol, na.rm = T)
 ```
 
 
@@ -1309,32 +1310,31 @@ ggplot(dat) +
               method = "lm", 
               se = F, 
               color = osml_color,
-              size = 1.6, 
+              size = 1, 
               alpha = 1) + 
   theme_classic() + 
-  xlab("Plasma Osmolality (mmol/kg)") + 
-  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
-  #ylab("") +
+  xlab(bquote('Osmolality (mmol '*kg^-1*')')) + 
+  ylab(bquote('CEWL (g '*m^-2*' '*h^-1*')')) + 
   xlim(300, 400) +
   ylim(0, 40) +
-#  manual_color_brewer(, name = "") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
-                            size = 22),
+                            size = 12),
         axis.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 16),
+                                 size = 8),
         #axis.text.y = element_blank(),
         #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
         ) -> cap_CEWL_osml_fig
 cap_CEWL_osml_fig
 
-ggsave(filename = "cap_CEWL_osml_fig.jpeg",
+ggsave(filename = "cap_CEWL_osml_fig.pdf",
        plot = cap_CEWL_osml_fig,
        path = "./results_figures",
-       device = "jpeg",
+       device = "pdf",
        dpi = 600,
-       width = 6, height = 4)
+       units = "mm",
+       width = 80, height = 60)
 ```
 
 

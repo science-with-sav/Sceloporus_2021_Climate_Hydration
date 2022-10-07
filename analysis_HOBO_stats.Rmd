@@ -9,7 +9,6 @@ toc: TRUE
 # Packages
 
 ```{r setup, include = TRUE, message = FALSE}
-`%nin%` = Negate(`%in%`)
 if (!require("tidyverse")) install.packages("tidyverse") 
 library("tidyverse")
 ```
@@ -18,7 +17,7 @@ library("tidyverse")
 
 # Load in Data
 
-This data was collected using Onset HOBO temperature and humidity dataloggers during the course of our experiment. See __ for full details. 
+This data was collected using Onset HOBO temperature and humidity dataloggers during the course of our experiment. See publication for full details. 
 
 The data is in a separate file for each download for each logger, so I need to compile each of those into one dataset. 
 
@@ -247,7 +246,7 @@ format_HOBO_data %>%
   theme_classic()
 ```
 
-I'm disappointed in the high variability in humidity treatment, but it is what it is.
+
 
 
 

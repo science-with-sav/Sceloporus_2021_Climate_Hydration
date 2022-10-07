@@ -409,7 +409,7 @@ All assumptions are OKAY. Normality of the residuals is statistically, but not n
 
 Save full model stats with p-values:
 
-```{r best osml exp models}
+```{r full osml exp model}
 osml_mod_full <- lmerTest::lmer(data = dat_no_rehab,
                         osmolality_mmol_kg_mean ~ 
                           day_n + 
@@ -662,117 +662,6 @@ write.csv(response_per_day, "./results_statistics/exp_change_per_day.csv")
 
 ## SMI
 
-### Building
-
-These models are just named in order.
-
-```{r SMI rehydration model 1}
-SMI_rmod1 <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ 
-                         type + 
-                         type:humidity_tmt + type:temp_tmt +
-                         type:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-summary(SMI_rmod1)
-drop1(SMI_rmod1)
-```
-
-Remove three-way interaction and see if we lose significant predictive power.
-
-```{r SMI rehydration model 2}
-SMI_rmod2 <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ 
-                         type + 
-                         type:humidity_tmt + type:temp_tmt +
-                         (1|trial_number/individual_ID))
-summary(SMI_rmod2)
-anova(SMI_rmod1, SMI_rmod2)
-drop1(SMI_rmod2)
-```
-
-We do not lose predictive power, so we're better-off without the 3-way interaction.
-
-
-
-try dropping either tmt effect:
-
-```{r SMI rehydration model 2ab}
-SMI_rmod2a <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ type + 
-                         type:temp_tmt +
-                         (1|trial_number/individual_ID))
-drop1(SMI_rmod2a)
-SMI_rmod2b <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ type + 
-                         type:humidity_tmt + 
-                         (1|trial_number/individual_ID))
-drop1(SMI_rmod2b)
-```
-
-rehab effect only:
-
-```{r SMI rehydration model 3}
-SMI_rmod3 <- lme4::lmer(data = dat_for_rehab,
-                       SMI ~ type +
-                         (1|trial_number/individual_ID))
-summary(SMI_rmod3)
-```
-
-
-
-Lastly, null model:
-
-
-```{r SMI rehydration model null}
-SMI_rmod_null <- lme4::lmer(data = dat_for_rehab,
-                            SMI ~ 1 + (1|trial_number/individual_ID))
-```
-
-
-
-
-### Selection
-
-Compare all models:
-
-```{r SMI rehydration mod compare}
-SMI_rmodels <- list(SMI_rmod1, 
-                   SMI_rmod2, SMI_rmod2a, SMI_rmod2b, 
-                   SMI_rmod3, 
-                   SMI_rmod_null)
-
-#specify model names
-REHYD_mod_names <- c('(model 1) ~ Rhyd, Rhyd:Humd, Rhyd:Temp, Rhyd:Humd:Temp',
-                   '(model 2) ~ Rhyd, Rhyd:Humd, Rhyd:Temp',
-                   '(model 2a) ~ Rhyd, Rhyd:Temp',
-                   '(model 2b) ~ Rhyd, Rhyd:Humd',
-                   '(model 3) ~ Rhyd',
-                   'null model')
-
-#calculate AIC of each model
-SMI_rAICc <- data.frame(aictab(cand.set = SMI_rmodels, 
-                                 modnames = REHYD_mod_names))
-SMI_rAICc
-```
-
-
-Models 2a is the best model.
-
-
-### Assumptions
-
-Check linear regression assumptions/conditions:
-
-```{r SMI rehydration model assumptions}
-plot(SMI_rmod2a)
-simple.eda(residuals(SMI_rmod2a))
-shapiro.test(residuals(SMI_rmod2a))
-```
-
-All of the assumptions are met very well.
-
-
-### Save SIMPLE
 
 ```{r best SMI rehydration models}
 SMI_rmod_best1 <- lmerTest::lmer(data = dat_for_rehab,
@@ -783,116 +672,9 @@ summary(SMI_rmod_best1)
 
 
 
-
-
-
-
 ## Hematocrit
 
 
-
-### Building
-
-```{r hct rehydration model 1}
-hct_rmod1 <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ 
-                         type + 
-                         type:humidity_tmt + type:temp_tmt +
-                         type:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-summary(hct_rmod1)
-drop1(hct_rmod1)
-```
-
-Remove three-way interaction
-
-```{r hct rehydration model 2}
-hct_rmod2 <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ 
-                         type + 
-                         type:humidity_tmt + type:temp_tmt +
-                         (1|trial_number/individual_ID))
-summary(hct_rmod2)
-anova(hct_rmod1, hct_rmod2)
-drop1(hct_rmod2)
-```
-
-
-try dropping either interaction:
-
-```{r hct rehydration model 2ab}
-hct_rmod2a <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ 
-                         type + 
-                         type:temp_tmt +
-                         (1|trial_number/individual_ID))
-drop1(hct_rmod2a)
-hct_rmod2b <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ 
-                         type + 
-                         type:humidity_tmt +
-                         (1|trial_number/individual_ID))
-drop1(hct_rmod2b)
-```
-
-rehab effect only:
-
-```{r hct rehydration model 3}
-hct_rmod3 <- lme4::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ type +
-                         (1|trial_number/individual_ID))
-```
-
-
-
-
-Lastly, null model:
-
-
-```{r hct rehydration model null}
-hct_rmod_null <- lme4::lmer(data = dat_for_rehab,
-                            hematocrit_percent ~ 1 + (1|trial_number/individual_ID))
-```
-
-
-
-
-### Selection
-
-Compare all models:
-
-```{r hct rehydration mod compare}
-hct_rmodels <- list(hct_rmod1, 
-                   hct_rmod2, hct_rmod2a, hct_rmod2b, 
-                   hct_rmod3,
-                   hct_rmod_null)
-
-#calculate AIC of each model
-hct_rAICc <- data.frame(aictab(cand.set = hct_rmodels, 
-                                 modnames = REHYD_mod_names))
-hct_rAICc
-```
-
-
-The top model is model 1, the full model!
-
-
-### Assumptions
-
-Check linear regression assumptions/conditions:
-
-```{r hct rehydration model assumptions}
-plot(hct_rmod1)
-simple.eda(residuals(hct_rmod1))
-shapiro.test(residuals(hct_rmod1))
-```
-
-conditions are all acceptable
-
-
-### Save
-
-Save best model stats with p-values:
 
 ```{r best hct rehydration models}
 hct_rmod_best1 <- lmerTest::lmer(data = dat_for_rehab,
@@ -908,105 +690,6 @@ summary(hct_rmod_best1)
 ## Osmolality
 
 
-### Building
-
-```{r osml rehydration model 1}
-osml_rmod1 <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ 
-                         type + 
-                         type:humidity_tmt + type:temp_tmt +
-                         type:humidity_tmt:temp_tmt + 
-                         (1|trial_number/individual_ID))
-summary(osml_rmod1)
-drop1(osml_rmod1)
-```
-
-Remove three-way interaction.
-
-```{r osml rehydration model 2}
-osml_rmod2 <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ 
-                         type + 
-                         type:humidity_tmt + type:temp_tmt +
-                         (1|trial_number/individual_ID))
-summary(osml_rmod2)
-anova(osml_rmod1, osml_rmod2)
-drop1(osml_rmod2)
-```
-
-We do not need 3-way interaction.
-
-try either 2-way-interaction:
-
-```{r osml rehydration model 2ab}
-osml_rmod2a <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ 
-                         type + type:temp_tmt +
-                         (1|trial_number/individual_ID))
-drop1(osml_rmod2a)
-osml_rmod2b <- lme4::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~ 
-                         type + 
-                         type:humidity_tmt +
-                         (1|trial_number/individual_ID))
-drop1(osml_rmod2b)
-```
-
-
-single effect of rehab:
-
-```{r osml rehydration model 3}
-osml_rmod3 <- lme4::lmer(data = dat_for_rehab,
-                            osmolality_mmol_kg_mean ~ type + 
-                              (1|trial_number/individual_ID))
-```
-
-Lastly, null model:
-
-
-```{r osml rehydration model null}
-osml_rmod_null <- lme4::lmer(data = dat_for_rehab,
-                            osmolality_mmol_kg_mean ~ 1 +
-                              (1|trial_number/individual_ID))
-```
-
-
-
-
-### Selection
-
-Compare all models:
-
-```{r osml rehydration mod compare}
-osml_rmodels <- list(osml_rmod1, 
-                   osml_rmod2, osml_rmod2a, osml_rmod2b, 
-                   osml_rmod3, 
-                   osml_rmod_null)
-
-#calculate AIC of each model
-osml_rAICc <- data.frame(aictab(cand.set = osml_rmodels, 
-                                 modnames = REHYD_mod_names))
-osml_rAICc
-```
-
-
-The full model is the single best model.
-
-
-### Assumptions
-
-Check linear regression assumptions/conditions:
-
-```{r osml rehydration model assumptions}
-plot(osml_rmod1)
-simple.eda(residuals(osml_rmod1))
-shapiro.test(residuals(osml_rmod1))
-```
-
-The conditions are acceptable.
-
-
-### Save
 
 ```{r best osml rehydration model}
 osml_rmod_best1 <- lmerTest::lmer(data = dat_for_rehab,
@@ -1030,12 +713,6 @@ rehydration_stats <- broom.mixed::tidy(osml_rmod_best1) %>%
                       rep("Body Condition (g)", 5)))
 write.csv(rehydration_stats, 
           "./results_statistics/rehydration_best_models.csv")
-
-AICc_ranks_rehy <- osml_rAICc %>%
-  rbind(hct_rAICc) %>%
-  rbind(SMI_rAICc)
-write.csv(AICc_ranks_rehy, 
-          "./results_statistics/rehydration_model_rankings.csv")
 ```
 
 
@@ -1059,10 +736,19 @@ mean values per day per tmt group:
 ```{r means}
 means <- dat %>% # use whole dat because want for both exp and rehyd
   group_by(day_n, tmt) %>%
-  summarise(mean_CEWL = mean(CEWL_g_m2h_mean, na.rm = T),
+  summarise(n_lizards = n(),
+            mean_CEWL = mean(CEWL_g_m2h_mean, na.rm = T),
+            sd_CEWL = sd(CEWL_g_m2h_mean, na.rm = T),
             mean_osml = mean(osmolality_mmol_kg_mean, na.rm = T),
+            sd_osml = sd(osmolality_mmol_kg_mean, na.rm = T),
             mean_hct = mean(hematocrit_percent, na.rm = T),
-            mean_SMI = mean(SMI, na.rm = T)) 
+            sd_hct = sd(hematocrit_percent, na.rm = T),
+            mean_SMI = mean(SMI, na.rm = T),
+            sd_SMI = sd(SMI, na.rm = T)) %>%
+  mutate(se_CEWL = (sd_CEWL/sqrt(n_lizards)),
+         se_osml = (sd_osml/sqrt(n_lizards)),
+         se_hct = (sd_hct/sqrt(n_lizards)),
+         se_SMI = (sd_SMI/sqrt(n_lizards)))
 means$mean_CEWL[is.nan(means$mean_CEWL)] <- NA
 means$mean_osml[is.nan(means$mean_osml)] <- NA
 means$mean_hct[is.nan(means$mean_hct)] <- NA
@@ -1071,7 +757,11 @@ means
 
 # make only for days 0,8,10 for points to plot
 pt_means <- means %>%
-  dplyr::filter(day_n %in% c(0,8,10))
+  dplyr::filter(day_n %in% c(0,4,8,10))
+
+end_means <- means %>%
+  dplyr::filter(day_n == 8)
+write.csv(end_means, "./results_statistics/exp_end_means.csv")
 ```
 
 
@@ -1128,36 +818,59 @@ ggplot() +
                              0.41 #left
                              ), "cm")) -> SMI_fig
 SMI_fig
-ggsave(filename = "SMI_fig1.jpeg",
-       plot = SMI_fig,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 6, height = 6)
+#ggsave(filename = "SMI_fig1.jpeg",
+ #      plot = SMI_fig,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 6, height = 6)
 ```
 
 ### Means Only
 
 ```{r SMI actual-min fig}
 ggplot() + 
+  #plot these first so they end up on the "bottom"
+  geom_errorbar(data = means,
+                  aes(x = day_n,
+                y = mean_SMI, 
+                color = tmt,
+                group = tmt,
+                ymin = mean_SMI-se_SMI, 
+                ymax = mean_SMI+se_SMI),
+                width = .1,
+                #position=position_dodge(.01),
+                alpha = 0.7) +
   geom_line(data = means,
             aes(x = day_n,
                 y = mean_SMI, 
                 color = tmt,
                 group = tmt),
             alpha = 1, 
-            size = 1) +
-  geom_point(data = pt_means,
+            size = 0.5) +
+  geom_point(data = means,
             aes(x = day_n,
                 y = mean_SMI, 
                 color = tmt,
+                fill = tmt,
                 shape = tmt),
             alpha = 1, 
-            size = 5) +
+            size = 3) +
+  #geom_pointrange(data = means,
+   #               aes(x = day_n,
+    #            y = mean_SMI, 
+     #           color = tmt,
+      #          group = tmt,
+       #         ymin = mean_SMI-sd_SMI, 
+        #        ymax = mean_SMI+sd_SMI)) +
+  
   theme_classic() + 
-  scale_shape_manual(values = c(15:18), name = "") +
-  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_shape_manual(values = c(21:24), name = "") +
+  scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_y_continuous(breaks = c(seq(8,12)),
+                     limits = c(8.5,12.5)) +
   xlab("Day") + 
   ylab("Body Condition (g)") + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
@@ -1166,28 +879,28 @@ ggplot() +
              color = "darkgrey") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
-                            size = 22),
+                            size = 12),
         axis.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 16),
+                                 size = 8),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 22),
+                                 size = 12),
         legend.text.align = 0,
         legend.position = "none"
 ) -> SMI_fig_min
 SMI_fig_min
-ggsave(filename = "SMI_fig2.jpeg",
-       plot = SMI_fig_min,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 6, height = 6)
+#ggsave(filename = "SMI_fig2.jpeg",
+ #      plot = SMI_fig_min,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 6, height = 6)
 ```
 
 
 
-### CSU Presentation
+### LM + SE
 
 ```{r mass prez version}
 ggplot() + 
@@ -1220,14 +933,8 @@ ggplot() +
                                  size = 22),
         legend.text.align = 0,
         legend.position = "none"
-) -> SMI_CSU_fig
-SMI_CSU_fig
-ggsave(filename = "SMI_fig3.jpeg",
-       plot = SMI_CSU_fig,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 6, height = 6)
+) -> SMI_lm_fig
+SMI_lm_fig
 ```
 
 
@@ -1247,36 +954,47 @@ ggplot(data = end_vals_SMI) +
   geom_boxplot(aes(x = tmt,
                    y = SMI, 
                    color = tmt), 
-               size = 1) + 
+               size = 0.5) + 
+  geom_jitter(aes(x = tmt,
+                   y = SMI, 
+                   color = tmt,
+                 fill = tmt,
+                 shape = tmt), 
+               size = 1,
+              alpha = 0.4) +
   theme_classic() + 
+  scale_shape_manual(values = c(21:24), name = "") +
+  scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
+  scale_y_continuous(limits = c(7,15),
+                     breaks = c(seq(7,15, by = 2)),
+                     labels = c(seq(7,15, by = 2))) +
   xlab("") + 
   annotate(geom = "text", x = 1, y = 13.8, label = "A", 
-           size = 8) +
+           size = 3) +
   annotate(geom = "text", x = 2, y = 12.3, label = "A", 
-           size = 8) +
+           size = 3) +
   annotate(geom = "text", x = 3, y = 14.3, label = "B", 
-           size = 8) +
+           size = 3) +
   annotate(geom = "text", x = 4, y = 14.5, label = "B", 
-           size = 8) +
-  ylab("Scaled Mass Index (g)") + 
+           size = 3) +
+  ylab("Body Condition (g)") + 
   theme(text = element_text(color = "black", 
                             family = "sans", 
-                            size = 22),
+                            size = 12),
         axis.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 16),
+                                 size = 8),
         #axis.text.x = element_blank(),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 22),
+                                 size = 12),
         legend.text.align = 0,
         legend.position = "none",
         plot.margin = unit(c(0, #top
-                             0, #right
-                             0, #bottom
-                             0.74 #left
-                             ), "cm")
+                              0, #right
+                              0, #bottom
+                              3.4), "mm")
         ) -> SMI_end_boxplot
 SMI_end_boxplot
 ```
@@ -1347,24 +1065,38 @@ hct_fig
 
 ```{r hct actual-minimal fig}
 ggplot() +
+  geom_errorbar(data = means[complete.cases(means$mean_hct),],
+                  aes(x = day_n,
+                y = mean_hct, 
+                color = tmt,
+                group = tmt,
+                ymin = mean_hct-se_hct, 
+                ymax = mean_hct+se_hct),
+                width = .1,
+                #position=position_dodge(.1),
+                alpha = 0.7) +
   geom_line(data = means[complete.cases(means$mean_hct),],
             aes(x = day_n,
                 y = mean_hct, 
                 color = tmt,
                 group = tmt),
             alpha = 1, 
-            size = 1) +
+            size = 0.5) +
   geom_point(data = pt_means,
             aes(x = day_n,
                 y = mean_hct, 
                 color = tmt,
+                fill = tmt,
                 shape = tmt),
             alpha = 1, 
-            size = 5) +
+            size = 3) +
   theme_classic() + 
-  scale_shape_manual(values = c(15:18), name = "") +
-  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_shape_manual(values = c(21:24), name = "") +
+  scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_y_continuous(breaks = c(25, 30, 35, 40),
+                     limits = c(23,42)) +
   xlab("") + 
   ylab("Hematocrit (%)") + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
@@ -1373,13 +1105,13 @@ ggplot() +
              color = "darkgrey") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
-                            size = 22),
+                            size = 12),
         axis.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 16),
+                                 size = 8),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 22),
+                                 size = 12),
         legend.text.align = 0,
         legend.position = "none"
         ) -> hct_fig_min
@@ -1405,38 +1137,48 @@ ggplot(data = end_vals_hct) +
   geom_boxplot(aes(x = tmt,
                    y = hematocrit_percent, 
                    color = tmt), 
-               size = 1) + 
+               size = 0.5) + 
+  geom_jitter(aes(x = tmt,
+                   y = hematocrit_percent, 
+                   color = tmt,
+                 fill = tmt,
+                 shape = tmt), 
+               size = 1,
+              alpha = 0.4) +
   theme_classic() + 
+  scale_shape_manual(values = c(21:24), name = "") +
+  scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
   xlab("") + 
+  scale_y_continuous(limits = c(10,55),
+                     breaks = c(seq(10,50, by = 10)),
+                     labels = c(seq(10,50, by = 10))) +
   annotate(geom = "text", x = 1, y = 42, label = "A", 
-           size = 8) +
+           size = 3) +
   annotate(geom = "text", x = 2, y = 45, label = "AB", 
-           size = 8) +
+           size = 3) +
   annotate(geom = "text", x = 3, y = 53, label = "B", 
-           size = 8) +
+           size = 3) +
   annotate(geom = "text", x = 4, y = 53, label = "B", 
-           size = 8) +
-  ylab("Final Hematocrit (%)") + 
+           size = 3) +
+  ylab("Hematocrit (%)") + 
   theme(text = element_text(color = "black", 
                             family = "sans", 
-                            size = 22),
+                            size = 12),
         axis.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 16),
+                                 size = 8),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 22),
+                                 size = 12),
         legend.text.align = 0,
         legend.position = "none",
         plot.margin = unit(c(0, #top
-                             0, #right
-                             0, #bottom
-                             0.74 #left
-                             ), "cm")
+                              0, #right
+                              0, #bottom
+                              2.24), "mm")
         ) -> hct_end_boxplot
 hct_end_boxplot
-hct_tukey
 ```
 
 
@@ -1506,39 +1248,53 @@ osml_fig
 
 ```{r osmolality actual-minimal fig}
 ggplot() + 
+  geom_errorbar(data = means,
+                  aes(x = day_n,
+                y = mean_osml, 
+                color = tmt,
+                group = tmt,
+                ymin = mean_osml-se_osml, 
+                ymax = mean_osml+se_osml),
+                width = .1,
+                #position=position_dodge(.1),
+                alpha = 0.7) +
   geom_line(data = means[complete.cases(means$mean_osml),],
             aes(x = day_n,
                 y = mean_osml, 
                 color = tmt,
                 group = tmt),
             alpha = 1, 
-            size = 1) +
+            size = 0.5) +
   geom_point(data = pt_means,
             aes(x = day_n,
                 y = mean_osml, 
                 color = tmt,
+                fill = tmt,
                 shape = tmt),
             alpha = 1, 
-            size = 5) +
+            size = 3) +
   theme_classic() + 
-  scale_shape_manual(values = c(15:18), name = "") +
-  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_shape_manual(values = c(21:24), name = "") +
+  scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_y_continuous(breaks = c(seq(320,400, by = 10)),
+                     limits = c(340,380)) +
   xlab("") + 
-  ylab("Osmolality (mmol/kg)") + 
+  ylab(bquote('Osmolality (mmol '*kg^-1*')')) + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
   geom_vline(xintercept = 9,
              linetype = "dashed",
              color = "darkgrey") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
-                            size = 22),
+                            size = 12),
         axis.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 16),
+                                 size = 8),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 22),
+                                 size = 12),
         legend.text.align = 0,
         legend.position = "none"
         ) -> osml_fig_min
@@ -1547,10 +1303,10 @@ osml_fig_min
 
 
 
-### CSU Presentation
+### LM + SE
 
 
-```{r osmolality CSU Prez fig}
+```{r osmolality lm fig}
 ggplot() + 
   stat_smooth(data = dat_no_rehab,
               aes(x = day_n,
@@ -1584,14 +1340,8 @@ ggplot() +
                                  size = 22),
         legend.text.align = 0,
         legend.position = "none"
-        ) -> osml_CSU_fig
-osml_CSU_fig
-ggsave(filename = "CSU_osml_fig.jpeg",
-       plot = osml_CSU_fig,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 9, height = 6)
+        ) -> osml_lm_fig
+osml_lm_fig
 ```
 
 
@@ -1612,44 +1362,49 @@ ggplot(data = end_vals_osml) +
   geom_boxplot(aes(x = tmt,
                    y = osmolality_mmol_kg_mean, 
                    color = tmt), 
-               size = 1) + 
+               size = 0.5) + 
+  geom_jitter(aes(x = tmt,
+                   y = osmolality_mmol_kg_mean, 
+                   color = tmt,
+                 fill = tmt,
+                 shape = tmt), 
+               size = 1,
+              alpha = 0.4) +
   theme_classic() + 
+  scale_shape_manual(values = c(21:24), name = "") +
+  scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
+  scale_y_continuous(limits = c(290,470),
+                     breaks = c(seq(300,450, by = 50)),
+                     labels = c(seq(300,450, by = 50))) +
   xlab("") + 
   annotate(geom = "text", x = 1, y = 445, label = "A", 
-           size = 8) +
+           size = 3) +
   annotate(geom = "text", x = 2, y = 420, label = "A", 
-           size = 8) +
+           size = 3) +
   annotate(geom = "text", x = 3, y = 465, label = "A", 
-           size = 8) +
+           size = 3) +
   annotate(geom = "text", x = 4, y = 430, label = "A", 
-           size = 8) +
-  ylab("Final Plasma Osmolality\n(mmol/kg)") + 
+           size = 3) +
+  ylab(bquote('Osmolality (mmol '*kg^-1*')')) + 
   theme(text = element_text(color = "black", 
                             family = "sans", 
-                            size = 22),
+                            size = 12),
         axis.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 16),
+                                 size = 8),
+        #axis.text.x = element_blank(),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 22),
+                                 size = 12),
         legend.text.align = 0,
         legend.position = "none",
         plot.margin = unit(c(0, #top
-                             0, #right
-                             0, #bottom
-                             0.01 #left
-                             ), "cm")
+                              0, #right
+                              0, #bottom
+                              0), "mm")
         ) -> osml_end_boxplot
 osml_end_boxplot
-osml_tukey
-#ggsave(filename = "osml_end_boxplot.jpeg",
- #      plot = osml_end_boxplot,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 9, height = 6)
 ```
 
 
@@ -1703,12 +1458,12 @@ ggplot() +
         #legend.position = c(0.25,0.85)
         ) -> CEWL_fig
 CEWL_fig
-ggsave(filename = "CEWL_fig1.jpeg",
-       plot = CEWL_fig,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 6, height = 6)
+#ggsave(filename = "CEWL_fig1.jpeg",
+ #      plot = CEWL_fig,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 6, height = 6)
 ```
 
 
@@ -1717,57 +1472,79 @@ ggsave(filename = "CEWL_fig1.jpeg",
 
 ```{r CEWL actual fig minimal}
 ggplot() + 
+  geom_errorbar(data = means[complete.cases(means$mean_CEWL),],
+                  aes(x = day_n,
+                y = mean_CEWL, 
+                color = tmt,
+                group = tmt,
+                ymin = mean_CEWL-se_CEWL, 
+                ymax = mean_CEWL+se_CEWL),
+                width = .1,
+                #position=position_dodge(.1),
+                alpha = 0.7) +
   geom_line(data = means[complete.cases(means$mean_CEWL),],
             aes(x = day_n,
                 y = mean_CEWL, 
                 color = tmt,
                 group = tmt),
             alpha = 1, 
-            size = 1) +
+            size = .5) +
   geom_point(data = pt_means[complete.cases(pt_means$mean_CEWL),],
             aes(x = day_n,
                 y = mean_CEWL, 
                 color = tmt,
+                fill = tmt,
                 shape = tmt),
             alpha = 1, 
-            size = 5) +
+            size = 3) +
   theme_classic() + 
-  scale_shape_manual(values = c(15:18), name = "") +
-  scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
+  scale_shape_manual(values = c(21:24), name = "") +
+  scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
+  scale_y_continuous(breaks = c(20, 25, 30, 35, 40),
+                     limits = c(18,40)) +
   xlab("Day") + 
-  ylim(0,60) +
-  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  ylab(bquote('CEWL (g '*m^-2*' '*h^-1*')')) + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
   theme(text = element_text(color = "black", 
                             family = "sans", 
-                            size = 22),
+                            size = 12),
         axis.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 16),
+                                 size = 8),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 22),
+                                 size = 12),
         legend.text.align = 0,
-        legend.position = "bottom"
+        legend.position = "none"
         #legend.position = c(0.25,0.85)
         ) -> CEWL_fig_min
 CEWL_fig_min
-ggsave(filename = "CEWL_fig2.jpeg",
-       plot = CEWL_fig_min,
+
+# use ggarrange so legend is centered
+CEWL_fig_formatted <- ggarrange(CEWL_fig_min,
+                                ncol = 1, nrow = 1,
+                                common.legend = TRUE,
+                                legend = "bottom")
+# save
+ggsave(filename = "experiment_CEWL_fig.pdf",
+       plot = CEWL_fig_formatted,
        path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 6, height = 6)
+       device = "pdf",
+       dpi = 600,
+       units = "mm",
+       width = 80, height = 80)
+
 ```
 
 
 
 
-### CSU Presentation
+### LM + SE
 
 
-```{r CEWL CSU prez fig}
+```{r CEWL lm fig}
 ggplot() + 
   stat_smooth(data = dat,
               aes(x = day_n,
@@ -1799,15 +1576,8 @@ ggplot() +
         legend.text.align = 0,
         legend.position = "none"
         #legend.position = c(0.25,0.85)
-        ) -> CEWL_CSU_pres_fig
-CEWL_CSU_pres_fig
-
-ggsave(filename = "CEWL_fig3.jpeg",
-       plot = CEWL_CSU_pres_fig,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 8, height = 6)
+        ) -> CEWL_lm_fig
+CEWL_lm_fig
 ```
 
 
@@ -1820,7 +1590,7 @@ end_vals_CEWL <- dat %>%
   dplyr::filter(day_n == 8) %>%
   dplyr::filter(complete.cases(CEWL_g_m2h_mean))
 
-TukeyHSD(aov(data = end_vals_CEWL, 
+CEWL_tukey <- TukeyHSD(aov(data = end_vals_CEWL, 
              CEWL_g_m2h_mean ~ temp_tmt * humidity_tmt))
 
 
@@ -1828,45 +1598,49 @@ ggplot(data = end_vals_CEWL) +
   geom_boxplot(aes(x = tmt,
                    y = CEWL_g_m2h_mean, 
                    color = tmt), 
-               size = 1) + 
+               size = 0.5) + 
+  geom_jitter(aes(x = tmt,
+                   y = CEWL_g_m2h_mean, 
+                   color = tmt,
+                 fill = tmt,
+                 shape = tmt), 
+               size = 1,
+              alpha = 0.4) +
   theme_classic() + 
+  scale_shape_manual(values = c(21:24), name = "") +
+  scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
+  scale_y_continuous(limits = c(9,63),
+                     breaks = c(seq(10,60, by = 10)),
+                     labels = c(seq(10,60, by = 10))) +
   xlab("") + 
-  ylab(bquote('Final CEWL (g/'*m^2*'h)')) + 
+  ylab(bquote('CEWL (g '*m^-2*' '*h^-1*')')) + 
   annotate(geom = "text", x = 1, y = 61, label = "A", 
-           size = 8) +
+           size = 3) +
   annotate(geom = "text", x = 2, y = 48, label = "B", 
-           size = 8) +
+           size = 3) +
   annotate(geom = "text", x = 3, y = 49, label = "C", 
-           size = 8) +
+           size = 3) +
   annotate(geom = "text", x = 4, y = 39, label = "B", 
-           size = 8) +
+           size = 3) +
   theme(text = element_text(color = "black", 
                             family = "sans", 
-                            size = 22),
+                            size = 12),
         axis.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 16),
+                                 size = 8),
         #axis.text.x = element_blank(),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 22),
+                                 size = 12),
         legend.text.align = 0,
         legend.position = "none",
         plot.margin = unit(c(0, #top
-                             0, #right
-                             0, #bottom
-                             0.74 #left
-                             ), "cm")
+                              0, #right
+                              0, #bottom
+                              0), "mm")
         ) -> CEWL_end_boxplot
 CEWL_end_boxplot
-
-#ggsave(filename = "CEWL_end_boxplot.jpeg",
- #      plot = CEWL_end_boxplot,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 8, height = 6)
 ```
 
 
@@ -1878,21 +1652,23 @@ CEWL_end_boxplot
 over time:
 
 ```{r arrange figs}
-ggarrange(osml_fig, #osml_fig_min, osml_predict_fig,
-          hct_fig, #hct_fig_min, hct_predict_fig,
-          SMI_fig, #SMI_fig_min, SMI_predict_fig,
+ggarrange(osml_fig_min, #osml_fig_min, osml_predict_fig,
+          hct_fig_min, #hct_fig_min, hct_predict_fig,
+          SMI_fig_min, #SMI_fig_min, SMI_predict_fig,
           ncol = 1, nrow = 3,
+          labels = c("A", "B", "C"),
           common.legend = TRUE,
           legend = "bottom"
           ) -> experiment_multi_fig
-experiment_multi_fig
+#experiment_multi_fig
 # export figure
-ggsave(filename = "experiment_multi_fig.jpeg",
+ggsave(filename = "experiment_multi_fig.pdf",
        plot = experiment_multi_fig,
        path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 6, height = 14)
+       device = "pdf",
+       dpi = 600,
+       units = "mm",
+       width = 80, height = 210)
 ```
 
 
@@ -1900,46 +1676,27 @@ end values:
 
 ```{r}
 ggarrange(CEWL_end_boxplot, 
-          SMI_end_boxplot, 
           osml_end_boxplot, 
           hct_end_boxplot,
+          SMI_end_boxplot, 
           ncol = 2, nrow = 2,
+          labels = c("A", "B", "C", "D"),
           common.legend = FALSE
           ) -> ending_values_multi_fig
-ending_values_multi_fig
+#ending_values_multi_fig
 
-ggsave(filename = "exp_ending_values_multi_fig.jpeg",
+ggsave(filename = "exp_end_val_multi_fig.pdf",
        plot = ending_values_multi_fig,
        path = "./results_figures",
-       device = "jpeg",
-       dpi = 2400,
-       width = 12, height = 8)
+       device = "pdf",
+       dpi = 600,
+       units = "mm",
+       width = 180, height = 150)
 ```
 
 
 
 
-CSU research paper:
-
-```{r quickie}
-ggarrange(CEWL_fig, osml_fig,
-          ncol = 1, nrow = 2,
-          labels = c("A", "B"),
-          hjust = -1,
-          vjust = c(2,-1),
-          font.label = list(size = 20),
-          common.legend = TRUE,
-          legend = "bottom"
-          ) -> CSU_RC_fig
-CSU_RC_fig
-# export figure
-ggsave(filename = "CSU_RC_fig.jpeg",
-       plot = CSU_RC_fig,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 6, height = 10)
-```
 
 
 

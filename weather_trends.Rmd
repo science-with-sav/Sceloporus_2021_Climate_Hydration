@@ -118,14 +118,6 @@ ggplot(data = weather_dat,
         legend.position = "right"
         ) -> temp_fig
 temp_fig
-
-# export figure
-ggsave(filename = "weather_long_trends_temp.jpeg",
-       plot = temp_fig,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 6, height = 4)
 ```
 
 
@@ -185,14 +177,6 @@ ggplot(data = weather_dat,
         legend.position = "right"
         ) -> VPD_fig
 VPD_fig
-
-# export figure
-ggsave(filename = "weather_long_trends_VPD.jpeg",
-       plot = VPD_fig,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 6, height = 4)
 ```
 
 
@@ -253,14 +237,6 @@ ggplot(data = weather_dat,
         legend.position = "right"
         ) -> wind_fig
 wind_fig
-
-# export figure
-ggsave(filename = "weather_long_trends_wind.jpeg",
-       plot = wind_fig,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 6, height = 4)
 ```
 
 
@@ -322,14 +298,6 @@ ggplot(data = weather_dat,
         legend.position = "right"
         ) -> sorad_fig
 sorad_fig
-
-# export figure
-ggsave(filename = "weather_long_trends_sorad.jpeg",
-       plot = sorad_fig,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 6, height = 4)
 ```
 
 

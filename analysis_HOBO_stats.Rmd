@@ -391,13 +391,6 @@ format_HOBO_data %>%
             mapping = aes(x = 5, y = c(35,35,20,20), label = t5)
             ) -> ANOVA_temp_boxplot
 ANOVA_temp_boxplot
-# save
-ggsave(filename = "ANOVA_temp_boxplot.jpeg",
-       plot = ANOVA_temp_boxplot,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 6, height = 4)
 ```
 
 
@@ -458,13 +451,6 @@ format_HOBO_data %>%
             mapping = aes(x = 5, y = c(90,10,90,10), label = t5)
             ) -> ANOVA_humidity_boxplot
 ANOVA_humidity_boxplot
-# save
-ggsave(filename = "ANOVA_humidity_boxplot.jpeg",
-       plot = ANOVA_humidity_boxplot,
-       path = "./results_figures",
-       device = "jpeg",
-       dpi = 1200,
-       width = 6, height = 4)
 ```
 
 

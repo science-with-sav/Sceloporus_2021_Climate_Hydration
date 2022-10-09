@@ -256,6 +256,13 @@ format_HOBO_data %>%
 ## Treatment Differences
 
 ```{r}
+format_HOBO_data %>%
+  group_by(humidity_tmt) %>%
+  summarise(temp_mean = mean(temp_C),
+            temp_SD = sd(temp_C),
+            humidity_mean = mean(relative_humidity),
+            humidity_SD = sd(relative_humidity))
+
 tmt_only_means <- format_HOBO_data %>%
   group_by(tmt) %>%
   summarise(temp_mean = mean(temp_C),

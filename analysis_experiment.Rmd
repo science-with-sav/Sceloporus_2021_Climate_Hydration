@@ -94,6 +94,7 @@ dat %>%
   dplyr::filter(day_n == 0) %>%
   group_by(tmt) %>%
   summarise(mean(mass_g),
+            sd(mass_g),
             mean(SMI),
             mean(hematocrit_percent),
             mean(osmolality_mmol_kg_mean),
@@ -1301,6 +1302,30 @@ ggplot() +
 osml_fig_min
 ```
 
+
+### Stats! Check Pairwise Diffs ~ Time
+
+Since Plasma osmolality has such a nonlinear trend, we need to test whether the elevated values in the middle of the experiment are significantly different than the values taken before and/or after.
+
+```{r}
+# first make sub-dfs for each tmt group
+HH <- dat_no_rehab %>%
+  dplyr::filter(tmt == "Hot Humid")
+HD <- dat_no_rehab %>%
+  dplyr::filter(tmt == "Hot Dry")
+CH <- dat_no_rehab %>%
+  dplyr::filter(tmt == "Cool Humid")
+CD <- dat_no_rehab %>%
+  dplyr::filter(tmt == "Cool Dry")
+
+# next do pairwise tests for osml on the diff exp days, for each tmt group
+pair_HH <- TukeyHSD(aov(data = HH, osmolality_mmol_kg_mean ~ day_factor)) #nonsig
+pair_HD <- TukeyHSD(aov(data = HD, osmolality_mmol_kg_mean ~ day_factor)) #nonsig
+pair_CH <- TukeyHSD(aov(data = CH, osmolality_mmol_kg_mean ~ day_factor)) #nonsig
+pair_CD <- TukeyHSD(aov(data = CD, osmolality_mmol_kg_mean ~ day_factor)) #nonsig
+```
+
+nope, none of the differences between days within tmt groups are significantly different 
 
 
 ### LM + SE

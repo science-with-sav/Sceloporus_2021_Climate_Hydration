@@ -846,6 +846,7 @@ ggplot() +
             aes(x = day_n,
                 y = mean_SMI, 
                 color = tmt,
+                linetype = tmt,
                 group = tmt),
             alpha = 1, 
             size = 0.5) +
@@ -853,20 +854,15 @@ ggplot() +
             aes(x = day_n,
                 y = mean_SMI, 
                 color = tmt,
-                fill = tmt,
+                #fill = tmt,
                 shape = tmt),
+            fill = "white",
             alpha = 1, 
             size = 3) +
-  #geom_pointrange(data = means,
-   #               aes(x = day_n,
-    #            y = mean_SMI, 
-     #           color = tmt,
-      #          group = tmt,
-       #         ymin = mean_SMI-sd_SMI, 
-        #        ymax = mean_SMI+sd_SMI)) +
-  
   theme_classic() + 
-  scale_shape_manual(values = c(21:24), name = "") +
+  scale_shape_manual(values = c(19,15,21,22), name = "") +
+  scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
+                        name = "") +
   scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
@@ -891,12 +887,6 @@ ggplot() +
         legend.position = "none"
 ) -> SMI_fig_min
 SMI_fig_min
-#ggsave(filename = "SMI_fig2.jpeg",
- #      plot = SMI_fig_min,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 6, height = 6)
 ```
 
 
@@ -955,16 +945,19 @@ ggplot(data = end_vals_SMI) +
   geom_boxplot(aes(x = tmt,
                    y = SMI, 
                    color = tmt), 
-               size = 0.5) + 
+               size = 0.5,
+               outlier.shape = NA) + 
   geom_jitter(aes(x = tmt,
                    y = SMI, 
                    color = tmt,
                  fill = tmt,
                  shape = tmt), 
+              #fill = "white",
                size = 1,
-              alpha = 0.4) +
+              alpha = 0.4,
+              position = position_jitter(height = 0, width = 0.2)) +
   theme_classic() + 
-  scale_shape_manual(values = c(21:24), name = "") +
+  scale_shape_manual(values = c(19,15,21,22), name = "") +
   scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
   scale_y_continuous(limits = c(7,15),
@@ -1080,6 +1073,7 @@ ggplot() +
             aes(x = day_n,
                 y = mean_hct, 
                 color = tmt,
+                linetype = tmt,
                 group = tmt),
             alpha = 1, 
             size = 0.5) +
@@ -1087,12 +1081,15 @@ ggplot() +
             aes(x = day_n,
                 y = mean_hct, 
                 color = tmt,
-                fill = tmt,
+                #fill = tmt,
                 shape = tmt),
             alpha = 1, 
+            fill = "white",
             size = 3) +
   theme_classic() + 
-  scale_shape_manual(values = c(21:24), name = "") +
+  scale_shape_manual(values = c(19,15,21,22), name = "") +
+  scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
+                        name = "") +
   scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
@@ -1138,16 +1135,18 @@ ggplot(data = end_vals_hct) +
   geom_boxplot(aes(x = tmt,
                    y = hematocrit_percent, 
                    color = tmt), 
-               size = 0.5) + 
+               size = 0.5,
+               outlier.shape = NA) + 
   geom_jitter(aes(x = tmt,
                    y = hematocrit_percent, 
                    color = tmt,
                  fill = tmt,
                  shape = tmt), 
                size = 1,
-              alpha = 0.4) +
+              alpha = 0.4,
+              position = position_jitter(height = 0, width = 0.2)) +
   theme_classic() + 
-  scale_shape_manual(values = c(21:24), name = "") +
+  scale_shape_manual(values = c(19,15,21,22), name = "") +
   scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
   xlab("") + 
@@ -1263,6 +1262,7 @@ ggplot() +
             aes(x = day_n,
                 y = mean_osml, 
                 color = tmt,
+                linetype = tmt,
                 group = tmt),
             alpha = 1, 
             size = 0.5) +
@@ -1270,12 +1270,15 @@ ggplot() +
             aes(x = day_n,
                 y = mean_osml, 
                 color = tmt,
-                fill = tmt,
+                #fill = tmt,
                 shape = tmt),
+            fill = "white",
             alpha = 1, 
             size = 3) +
   theme_classic() + 
-  scale_shape_manual(values = c(21:24), name = "") +
+  scale_shape_manual(values = c(19,15,21,22), name = "") +
+  scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
+                        name = "") +
   scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
@@ -1387,16 +1390,18 @@ ggplot(data = end_vals_osml) +
   geom_boxplot(aes(x = tmt,
                    y = osmolality_mmol_kg_mean, 
                    color = tmt), 
-               size = 0.5) + 
+               size = 0.5,
+               outlier.shape = NA) + 
   geom_jitter(aes(x = tmt,
                    y = osmolality_mmol_kg_mean, 
                    color = tmt,
                  fill = tmt,
                  shape = tmt), 
                size = 1,
-              alpha = 0.4) +
+              alpha = 0.4,
+              position = position_jitter(height = 0, width = 0.2)) +
   theme_classic() + 
-  scale_shape_manual(values = c(21:24), name = "") +
+  scale_shape_manual(values = c(19,15,21,22), name = "") +
   scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
   scale_y_continuous(limits = c(290,470),
@@ -1511,6 +1516,7 @@ ggplot() +
             aes(x = day_n,
                 y = mean_CEWL, 
                 color = tmt,
+                linetype = tmt,
                 group = tmt),
             alpha = 1, 
             size = .5) +
@@ -1518,12 +1524,14 @@ ggplot() +
             aes(x = day_n,
                 y = mean_CEWL, 
                 color = tmt,
-                fill = tmt,
                 shape = tmt),
+            fill = "white",
             alpha = 1, 
             size = 3) +
   theme_classic() + 
-  scale_shape_manual(values = c(21:24), name = "") +
+  scale_shape_manual(values = c(19,15,21,22), name = "") +
+  scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
+                        name = "") +
   scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
@@ -1623,16 +1631,18 @@ ggplot(data = end_vals_CEWL) +
   geom_boxplot(aes(x = tmt,
                    y = CEWL_g_m2h_mean, 
                    color = tmt), 
-               size = 0.5) + 
+               size = 0.5,
+               outlier.shape = NA) + 
   geom_jitter(aes(x = tmt,
                    y = CEWL_g_m2h_mean, 
                    color = tmt,
                  fill = tmt,
                  shape = tmt), 
                size = 1,
-              alpha = 0.4) +
+              alpha = 0.4,
+              position = position_jitter(height = 0, width = 0.2)) +
   theme_classic() + 
-  scale_shape_manual(values = c(21:24), name = "") +
+  scale_shape_manual(values = c(19,15,21,22), name = "") +
   scale_fill_brewer(palette = "Set2", name = "") +
   scale_color_brewer(palette = "Set2", name = "") +
   scale_y_continuous(limits = c(9,63),

@@ -43,11 +43,10 @@ This data was collected June - August by Master's student Savannah Weaver, advis
 ```{r}
 dat <- read_rds("./data/analysis_data_capture.RDS")
 summary(dat)
-mean(dat$RH_percent_interpol, na.rm = T)
 ```
 
 
-**note** IDs I do not have data for: 254, 284, 304
+**note** IDs I do not have data for (and shouldn't): 254, 284, 304
 
 
 
@@ -1336,6 +1335,17 @@ ggsave(filename = "cap_CEWL_osml_fig.pdf",
        units = "mm",
        width = 80, height = 60)
 ```
+
+
+
+### Add SLR
+
+```{r}
+CEWL_osml <- lm(data = dat, CEWL_g_m2h_mean ~ osmolality_mmol_kg_mean)
+summary(CEWL_osml)
+```
+
+
 
 
 

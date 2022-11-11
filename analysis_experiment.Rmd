@@ -846,7 +846,7 @@ ggplot() +
             aes(x = day_n,
                 y = mean_SMI, 
                 color = tmt,
-                linetype = tmt,
+                #linetype = tmt,
                 group = tmt),
             alpha = 1, 
             size = 0.5) +
@@ -860,11 +860,11 @@ ggplot() +
             alpha = 1, 
             size = 3) +
   theme_classic() + 
-  scale_shape_manual(values = c(19,15,21,22), name = "") +
-  scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
-                        name = "") +
-  scale_fill_brewer(palette = "Set2", name = "") +
-  scale_color_brewer(palette = "Set2", name = "") +
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  #scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
+   #                     name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
   scale_y_continuous(breaks = c(seq(8,12)),
                      limits = c(8.5,12.5)) +
@@ -956,21 +956,28 @@ ggplot(data = end_vals_SMI) +
                size = 1,
               alpha = 0.4,
               position = position_jitter(height = 0, width = 0.2)) +
+  geom_point(data = end_means, 
+             aes(x = tmt,
+                   y = mean_SMI, 
+                   color = tmt,
+                 fill = tmt), 
+               size = 3,
+             shape = 23) +
   theme_classic() + 
-  scale_shape_manual(values = c(19,15,21,22), name = "") +
-  scale_fill_brewer(palette = "Set2", name = "") +
-  scale_color_brewer(palette = "Set2", name = "") +
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
   scale_y_continuous(limits = c(7,15),
                      breaks = c(seq(7,15, by = 2)),
                      labels = c(seq(7,15, by = 2))) +
   xlab("") + 
-  annotate(geom = "text", x = 1, y = 13.8, label = "A", 
+  annotate(geom = "text", x = 2, y = 13.8, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 12.3, label = "A", 
+  annotate(geom = "text", x = 1, y = 12.3, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 14.3, label = "B", 
+  annotate(geom = "text", x = 4, y = 14.3, label = "B", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 14.5, label = "B", 
+  annotate(geom = "text", x = 3, y = 14.5, label = "B", 
            size = 3) +
   ylab("Body Condition (g)") + 
   theme(text = element_text(color = "black", 
@@ -1073,7 +1080,7 @@ ggplot() +
             aes(x = day_n,
                 y = mean_hct, 
                 color = tmt,
-                linetype = tmt,
+                #linetype = tmt,
                 group = tmt),
             alpha = 1, 
             size = 0.5) +
@@ -1087,11 +1094,11 @@ ggplot() +
             fill = "white",
             size = 3) +
   theme_classic() + 
-  scale_shape_manual(values = c(19,15,21,22), name = "") +
-  scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
-                        name = "") +
-  scale_fill_brewer(palette = "Set2", name = "") +
-  scale_color_brewer(palette = "Set2", name = "") +
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  #scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
+   #                     name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
   scale_y_continuous(breaks = c(25, 30, 35, 40),
                      limits = c(23,42)) +
@@ -1145,21 +1152,28 @@ ggplot(data = end_vals_hct) +
                size = 1,
               alpha = 0.4,
               position = position_jitter(height = 0, width = 0.2)) +
+  geom_point(data = end_means, 
+             aes(x = tmt,
+                   y = mean_hct, 
+                   color = tmt,
+                 fill = tmt), 
+               size = 3,
+             shape = 23) +
   theme_classic() + 
-  scale_shape_manual(values = c(19,15,21,22), name = "") +
-  scale_fill_brewer(palette = "Set2", name = "") +
-  scale_color_brewer(palette = "Set2", name = "") +
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
   xlab("") + 
   scale_y_continuous(limits = c(10,55),
                      breaks = c(seq(10,50, by = 10)),
                      labels = c(seq(10,50, by = 10))) +
-  annotate(geom = "text", x = 1, y = 42, label = "A", 
+  annotate(geom = "text", x = 2, y = 42, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 45, label = "AB", 
-           size = 3) +
-  annotate(geom = "text", x = 3, y = 53, label = "B", 
+  annotate(geom = "text", x = 1, y = 45, label = "AB", 
            size = 3) +
   annotate(geom = "text", x = 4, y = 53, label = "B", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 53, label = "B", 
            size = 3) +
   ylab("Hematocrit (%)") + 
   theme(text = element_text(color = "black", 
@@ -1262,7 +1276,7 @@ ggplot() +
             aes(x = day_n,
                 y = mean_osml, 
                 color = tmt,
-                linetype = tmt,
+                #linetype = tmt,
                 group = tmt),
             alpha = 1, 
             size = 0.5) +
@@ -1276,11 +1290,11 @@ ggplot() +
             alpha = 1, 
             size = 3) +
   theme_classic() + 
-  scale_shape_manual(values = c(19,15,21,22), name = "") +
-  scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
-                        name = "") +
-  scale_fill_brewer(palette = "Set2", name = "") +
-  scale_color_brewer(palette = "Set2", name = "") +
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  #scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
+   #                     name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
   scale_y_continuous(breaks = c(seq(320,400, by = 10)),
                      limits = c(340,380)) +
@@ -1400,21 +1414,28 @@ ggplot(data = end_vals_osml) +
                size = 1,
               alpha = 0.4,
               position = position_jitter(height = 0, width = 0.2)) +
+  geom_point(data = end_means, 
+             aes(x = tmt,
+                   y = mean_osml, 
+                   color = tmt,
+                 fill = tmt), 
+               size = 3,
+             shape = 23) +
   theme_classic() + 
-  scale_shape_manual(values = c(19,15,21,22), name = "") +
-  scale_fill_brewer(palette = "Set2", name = "") +
-  scale_color_brewer(palette = "Set2", name = "") +
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
   scale_y_continuous(limits = c(290,470),
                      breaks = c(seq(300,450, by = 50)),
                      labels = c(seq(300,450, by = 50))) +
   xlab("") + 
-  annotate(geom = "text", x = 1, y = 445, label = "A", 
+  annotate(geom = "text", x = 2, y = 445, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 420, label = "A", 
+  annotate(geom = "text", x = 1, y = 420, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 465, label = "A", 
+  annotate(geom = "text", x = 4, y = 465, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 430, label = "A", 
+  annotate(geom = "text", x = 3, y = 430, label = "A", 
            size = 3) +
   ylab(bquote('Osmolality (mmol '*kg^-1*')')) + 
   theme(text = element_text(color = "black", 
@@ -1516,7 +1537,7 @@ ggplot() +
             aes(x = day_n,
                 y = mean_CEWL, 
                 color = tmt,
-                linetype = tmt,
+                #linetype = tmt,
                 group = tmt),
             alpha = 1, 
             size = .5) +
@@ -1529,11 +1550,11 @@ ggplot() +
             alpha = 1, 
             size = 3) +
   theme_classic() + 
-  scale_shape_manual(values = c(19,15,21,22), name = "") +
-  scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
-                        name = "") +
-  scale_fill_brewer(palette = "Set2", name = "") +
-  scale_color_brewer(palette = "Set2", name = "") +
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  #scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
+   #                     name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
   scale_y_continuous(breaks = c(20, 25, 30, 35, 40),
                      limits = c(18,40)) +
@@ -1641,22 +1662,29 @@ ggplot(data = end_vals_CEWL) +
                size = 1,
               alpha = 0.4,
               position = position_jitter(height = 0, width = 0.2)) +
+  geom_point(data = end_means, 
+             aes(x = tmt,
+                   y = mean_CEWL, 
+                   color = tmt,
+                 fill = tmt), 
+               size = 3,
+             shape = 23) +
   theme_classic() + 
-  scale_shape_manual(values = c(19,15,21,22), name = "") +
-  scale_fill_brewer(palette = "Set2", name = "") +
-  scale_color_brewer(palette = "Set2", name = "") +
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
   scale_y_continuous(limits = c(9,63),
                      breaks = c(seq(10,60, by = 10)),
                      labels = c(seq(10,60, by = 10))) +
   xlab("") + 
   ylab(bquote('CEWL (g '*m^-2*' '*h^-1*')')) + 
-  annotate(geom = "text", x = 1, y = 61, label = "A", 
+  annotate(geom = "text", x = 2, y = 61, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 48, label = "B", 
+  annotate(geom = "text", x = 1, y = 48, label = "B", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 49, label = "C", 
+  annotate(geom = "text", x = 4, y = 49, label = "C", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 39, label = "B", 
+  annotate(geom = "text", x = 3, y = 39, label = "B", 
            size = 3) +
   theme(text = element_text(color = "black", 
                             family = "sans", 

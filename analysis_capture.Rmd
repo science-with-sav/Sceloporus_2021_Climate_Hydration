@@ -949,7 +949,7 @@ temp_color = "gray"
 solar_color = "orange"
 wind_color = "orange"
 date_color = "gray"
-osml_color  <- c(brewer.pal(6, "Set2")[c(2)])
+osml_color  <- c(brewer.pal(11, "Spectral")[c(10)])
 ```
 
 

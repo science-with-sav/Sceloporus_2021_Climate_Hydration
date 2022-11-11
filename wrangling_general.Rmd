@@ -242,6 +242,9 @@ Add SMI to an updated full_dat df - full_dat2
 full_dat2 <- full_dat %>%
   # compute SMI
   mutate(SMI = mass_g * ((L0/SVL_mm) ^ b_SMA))
+ggplot(full_dat2) + 
+  geom_point(aes(x = mass_g,
+                 y = SMI))
 ```
 
 
@@ -419,10 +422,10 @@ full_dat3$temp_tmt <- factor(full_dat3$temp_tmt,
                            levels = c("hot", "cool"),
                            labels = c("Hot", "Cool"))
 full_dat3$tmt <- factor(full_dat3$tmt,
-                           levels = c("hot humid", "hot dry",
-                                      "cool humid", "cool dry"),
-                           labels = c("Hot Humid", "Hot Dry",
-                                      "Cool Humid", "Cool Dry"))
+                           levels = c("hot dry","hot humid", 
+                                      "cool dry", "cool humid"),
+                           labels = c("Hot Dry", "Hot Humid", 
+                                      "Cool Dry", "Cool Humid"))
 summary(full_dat3)
 ```
 

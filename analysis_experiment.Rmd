@@ -987,14 +987,24 @@ ggplot(data = end_vals_SMI) +
                      breaks = c(seq(7,15, by = 2)),
                      labels = c(seq(7,15, by = 2))) +
   xlab("") + 
-  annotate(geom = "text", x = 2, y = 13.8, label = "A", 
+  
+  annotate(geom = "text", x = 1, y = 12.7, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 1, y = 12.3, label = "A", 
+  annotate(geom = "text", x = 1, y = 12.2, label = "9.4", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 14.3, label = "B", 
+  annotate(geom = "text", x = 2, y = 14.2, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 14.5, label = "B", 
+  annotate(geom = "text", x = 2, y = 13.7, label = "9.7", 
            size = 3) +
+  annotate(geom = "text", x = 3, y = 14.8, label = "B", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 14.3, label = "10.6", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 14.6, label = "B", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 14.1, label = "10.8", 
+           size = 3) +
+  
   ylab("Body Condition (g)") + 
   theme(text = element_text(color = "black", 
                             family = "sans", 
@@ -1183,14 +1193,24 @@ ggplot(data = end_vals_hct) +
   scale_y_continuous(limits = c(10,55),
                      breaks = c(seq(10,50, by = 10)),
                      labels = c(seq(10,50, by = 10))) +
-  annotate(geom = "text", x = 2, y = 42, label = "A", 
+  
+  annotate(geom = "text", x = 1, y = 47.6, label = "AB", 
            size = 3) +
-  annotate(geom = "text", x = 1, y = 45, label = "AB", 
+  annotate(geom = "text", x = 1, y = 45, label = "28", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 53, label = "B", 
+  annotate(geom = "text", x = 2, y = 44.6, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 53, label = "B", 
+  annotate(geom = "text", x = 2, y = 42, label = "26", 
            size = 3) +
+  annotate(geom = "text", x = 3, y = 54.6, label = "B", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 52, label = "30", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 54.6, label = "B", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 52, label = "30", 
+           size = 3) +
+  
   ylab("Hematocrit (%)") + 
   theme(text = element_text(color = "black", 
                             family = "sans", 
@@ -1356,6 +1376,21 @@ pair_HH <- TukeyHSD(aov(data = HH, osmolality_mmol_kg_mean ~ day_factor)) #nonsi
 pair_HD <- TukeyHSD(aov(data = HD, osmolality_mmol_kg_mean ~ day_factor)) #nonsig
 pair_CH <- TukeyHSD(aov(data = CH, osmolality_mmol_kg_mean ~ day_factor)) #nonsig
 pair_CD <- TukeyHSD(aov(data = CD, osmolality_mmol_kg_mean ~ day_factor)) #nonsig
+
+# put into a df and export
+osml_pairwise_df <- as.data.frame(pair_HD[[1]]) %>%
+  rbind(as.data.frame(pair_HH[[1]])) %>%
+  rbind(as.data.frame(pair_CD[[1]])) %>%
+  rbind(as.data.frame(pair_CH[[1]])) %>%
+  mutate(day_diff = paste("day", substr(rownames(.), 1, 3)),
+         tmt = c(rep("Hot Dry",3),
+                 rep("Hot Humid",3),
+                 rep("Cool Dry",3),
+                 rep("Cool Humid",3)),
+         CI_95 = paste(round(lwr, digits = 2), round(upr, digits = 2), sep = ", "),
+         diff = round(diff, digits = 2)) %>%
+  dplyr::select(tmt, day_diff, diff, CI_95, p_adj = "p adj")
+write.csv(osml_pairwise_df, "./results_statistics/osmolality_pairwise_diffs.csv")
 ```
 
 nope, none of the differences between days within tmt groups are significantly different 
@@ -1445,14 +1480,24 @@ ggplot(data = end_vals_osml) +
                      breaks = c(seq(300,450, by = 50)),
                      labels = c(seq(300,450, by = 50))) +
   xlab("") + 
-  annotate(geom = "text", x = 2, y = 445, label = "A", 
+  
+  annotate(geom = "text", x = 1, y = 427, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 1, y = 420, label = "A", 
+  annotate(geom = "text", x = 1, y = 417, label = "360", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 465, label = "A", 
+  annotate(geom = "text", x = 2, y = 452, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 430, label = "A", 
+  annotate(geom = "text", x = 2, y = 442, label = "351", 
            size = 3) +
+  annotate(geom = "text", x = 3, y = 437, label = "A", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 427, label = "347", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 470, label = "A", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 460, label = "346", 
+           size = 3) +
+  
   ylab(bquote('Osmolality (mmol '*kg^-1*')')) + 
   theme(text = element_text(color = "black", 
                             family = "sans", 
@@ -1694,14 +1739,24 @@ ggplot(data = end_vals_CEWL) +
                      labels = c(seq(10,60, by = 10))) +
   xlab("") + 
   ylab(bquote('CEWL (g '*m^-2*' '*h^-1*')')) + 
-  annotate(geom = "text", x = 2, y = 61, label = "A", 
+  
+  annotate(geom = "text", x = 1, y = 50, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 1, y = 48, label = "B", 
+  annotate(geom = "text", x = 1, y = 47, label = "25", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 49, label = "C", 
+  annotate(geom = "text", x = 2, y = 63, label = "B", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 39, label = "B", 
+  annotate(geom = "text", x = 2, y = 60, label = "37", 
            size = 3) +
+  annotate(geom = "text", x = 3, y = 41, label = "A", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 38, label = "24", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 52, label = "C", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 49, label = "30", 
+           size = 3) +
+  
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 12),

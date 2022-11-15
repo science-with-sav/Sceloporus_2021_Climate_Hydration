@@ -104,6 +104,22 @@ dat %>%
 There are slight differences, but overall the starting values across groups are more or less the same.
 
 
+Temp & RH during CEWL measurements:
+
+```{r}
+summary(dat_no_rehab)
+dat_no_rehab %>%
+  group_by(type) %>%
+  summarise(mean(msmt_temp_C, na.rm = T),
+            sd(msmt_temp_C, na.rm = T),
+            mean(msmt_RH_percent, na.rm = T),
+            sd(msmt_RH_percent, na.rm = T),
+            mean(msmt_VPD_kPa, na.rm = T),
+            mean(msmt_VPD_kPa, na.rm = T))
+```
+
+
+
 
 # Experiment Models
 

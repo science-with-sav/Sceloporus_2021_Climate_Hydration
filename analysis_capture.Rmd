@@ -1354,13 +1354,14 @@ summary(CEWL_osml)
 ```{r CEWL temp fig}
 ggplot(dat) + 
   aes(x = msmt_temp_C,
-      y = CEWL_g_m2h_mean) +
+      y = CEWL_g_m2h_mean,
+      color = as.factor(capture_date)) +
   geom_point(size = 1, 
              alpha = 0.4) + 
   stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
-              color = temp_color,
+              #color = temp_color,
               size = 1.6, 
               alpha = 1) + 
   theme_classic() + 
@@ -1387,13 +1388,14 @@ cap_CEWL_temp_fig
 ```{r CEWL VPD-m fig}
 ggplot(dat) + 
   aes(x = msmt_VPD_kPa,
-      y = CEWL_g_m2h_mean) +
+      y = CEWL_g_m2h_mean,
+      color = as.factor(capture_date)) +
   geom_point(size = 1, 
              alpha = 0.4) + 
   stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
-              color = VPD_color,
+              #color = VPD_color,
               size = 1.6, 
               alpha = 1 ) + 
   theme_classic() + 

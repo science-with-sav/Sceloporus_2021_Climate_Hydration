@@ -1780,6 +1780,60 @@ CEWL_end_boxplot
 
 
 
+## CEWL ~ Osml
+
+```{r CEWL osml fig}
+end_vals_CEWL_osml <- dat %>%
+  dplyr::filter(day_n == 8) %>%
+  dplyr::filter(complete.cases(CEWL_g_m2h_mean, osmolality_mmol_kg_mean))
+
+ggplot(end_vals_CEWL_osml) + 
+  aes(x = osmolality_mmol_kg_mean,
+      y = CEWL_g_m2h_mean,
+      color = tmt,
+      shape = tmt) +
+  geom_point(size = 1.5, 
+             alpha = 0.8) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1, 
+              alpha = 0.9) + 
+  theme_classic() + 
+  xlab(bquote('Osmolality (mmol '*kg^-1*')')) + 
+  ylab(bquote('CEWL (g '*m^-2*' '*h^-1*')')) + 
+  #xlim(300, 400) +
+  #ylim(0, 40) +
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_x_continuous(breaks = c(300, 350, 400, 450)) +
+  scale_y_continuous(breaks = c(20, 30, 40, 50),
+                     limits = c(12,57)) +
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.position = "bottom"
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> exp_end_CEWL_osml_fig
+exp_end_CEWL_osml_fig
+
+# will need to save using figure arrange to make legend centered if I use that fig
+ggsave(filename = "exp_CEWL_osml_fig.pdf",
+       plot = exp_end_CEWL_osml_fig,
+       path = "./results_figures",
+       device = "pdf",
+       dpi = 600,
+       units = "mm",
+       width = 80, height = 90)
+```
+
+
 
 ## Multi-Figures
 

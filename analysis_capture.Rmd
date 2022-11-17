@@ -1302,7 +1302,9 @@ cap_CEWL_clotemp_fig
 ```{r CEWL osml fig}
 ggplot(dat) + 
   aes(x = osmolality_mmol_kg_mean,
-                 y = CEWL_g_m2h_mean) +
+                 y = (CEWL_g_m2h_mean/msmt_VPD_kPa),
+      #color = as.factor(capture_date)
+      ) +
   geom_point(size = 1, 
              alpha = 0.4) + 
   stat_smooth(formula = y ~ x, 
@@ -1315,7 +1317,7 @@ ggplot(dat) +
   xlab(bquote('Osmolality (mmol '*kg^-1*')')) + 
   ylab(bquote('CEWL (g '*m^-2*' '*h^-1*')')) + 
   xlim(300, 400) +
-  ylim(0, 40) +
+  #ylim(0, 40) +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 12),

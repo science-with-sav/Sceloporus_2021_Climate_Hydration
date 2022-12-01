@@ -43,6 +43,7 @@ This data was collected June - August by Master's student Savannah Weaver, advis
 ```{r}
 dat <- read_rds("./data/analysis_data_capture.RDS")
 summary(dat)
+mean(dat$hold_time_hr, na.rm=T)
 ```
 
 
@@ -247,11 +248,11 @@ Everything is almost perfect.
 ### Export
 
 ```{r}
-write.csv(hct_AICc, "./results_statistics/capture_hct_mod_rankings.csv")
-write.csv(broom.mixed::tidy(hct_mod6), 
-          "./results_statistics/capture_hct_best_mod1.csv")
-write.csv(broom.mixed::tidy(hct_mod5), 
-          "./results_statistics/capture_hct_best_mod2.csv")
+#write.csv(hct_AICc, "./results_statistics/capture_hct_mod_rankings.csv")
+#write.csv(broom.mixed::tidy(hct_mod6), 
+ #         "./results_statistics/capture_hct_best_mod1.csv")
+#write.csv(broom.mixed::tidy(hct_mod5), 
+ #         "./results_statistics/capture_hct_best_mod2.csv")
 ```
 
 
@@ -505,11 +506,11 @@ summary(osml_mod7p)
 Save the model output.
 
 ```{r best osml model}
-write.csv(broom.mixed::tidy(osml_mod6p),
-          "./results_statistics/capture_osml_best_model1.csv")
-write.csv(broom.mixed::tidy(osml_mod7p),
-          "./results_statistics/capture_osml_best_model2.csv")
-write.csv(osml_AICc, "./results_statistics/capture_osml_mod_rankings.csv")
+#write.csv(broom.mixed::tidy(osml_mod6p),
+ #         "./results_statistics/capture_osml_best_model1.csv")
+#write.csv(broom.mixed::tidy(osml_mod7p),
+ #         "./results_statistics/capture_osml_best_model2.csv")
+#write.csv(osml_AICc, "./results_statistics/capture_osml_mod_rankings.csv")
 ```
 
 
@@ -924,18 +925,59 @@ summary(CEWL_mod10p)
 Save the best CEWL model output.
 
 ```{r best CEWL model}
-write.csv(broom.mixed::tidy(CEWL_mod9p),
-          "./results_statistics/capture_CEWL_best_model1.csv")
-write.csv(broom.mixed::tidy(CEWL_mod10p),
-          "./results_statistics/capture_CEWL_best_model2.csv")
-write.csv(CEWL_AICc, 
-          "./results_statistics/capture_CEWL_mod_rankings.csv")
+#write.csv(broom.mixed::tidy(CEWL_mod9p),
+ #         "./results_statistics/capture_CEWL_best_model1.csv")
+#write.csv(broom.mixed::tidy(CEWL_mod10p),
+ #         "./results_statistics/capture_CEWL_best_model2.csv")
+#write.csv(CEWL_AICc, 
+ #         "./results_statistics/capture_CEWL_mod_rankings.csv")
 ```
 
 
 To report in paper:
 
 The best model to predict CEWL included plasma osmolality, temperature and VPD at the time of measurement, and VPD and wind at the time of capture. The final model met all linear regression conditions for linearity, normality, and equal error variance, and there was no multicollinearity.
+
+
+
+## Group Model Export
+
+```{r}
+# model rankings
+all_top_mod_ranks <- CEWL_AICc[1:2,] %>%
+  rbind(osml_AICc[1:2,]) %>% 
+  dplyr::rename(LL = "Res.LL") %>%
+  rbind(hct_AICc[1:2,]) %>%
+  mutate(var = c(rep("CEWL", 2), rep("osml", 2), rep("hct", 2)),
+         AICc = round(AICc, digits = 2),
+         Delta_AICc = round(Delta_AICc, digits = 2),
+         ModelLik = round(ModelLik, digits = 2),
+         AICcWt = round(AICcWt, digits = 2),
+         LL = round(LL, digits = 2),
+         Cum.Wt = round(Cum.Wt, digits = 2))
+
+write.csv(all_top_mod_ranks, "./results_statistics/capture_ALL_mod_rankings.csv")
+
+
+# actual models
+hct_SLR_format <- broom.mixed::tidy(hct_mod6) %>%
+  mutate(effect = "fixed",
+         group = NA,
+         df = 120)
+all_top_mods <- broom.mixed::tidy(CEWL_mod10p) %>%
+  rbind(broom.mixed::tidy(osml_mod7p)) %>%
+  rbind(hct_SLR_format) %>%
+  mutate(var = c(rep("CEWL", 8), rep("osml", 6), rep("hct", 4)),
+         estimate = round(estimate, digits = 2),
+         std.error = round(std.error, digits = 2),
+         statistic = round(statistic, digits = 2),
+         df = round(df, digits = 0),
+         p.value = round(p.value, digits = 4))
+
+write.csv(all_top_mods, "./results_statistics/capture_ALL_best_mods.csv")
+```
+
+
 
 
 # Pub Figures

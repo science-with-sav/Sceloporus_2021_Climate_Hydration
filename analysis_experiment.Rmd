@@ -885,7 +885,7 @@ ggplot() +
   scale_y_continuous(breaks = c(seq(8,12)),
                      limits = c(8.5,12.5)) +
   xlab("Day") + 
-  ylab("Body Condition (g)") + 
+  ylab("Body Condition (g')") + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
   geom_vline(xintercept = 9,
              linetype = "dashed",
@@ -900,7 +900,8 @@ ggplot() +
                                  family = "sans", 
                                  size = 12),
         legend.text.align = 0,
-        legend.position = "none"
+        legend.position = "none",
+        plot.margin = margin(t = 6, r = 6, b = 6, l = 10.8, unit = "pt")
 ) -> SMI_fig_min
 SMI_fig_min
 ```
@@ -1005,7 +1006,7 @@ ggplot(data = end_vals_SMI) +
   annotate(geom = "text", x = 4, y = 14.1, label = "10.8", 
            size = 3) +
   
-  ylab("Body Condition (g)") + 
+  ylab("Body Condition (g')") + 
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 12),
@@ -1144,7 +1145,8 @@ ggplot() +
                                  family = "sans", 
                                  size = 12),
         legend.text.align = 0,
-        legend.position = "none"
+        legend.position = "none",
+        plot.margin = margin(t = 6, r = 6, b = 0, l = 10.8, unit = "pt")
         ) -> hct_fig_min
 hct_fig_min
 ```
@@ -1350,7 +1352,8 @@ ggplot() +
                                  family = "sans", 
                                  size = 12),
         legend.text.align = 0,
-        legend.position = "none"
+        legend.position = "none",
+        plot.margin = margin(t = 6, r = 6, b = 0, l = 1, unit = "pt")
         ) -> osml_fig_min
 osml_fig_min
 ```
@@ -1840,9 +1843,9 @@ ggsave(filename = "exp_CEWL_osml_fig.pdf",
 over time:
 
 ```{r arrange figs}
-ggarrange(osml_fig_min, #osml_fig_min, osml_predict_fig,
-          hct_fig_min, #hct_fig_min, hct_predict_fig,
-          SMI_fig_min, #SMI_fig_min, SMI_predict_fig,
+ggarrange(osml_fig_min, 
+          hct_fig_min, 
+          SMI_fig_min,
           ncol = 1, nrow = 3,
           labels = c("A", "B", "C"),
           common.legend = TRUE,
@@ -1869,6 +1872,7 @@ ggarrange(CEWL_end_boxplot,
           SMI_end_boxplot, 
           ncol = 2, nrow = 2,
           labels = c("A", "B", "C", "D"),
+          widths = c(2, 2.045), heights = c(2, 2),
           common.legend = FALSE
           ) -> ending_values_multi_fig
 #ending_values_multi_fig

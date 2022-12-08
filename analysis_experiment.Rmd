@@ -52,13 +52,18 @@ summary(dat)
 
 
 
-## Split
+## Split & Add VPD
 
 Make sub-dataframes without rehab data / with only rehab-related data:
 
 ```{r sub-dfs}
 dat_no_rehab <- dat %>%
-  dplyr::filter(day_n %in% c(seq(0,8)))
+  dplyr::filter(day_n %in% c(seq(0,8))) %>%
+  # add the per tmt group calculation of VPD from analysis_HOBO
+  mutate(VPD_kPa = case_when(tmt == "Hot Dry" ~ 3.82,
+                             tmt == "Hot Humid" ~ 1.07,
+                             tmt == "Cool Dry" ~ 2.50,
+                             tmt == "Cool Humid" ~ 0.64))
 dat_for_rehab <- dat %>%
   dplyr::filter(day_n %in% c(8, 10))
 ```
@@ -104,7 +109,7 @@ dat %>%
 There are slight differences, but overall the starting values across groups are more or less the same.
 
 
-Temp & RH during CEWL measurements:
+Temp & RH during (all, before and after exp) CEWL measurements:
 
 ```{r}
 summary(dat_no_rehab)
@@ -138,11 +143,25 @@ SMI_mod4 <- lme4::lmer(data = dat_no_rehab,
                        SMI ~ day_n + 
                          day_n:humidity_tmt + day_n:temp_tmt +
                          day_n:humidity_tmt:temp_tmt + 
+                         VPD_kPa + 
                          (1|trial_number/individual_ID))
 car::vif(SMI_mod4) # check collinearity 
 summary(SMI_mod4)
 drop1(SMI_mod4)
 ```
+
+drop VPD and compare:
+
+```{r}
+SMI_mod4a <- lme4::lmer(data = dat_no_rehab,
+                       SMI ~ day_n + 
+                         day_n:humidity_tmt + day_n:temp_tmt +
+                         day_n:humidity_tmt:temp_tmt + 
+                         (1|trial_number/individual_ID))
+anova(SMI_mod4, SMI_mod4a)
+```
+
+
 
 This is the best model based on AIC, but we will check dropping the 3-way interaction.
 
@@ -471,6 +490,7 @@ CEWL_mod4 <- lme4::lmer(data = dat_no_rehab_rm,
                          day_n + 
                          day_n:humidity_tmt + day_n:temp_tmt +
                          day_n:humidity_tmt:temp_tmt + 
+                         VPD_kPa + 
                          (1|trial_number/individual_ID))
 summary(CEWL_mod4)
 ```
@@ -479,16 +499,65 @@ summary(CEWL_mod4)
 We can and should drop the random effect of individual ID, since it accounts for zero variation.
 
 ```{r CEWL exp model 4.2}
-CEWL_mod4.2 <- lme4::lmer(data = dat_no_rehab_rm,
+CEWL_mod4.2a <- lme4::lmer(data = dat_no_rehab_rm,
+                       CEWL_g_m2h_mean ~ 
+                         cloacal_temp_C + 
+                         day_n + 
+                         day_n:VPD_kPa + 
+                         day_n:humidity_tmt + day_n:temp_tmt +
+                         day_n:humidity_tmt:temp_tmt + 
+                         
+                         (1|trial_number))
+CEWL_mod4.2b <- lme4::lmer(data = dat_no_rehab_rm,
+                       CEWL_g_m2h_mean ~ 
+                         cloacal_temp_C + 
+                         day_n + 
+                         
+                         day_n:humidity_tmt + day_n:temp_tmt +
+                         day_n:humidity_tmt:temp_tmt + 
+                         day_n:VPD_kPa + 
+                         (1|trial_number))
+#summary(CEWL_mod4.2)
+VPDa <- data.frame(anova(CEWL_mod4.2a)) %>%
+  mutate(model_order = "VPD listed before RH & temp",
+         variable = row.names(.))
+VPDb <- data.frame(anova(CEWL_mod4.2b)) %>%
+  mutate(model_order = "VPD listed after RH & temp",
+         variable = row.names(.)) %>%
+  rbind(VPDa)
+write.csv(VPDb, "./results_statistics/CEWL_VPD_SS_compare.csv")
+#drop1(CEWL_mod4.2)
+#car::vif(CEWL_mod4.2) # check collinearity 
+drop1(CEWL_mod4.2a)
+drop1(CEWL_mod4.2b)
+```
+
+
+VPD_kPa                        1 1052.9  1052.9  36.9580
+cloacal_temp_C                 1 3378.9  3378.9 118.6075
+day_n                          1 1793.2  1793.2  62.9459
+day_n:humidity_tmt             1 1376.9  1376.9  48.3314
+day_n:temp_tmt                 1  383.4   383.4  13.4585
+day_n:humidity_tmt:temp_tmt    1  211.8   211.8   7.4341
+
+
+
+
+yes, drop VPD:
+
+```{r CEWL exp model 4.3}
+CEWL_mod4.3 <- lme4::lmer(data = dat_no_rehab_rm,
                        CEWL_g_m2h_mean ~ cloacal_temp_C + 
                          day_n + 
                          day_n:humidity_tmt + day_n:temp_tmt +
                          day_n:humidity_tmt:temp_tmt + 
                          (1|trial_number))
-summary(CEWL_mod4.2)
-drop1(CEWL_mod4.2)
-car::vif(CEWL_mod4.2) # check collinearity 
+summary(CEWL_mod4.3)
+anova(CEWL_mod4.2, CEWL_mod4.3)
+drop1(CEWL_mod4.3)
+car::vif(CEWL_mod4.3) # check collinearity 
 ```
+
 
 All variables have really big t-values and AIC cannot be improved by dropping anything.
 

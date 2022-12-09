@@ -1,0 +1,1977 @@
+---
+title: "Climate Water Loss Experiment - Treatment Hydration Analysis"
+author: "Savannah Weaver"
+date: "2021"
+output: pdf_document
+toc: TRUE
+---
+
+# Packages
+
+
+```{r setup, include = TRUE, message = FALSE}
+`%nin%` = Negate(`%in%`)
+if (!require("tidyverse")) install.packages("tidyverse")
+library("tidyverse") # workflow and plots
+if (!require("lme4")) install.packages("lme4")
+library("lme4") # for LMMs
+if (!require("lmerTest")) install.packages("lmerTest")
+library("lmerTest") # for p-values
+if (!require("ggpubr")) install.packages("ggpubr")
+library("ggpubr") # for multi-ggplot figs
+if (!require("UsingR")) install.packages("UsingR")
+library("UsingR") # simple.eda model assumption checker
+if (!require("broom.mixed")) install.packages("broom.mixed")
+library("broom.mixed") # lmer model export
+if (!require("car")) install.packages("car")
+library("car") # VIFs
+if (!require("AICcmodavg")) install.packages("AICcmodavg")
+library("AICcmodavg") # model selection
+if (!require("RColorBrewer")) install.packages("RColorBrewer")
+library("RColorBrewer") # color
+```
+
+
+# Background and Goals
+
+This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus then acclimated to 4 different climate treatments. **This R file analyzes the effect of experimental climate treatments on lizard body condition, osmotic balance, and osmoregulation.** Please refer to the published scientific journal article for full details.
+
+
+# Data
+
+## Load
+
+Read-in data that was compiled, formatted, and checked for completeness in 'wrangling_general'. See that file for information related to the variables.
+
+```{r load data}
+dat <- read_rds("./data/analysis_data_experiment.RDS")
+summary(dat)
+```
+
+
+
+
+
+## Split & Add VPD
+
+Make sub-dataframes without rehab data / with only rehab-related data:
+
+```{r sub-dfs}
+dat_no_rehab <- dat %>%
+  dplyr::filter(day_n %in% c(seq(0,8))) %>%
+  # add the per tmt group calculation of VPD from analysis_HOBO
+  mutate(VPD_kPa = case_when(tmt == "Hot Dry" ~ 3.82,
+                             tmt == "Hot Humid" ~ 1.07,
+                             tmt == "Cool Dry" ~ 2.50,
+                             tmt == "Cool Humid" ~ 0.64))
+dat_for_rehab <- dat %>%
+  dplyr::filter(day_n %in% c(8, 10))
+```
+
+
+
+## Check
+
+Dates:
+
+```{r check dates}
+unique(dat$measurement_date)
+```
+
+Number of measurements for each lizard:
+
+```{r check n msmts}
+dat_no_rehab %>%
+  group_by(individual_ID) %>%
+  summarise(n = n()) %>%
+  arrange(n)
+```
+
+
+Every lizard has 6 experimental measurements: pre-tmt, mid-tmt, post-tmt, and mass checks on each of the 3 days between mid and post-tmt.
+
+
+Did any of the treatment groups inherently start out with large differences in response variables?
+
+
+```{r check starting diffs}
+dat %>%
+  dplyr::filter(day_n == 0) %>%
+  group_by(tmt) %>%
+  summarise(mean(mass_g),
+            sd(mass_g),
+            mean(SMI),
+            mean(hematocrit_percent),
+            mean(osmolality_mmol_kg_mean),
+            mean(CEWL_g_m2h_mean))
+```
+
+There are slight differences, but overall the starting values across groups are more or less the same.
+
+
+Temp & RH during (all, before and after exp) CEWL measurements:
+
+```{r}
+summary(dat_no_rehab)
+dat_no_rehab %>%
+  group_by(type) %>%
+  summarise(mean(msmt_temp_C, na.rm = T),
+            sd(msmt_temp_C, na.rm = T),
+            mean(msmt_RH_percent, na.rm = T),
+            sd(msmt_RH_percent, na.rm = T),
+            mean(msmt_VPD_kPa, na.rm = T),
+            mean(msmt_VPD_kPa, na.rm = T))
+```
+
+
+
+
+# Experiment Models
+
+We predicted that there would be effects of day, humidity, and temperature, but we only expect those **interactions with day** to have an effect because we're observing changes over time.
+
+So, each full model will include the following: day_n, day_n:humidity_tmt, day_n:temp_tmt, and day_n:humidity_tmt:temp_tmt. Then I'll test whether dropping any variables will improve the model.
+
+## SMI
+
+### Building
+
+Models are named based on the number of predictors.
+
+```{r SMI exp model 4}
+SMI_mod4 <- lme4::lmer(data = dat_no_rehab,
+                       SMI ~ day_n * (VPD_kPa + humidity_tmt + temp_tmt) +
+                         (1|trial_number/individual_ID))
+#anova(SMI_mod4) # not sure when to use this
+drop1(SMI_mod4)
+```
+
+drop humidity and compare:
+
+```{r}
+SMI_mod3 <- lme4::lmer(data = dat_no_rehab,
+                       SMI ~ day_n * (VPD_kPa + temp_tmt) +
+                         (1|trial_number/individual_ID))
+anova(SMI_mod4, SMI_mod3)
+drop1(SMI_mod3)
+```
+
+
+
+This is the best model based on AIC, but we will check ANOVA comparisons of dropping either VPD or temp, or adding their interaction.
+
+```{r SMI exp models 3a, 2a, 2b}
+SMI_mod3a <- lme4::lmer(data = dat_no_rehab,
+                       SMI ~ day_n * VPD_kPa * temp_tmt +
+                         (1|trial_number/individual_ID))
+anova(SMI_mod3, SMI_mod3a) # 3 better based on AIC & no loss of predictive power without interaction
+
+SMI_mod2a <- lme4::lmer(data = dat_no_rehab,
+                       SMI ~ day_n * temp_tmt +
+                         (1|trial_number/individual_ID))
+anova(SMI_mod3, SMI_mod2a) # 3 better based on AIC & lose pred power without VPD
+
+SMI_mod2b <- lme4::lmer(data = dat_no_rehab,
+                       SMI ~ day_n * VPD_kPa +
+                         (1|trial_number/individual_ID))
+anova(SMI_mod3, SMI_mod2b) # 3 better based on AIC & lose pred power without temp
+```
+
+Model 3 is the best version. The three-way interaction doesn't add anything, and dropping either VPD or temp results in significant loss of power.
+
+
+
+
+### Selection
+
+
+```{r SMI mod compare}
+SMI_models <- list(SMI_mod4, SMI_mod3, SMI_mod3a, SMI_mod2a, SMI_mod2b)
+
+EXP_mod_names <- data.frame(predictors = 
+                 c('Day * (VPD + Humidity + Temp)', #4
+                   'Day * (VPD + Temp)', #3
+                   'Day * (VPD * Temp)', #3b
+                   'Day * Temp', #2a
+                   'Day * VPD' #2b
+                   ))
+rownames(EXP_mod_names) <- c('4', '3', '3a', '2a', '2b')
+#calculate AIC of each model
+SMI_AICc <- data.frame(aictab(cand.set = SMI_models, 
+                                 modnames = EXP_mod_names)) %>%
+  mutate(response = "Body Condition (g')")
+SMI_AICc
+```
+
+The Day * (VPD + Temp) is the best model.
+
+
+### Assumptions
+
+Check linear regression assumptions/conditions:
+
+```{r SMI exp model assumptions}
+plot(SMI_mod3)
+simple.eda(residuals(SMI_mod3))
+shapiro.test(residuals(SMI_mod3))
+hist(dat_no_rehab$SMI)
+```
+
+Equal error variance and linearity look fantastic. Normality of the residuals is pretty bad, but with our large sample size that should not effect results, and the SMI variable is perfectly evenly distributed, so it should be fine. 
+
+
+### Save
+
+Save best model stats with p-values:
+
+```{r best SMI exp model}
+SMI_mod_best1 <- lmerTest::lmer(data = dat_no_rehab, 
+                                SMI ~ day_n * (VPD_kPa + temp_tmt) +
+                                 (1|trial_number/individual_ID))
+summary(SMI_mod_best1)
+SMI_stats <- broom.mixed::tidy(SMI_mod_best1) %>%
+  mutate(response = "Body Condition (g')")
+SMI_SS <- data.frame(anova(SMI_mod3)) %>%
+  mutate(variable = row.names(.),
+         response = "Body Condition (g')")
+```
+
+
+
+## Hematocrit
+
+### Building
+
+
+```{r hct exp model 4}
+hct_mod4 <- lme4::lmer(data = dat_no_rehab,
+               hematocrit_percent ~ day_n * (VPD_kPa + humidity_tmt + temp_tmt) +
+                         (1|trial_number/individual_ID))
+drop1(hct_mod4)
+```
+
+Try dropping either humidity or VPD:
+
+```{r hct exp model 3a}
+hct_mod3a <- lme4::lmer(data = dat_no_rehab,
+                       hematocrit_percent ~ day_n * (VPD_kPa + temp_tmt) +
+                         (1|trial_number/individual_ID))
+hct_mod3b <- lme4::lmer(data = dat_no_rehab,
+                       hematocrit_percent ~ day_n * (humidity_tmt + temp_tmt) +
+                         (1|trial_number/individual_ID))
+
+# compare
+anova(hct_mod4, hct_mod3a)
+anova(hct_mod4, hct_mod3b)
+anova(hct_mod3a, hct_mod3b)
+```
+
+Dropping either VPD or humidity significantly improves the model without losing predictive power, but there isn't a difference between *which* one to drop.
+
+Test next drops for each of them:
+
+```{r}
+drop1(hct_mod3a)
+drop1(hct_mod3b)
+```
+
+
+Each now suggests dropping the other... So both models indicate that a model with only temperature is best.
+
+```{r}
+hct_mod2 <- lme4::lmer(data = dat_no_rehab,
+                       hematocrit_percent ~ day_n * temp_tmt +
+                         (1|trial_number/individual_ID))
+drop1(hct_mod2)
+anova(hct_mod2, hct_mod3a)
+anova(hct_mod2, hct_mod3b)
+```
+
+The only-temperature model is definitely best.
+
+
+
+### Selection
+
+
+```{r hct mod compare}
+hct_models <- list(hct_mod4, hct_mod3a, hct_mod3b, hct_mod2)
+
+EXP_mod_names1 <- data.frame(predictors = 
+                 c('Day * (VPD + Humidity + Temp)', #4
+                   'Day * (VPD + Temp)', #3a
+                   'Day * (Humidity + Temp)', #3b
+                   'Day* Temp' #2
+                   ))
+rownames(EXP_mod_names1) <- c('4', '3a', '3b', '2')
+#calculate AIC of each model
+hct_AICc <- data.frame(aictab(cand.set = hct_models, 
+                                 modnames = EXP_mod_names1)) %>%
+  mutate(response = "Hematocrit (%)")
+hct_AICc
+```
+
+Model 2 with only predictors Day*Temp is the best by a good margin.
+
+
+### Assumptions
+
+Check linear regression assumptions/conditions:
+
+```{r hct exp model assumptions}
+plot(hct_mod2)
+simple.eda(residuals(hct_mod2))
+shapiro.test(residuals(hct_mod2))
+```
+
+All assumptions are satisfied (and beautiful). 
+
+
+
+### Save
+
+Save best model stats (2) with p-values:
+
+```{r best hct exp model}
+hct_mod_best1 <- lmerTest::lmer(data = dat_no_rehab,
+                        hematocrit_percent ~ day_n * temp_tmt +
+                         (1|trial_number/individual_ID))
+summary(hct_mod_best1)
+hct_stats <- broom.mixed::tidy(hct_mod_best1) %>%
+  mutate(response = "Hematocrit (%)")
+hct_SS <- data.frame(anova(hct_mod2)) %>%
+  mutate(variable = row.names(.),
+         response = "Hematocrit (%)")
+```
+
+
+
+
+
+
+
+## Osmolality
+
+
+### Building
+
+
+```{r osml exp model 4}
+osml_mod4 <- lme4::lmer(data = dat_no_rehab,
+                       osmolality_mmol_kg_mean ~ 
+                         day_n * (VPD_kPa + humidity_tmt + temp_tmt) +
+                         (1|trial_number/individual_ID))
+drop1(osml_mod4)
+```
+
+Try dropping either humidity or VPD:
+
+```{r osml exp model 3}
+osml_mod3a <- lme4::lmer(data = dat_no_rehab,
+                       osmolality_mmol_kg_mean ~ 
+                         day_n * (VPD_kPa + temp_tmt) +
+                         (1|trial_number/individual_ID))
+osml_mod3b <- lme4::lmer(data = dat_no_rehab,
+                       osmolality_mmol_kg_mean ~ 
+                         day_n * (humidity_tmt + temp_tmt) +
+                         (1|trial_number/individual_ID))
+
+# compare
+anova(osml_mod4, osml_mod3a)
+anova(osml_mod4, osml_mod3b)
+anova(osml_mod3b, osml_mod3a)
+```
+
+Mods 3b and 3a are each better than mod 4, but they are equal to each other...
+
+Test next drops for each of them:
+
+```{r}
+drop1(osml_mod3a)
+drop1(osml_mod3b)
+```
+
+
+The VPD model suggests dropping temp, but the humidity model suggests dropping humidity. Try each... 
+
+```{r}
+osml_mod2 <- lme4::lmer(data = dat_no_rehab,
+                       osmolality_mmol_kg_mean ~ day_n * temp_tmt +
+                         (1|trial_number/individual_ID))
+osml_mod2a <- lme4::lmer(data = dat_no_rehab,
+                       osmolality_mmol_kg_mean ~ day_n * VPD_kPa +
+                         (1|trial_number/individual_ID))
+osml_mod2b <- lme4::lmer(data = dat_no_rehab,
+                       osmolality_mmol_kg_mean ~ day_n * humidity_tmt +
+                         (1|trial_number/individual_ID))
+drop1(osml_mod2)
+drop1(osml_mod2a)
+drop1(osml_mod2b)
+```
+
+Okay, also test the day-only model... 
+
+```{r osml exp model 1}
+osml_mod1 <- lme4::lmer(data = dat_no_rehab,
+                       osmolality_mmol_kg_mean ~ 
+                         day_n + 
+                         (1|trial_number/individual_ID))
+```
+
+
+
+### Selection
+
+
+```{r osml mod compare}
+osml_models <- list(osml_mod4, osml_mod3a, osml_mod3b, 
+                    osml_mod2, osml_mod2a, osml_mod2b,
+                    osml_mod1)
+
+EXP_mod_names2 <- data.frame(predictors = 
+                 c('Day * (VPD + Humid + Temp)', #4
+                   'Day * (VPD + Temp)', #3a
+                   'Day * (Humid + Temp)', #3b
+                   'Day * Temp', #2
+                   'Day * VPD', #2a
+                   'Day * Humid', #2b
+                   'Day' # day only
+                   ))
+rownames(EXP_mod_names2) <- c('4', '3a', '3b', '2', '2a', '2b', '1')
+#calculate AIC of each model
+osml_AICc <- data.frame(aictab(cand.set = osml_models, 
+                                 modnames = EXP_mod_names2)) %>%
+  mutate(response = "Plasma Osmolality (mmol/kg)")
+osml_AICc
+```
+
+
+Surprisingly, the full model is the best by far.
+
+
+### Assumptions
+
+Check linear regression assumptions/conditions:
+
+```{r osml exp model assumptions}
+plot(osml_mod4)
+simple.eda(residuals(osml_mod4))
+shapiro.test(residuals(osml_mod4))
+hist(dat_no_rehab$osmolality_mmol_kg_mean)
+```
+
+All assumptions are OKAY. Normality of the residuals is statistically, but not necessarily visually, violated. Osmolality values are slightly skewed to the right, but not enough to transform the variable.
+
+
+
+### Save
+
+Save best model stats with p-values:
+
+```{r best osml exp models}
+osml_mod_best1 <- lmerTest::lmer(data = dat_no_rehab,
+                        osmolality_mmol_kg_mean ~ 
+                          day_n * (VPD_kPa + humidity_tmt + temp_tmt) +
+                         (1|trial_number/individual_ID))
+summary(osml_mod_best1)
+#anova(osml_mod_best1) # gives type 3, not what we want
+anova(osml_mod4)
+osml_stats <- broom.mixed::tidy(osml_mod_best1) %>%
+  mutate(response = "Plasma Osmolality (mmol/kg)")
+osml_SS <- data.frame(anova(osml_mod4)) %>%
+  mutate(variable = row.names(.),
+         response = "Plasma Osmolality (mmol/kg)")
+```
+
+
+
+
+
+
+## CEWL *HELP*
+
+First, get a df that only has complete observations that include CEWL values (only obs from before and after the experiment). Then, I will also calculate the CHANGE in CEWL from before to after the experiment. Because we only measured CEWL at those two time points, it makes more sense to assess the **amount of change** in CEWL for each lizard, rather than measuring the change over time.
+
+```{r}
+start_CEWL <- dat_no_rehab %>%
+  dplyr::filter(day_n == 0) %>%
+  dplyr::select(individual_ID, start_CEWL = CEWL_g_m2h_mean)
+dat_no_rehab_rm <- dat_no_rehab %>%
+  dplyr::filter(complete.cases(CEWL_g_m2h_mean)) %>%
+  left_join(start_CEWL, by = 'individual_ID') %>%
+  dplyr::filter(day_n == 8) %>%
+  mutate(delta_CEWL = CEWL_g_m2h_mean - start_CEWL)
+histogram(dat_no_rehab_rm$delta_CEWL, type = "count")
+ggplot(dat_no_rehab) + 
+  geom_point(aes(x = CEWL_g_m2h_mean,
+                 y = cloacal_temp_C))
+```
+
+
+### Building
+
+I can no longer include body temp (doesn't make sense to...), so should I relativize CEWL by temp before this model?
+
+Also, doesn't work to use any interaction effects to test that... rank deficient even if I only try to use one interaction.
+
+ *need to switch approach*
+
+
+```{r CEWL exp model 3}
+CEWL_mod3 <- lme4::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ VPD_kPa + humidity_tmt + temp_tmt +
+                         (1|trial_number))
+summary(CEWL_mod3)
+drop1(CEWL_mod3)
+vif(CEWL_mod3)
+```
+
+drop humidity:
+
+```{r CEWL exp model 2}
+CEWL_mod2 <- lme4::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ humidity_tmt + temp_tmt +
+                         (1|trial_number))
+summary(CEWL_mod2)
+drop1(CEWL_mod2)
+```
+
+compare:
+
+```{r}
+anova(CEWL_mod2, CEWL_mod3)
+```
+
+The models are equally good, and we don't lose any predictive power without humidity. I'll present the full model.
+
+
+try each 1-variable model:
+
+```{r}
+CEWL_mod1a <- lme4::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ VPD_kPa + 
+                         (1|trial_number))
+summary(CEWL_mod1a)
+CEWL_mod1b <- lme4::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ humidity_tmt + 
+                         (1|trial_number))
+summary(CEWL_mod1b)
+CEWL_mod1c <- lme4::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ temp_tmt +
+                         (1|trial_number))
+summary(CEWL_mod1c)
+anova(CEWL_mod1a, CEWL_mod1b) # b better than a
+anova(CEWL_mod1a, CEWL_mod1c) # a better than c
+anova(CEWL_mod1b, CEWL_mod1c) # b better than c
+```
+
+
+
+### Assumptions
+
+Check linear regression assumptions/conditions:
+
+```{r CEWL exp model assumptions}
+plot(CEWL_mod3)
+simple.eda(residuals(CEWL_mod3))
+shapiro.test(residuals(CEWL_mod3))
+hist(dat_no_rehab_rm$delta_CEWL)
+```
+
+all assumptions good or OKAY enough.
+
+
+
+### Save
+
+Save best model stats with p-values:
+
+```{r best CEWL exp model}
+CEWL_mod_best <- lmerTest::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ VPD_kPa + humidity_tmt + temp_tmt +
+                         (1|trial_number))
+summary(CEWL_mod_best)
+
+CEWL_stats <- broom.mixed::tidy(CEWL_mod_best) %>%
+  mutate(response = "CEWL (g/m2h)")
+CEWL_SS <- data.frame(anova(CEWL_mod3)) %>%
+  mutate(variable = row.names(.),
+         response = "delta-CEWL (g/m2h)")
+```
+
+
+
+## Group Export
+
+Put all the best models, SS values, and AICc rankings into one csv each
+
+```{r export exp stats}
+# continuous mods
+experiment_stats <- osml_stats %>%
+  rbind(hct_stats) %>%
+  rbind(SMI_stats) %>%
+  dplyr::select(response, predictor = term, group, estimate,
+                std.error, statistic, df, p.value)
+write.csv(experiment_stats, 
+          "./results_statistics/exp_models_BEST.csv")
+
+# continuous mod ranks
+AICc_ranks <- osml_AICc %>%
+  rbind(hct_AICc) %>%
+  rbind(SMI_AICc) %>%
+  dplyr::select(response, predictors, K, AICc, Delta_AICc, 
+                ModelLik, AICcWt, Res.LL, Cum.Wt)
+write.csv(AICc_ranks, "./results_statistics/exp_model_rankings.csv")
+
+# CEWL mod
+write.csv(CEWL_stats, 
+          "./results_statistics/exp_models_deltaCEWL.csv")
+
+# SS values for all
+exp_SS <- CEWL_SS %>%
+  rbind(osml_SS) %>%
+  rbind(hct_SS) %>%
+  rbind(SMI_SS) %>%
+  dplyr::select(response, predictor = variable, Sum.Sq, Mean.Sq, F.value)
+write.csv(exp_SS, "./results_statistics/exp_model_SS_values.csv")
+```
+
+
+
+
+
+# Effect Estimates (from coefficients)
+
+I want to know what the change in the response variables was per day for each treatment group, on average.
+
+So, first make a matrix expressing the 4 treatment groups with 0s (is not) and 1s (it is). For example, if the baseline states (1s) express Cool and Dry, then hot-dry would have a 0 for temperature and 1 for humidity.
+
+```{r}
+tmt_matrix <- data.frame(tmt = c("Hot Humid", "Hot Dry", 
+                                 "Cool Humid", "Cool Dry"),
+                         temp_state = c(0,0,1,1),
+                         humid_state = c(0,1,0,1),
+                         VPD = c(1.07, 3.82, 0.64, 2.50))
+
+tmt_matrix
+```
+
+
+## Osmolality
+
+```{r}
+# get coefficients
+osml_day_n <- experiment_stats %>% 
+  dplyr::filter(response == "Plasma Osmolality (mmol/kg)") %>% 
+  dplyr::filter(substr(predictor, 1, 5) == "day_n") %>%
+  dplyr::select(predictor, estimate)
+
+# calculate slopes per tmt
+osml_per_day <- tmt_matrix %>%
+  mutate(osml_per_day = 0.08397487 + # day_n
+           0.37090731	* VPD +
+           0.08625962	* humid_state +
+           (-0.96737050) * temp_state) %>%
+  dplyr::select(tmt, osml_per_day)
+```
+
+
+## Hematocrit
+
+```{r}
+# get coefficients
+hct_day_n <- experiment_stats %>% 
+  dplyr::filter(response == "Hematocrit (%)") %>% 
+  dplyr::filter(substr(predictor, 1, 5) == "day_n") %>%
+  dplyr::select(predictor, estimate)
+
+# calculate slopes per tmt
+hct_per_day <- tmt_matrix %>%
+  mutate(hct_per_day = (-1.4520009) + # day_n
+           0.2971501 * temp_state) %>%
+  dplyr::select(tmt, hct_per_day)
+```
+
+
+## SMI
+
+```{r}
+# get coefficients
+SMI_day_n <- experiment_stats %>% 
+  dplyr::filter(response == "Body Condition (g')") %>% 
+  dplyr::filter(substr(predictor, 1, 5) == "day_n") %>%
+  dplyr::select(predictor, estimate)
+
+# calculate slopes per tmt
+SMI_per_day <- tmt_matrix %>%
+  mutate(SMI_per_day = (-0.21557043) + # day_n
+           (-0.02250005) * VPD + 
+           0.11057532	 * temp_state) %>%
+  dplyr::select(tmt, SMI_per_day)
+```
+
+```{r}
+response_per_day <- osml_per_day %>%
+  left_join(hct_per_day, by = 'tmt') %>%
+  left_join(SMI_per_day, by = 'tmt')
+write.csv(response_per_day, "./results_statistics/exp_change_per_day.csv")
+```
+
+
+
+
+
+
+
+
+# Rehydration Models
+
+**I assume I will need to redo with ∆values, rather than raw**
+
+
+## SMI
+
+
+```{r best SMI rehydration models}
+SMI_rmod_best1 <- lmerTest::lmer(data = dat_for_rehab,
+                       SMI ~  type + 
+                         (1|trial_number/individual_ID))
+summary(SMI_rmod_best1)
+```
+
+
+
+## Hematocrit
+
+
+
+```{r best hct rehydration models}
+hct_rmod_best1 <- lmerTest::lmer(data = dat_for_rehab,
+                       hematocrit_percent ~ 
+                         type + 
+                         (1|trial_number/individual_ID))
+summary(hct_rmod_best1)
+```
+
+
+
+
+## Osmolality
+
+
+
+```{r best osml rehydration model}
+osml_rmod_best1 <- lmerTest::lmer(data = dat_for_rehab,
+                       osmolality_mmol_kg_mean ~
+                         type + 
+                         (1|trial_number/individual_ID))
+summary(osml_rmod_best1)
+```
+
+
+
+## Group Export
+
+
+```{r best rehydration models all vars}
+rehydration_stats <- broom.mixed::tidy(osml_rmod_best1) %>%
+  rbind(broom.mixed::tidy(hct_rmod_best1)) %>%
+  rbind(broom.mixed::tidy(SMI_rmod_best1)) %>%
+  mutate(response = c(rep("Plasma Osmolality (mmol/kg)", 5),
+                      rep("Hematocrit (%)", 5),
+                      rep("Body Condition (g)", 5)))
+write.csv(rehydration_stats, 
+          "./results_statistics/rehydration_best_models.csv")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Figures
+
+## Means to Overlay
+
+mean values per day per tmt group:
+
+```{r means}
+means <- dat %>% # use whole dat because want for both exp and rehyd
+  group_by(day_n, tmt) %>%
+  summarise(n_lizards = n(),
+            mean_CEWL = mean(CEWL_g_m2h_mean, na.rm = T),
+            sd_CEWL = sd(CEWL_g_m2h_mean, na.rm = T),
+            mean_osml = mean(osmolality_mmol_kg_mean, na.rm = T),
+            sd_osml = sd(osmolality_mmol_kg_mean, na.rm = T),
+            mean_hct = mean(hematocrit_percent, na.rm = T),
+            sd_hct = sd(hematocrit_percent, na.rm = T),
+            mean_SMI = mean(SMI, na.rm = T),
+            sd_SMI = sd(SMI, na.rm = T)) %>%
+  mutate(se_CEWL = (sd_CEWL/sqrt(n_lizards)),
+         se_osml = (sd_osml/sqrt(n_lizards)),
+         se_hct = (sd_hct/sqrt(n_lizards)),
+         se_SMI = (sd_SMI/sqrt(n_lizards)))
+means$mean_CEWL[is.nan(means$mean_CEWL)] <- NA
+means$mean_osml[is.nan(means$mean_osml)] <- NA
+means$mean_hct[is.nan(means$mean_hct)] <- NA
+means$mean_SMI[is.nan(means$mean_SMI)] <- NA
+means
+
+# make only for days 0,8,10 for points to plot
+pt_means <- means %>%
+  dplyr::filter(day_n %in% c(0,4,8,10))
+
+end_means <- means %>%
+  dplyr::filter(day_n == 8)
+write.csv(end_means, "./results_statistics/exp_end_means.csv")
+```
+
+
+## SMI 
+
+### Ind + Means
+
+```{r SMI actual fig}
+ggplot() + 
+  geom_line(data = dat,
+            aes(x = day_n,
+                y = SMI, 
+                color = tmt,
+                group = individual_ID),
+            alpha = 0.2) +
+  geom_line(data = means,
+            aes(x = day_n,
+                y = mean_SMI, 
+                color = tmt,
+                group = tmt),
+            alpha = 1, 
+            size = 1) +
+  geom_point(data = pt_means,
+            aes(x = day_n,
+                y = mean_SMI, 
+                color = tmt,
+                shape = tmt),
+            alpha = 1, 
+            size = 5) +
+  geom_vline(xintercept = 9,
+             linetype = "dashed",
+             color = "darkgrey") +
+  theme_classic() + 
+  scale_shape_manual(values = c(15:18), name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_color_brewer(palette = "Set2", name = "") +
+  xlab("Day") + 
+  ylab("Body Condition (g)") + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = unit(c(0.1, #top
+                             0.1, #right
+                             0.1, #bottom
+                             0.41 #left
+                             ), "cm")) -> SMI_fig
+SMI_fig
+#ggsave(filename = "SMI_fig1.jpeg",
+ #      plot = SMI_fig,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 6, height = 6)
+```
+
+### Means Only
+
+```{r SMI actual-min fig}
+ggplot() + 
+  #plot these first so they end up on the "bottom"
+  geom_smooth(data = dat_no_rehab,
+                  aes(x = day_n,
+                y = SMI, 
+                color = tmt,
+                group = tmt),
+              method = "lm",
+              se = F,
+              size = 0.7) +
+  geom_errorbar(data = means,
+                  aes(x = day_n,
+                y = mean_SMI, 
+                color = tmt,
+                group = tmt,
+                ymin = mean_SMI-se_SMI, 
+                ymax = mean_SMI+se_SMI),
+                width = .1,
+                #position=position_dodge(.01),
+                alpha = 0.7) +
+  #geom_line(data = means,
+   #         aes(x = day_n,
+    #            y = mean_SMI, 
+     #           color = tmt,
+      #          #linetype = tmt,
+       #         group = tmt),
+        #    alpha = 1, 
+         #   size = 0.5) +
+  geom_point(data = means,
+            aes(x = day_n,
+                y = mean_SMI, 
+                color = tmt,
+                #fill = tmt,
+                shape = tmt),
+            fill = "white",
+            alpha = 1, 
+            size = 3) +
+  
+  theme_classic() + 
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  #scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
+   #                     name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_y_continuous(breaks = c(seq(8,12)),
+                     labels = c(seq(8,12))) +
+  xlab("Day") + 
+  ylab("Body Condition (g')") + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  geom_vline(xintercept = 9,
+             linetype = "dashed",
+             color = "darkgrey") +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 12),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = margin(t = 6, r = 6, b = 6, l = 10.8, unit = "pt")
+) -> SMI_fig_min
+SMI_fig_min
+```
+
+
+
+### LM + SE
+
+```{r mass prez version}
+ggplot() + 
+  geom_smooth(data = dat_no_rehab,
+              aes(x = day_n,
+                  y = mass_g, 
+                  color = tmt,
+                  group = tmt),
+              formula = y ~ x, 
+              method = "lm", 
+              se = T, 
+              size = 1.2, 
+              alpha = 0.2) + 
+  theme_classic() + 
+  #scale_shape_manual(values = c(15:18), name = "") +
+  scale_x_continuous(limits = c(0,8),
+                     breaks = c(0, 2, 4, 6, 8)) +
+  scale_color_brewer(palette = "Set2", name = "") +
+  xlab("Acclimation Day") + 
+  ylab("Lizard Mass (g)") + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none"
+) -> SMI_lm_fig
+SMI_lm_fig
+```
+
+
+### Ending Values Boxplot
+
+```{r SMI ending vals}
+end_vals_SMI <- dat %>%
+  dplyr::filter(day_n == 8) %>%
+  dplyr::filter(complete.cases(SMI))
+
+SMI_aov <- summary(aov(data = end_vals_SMI, 
+             SMI ~ temp_tmt * humidity_tmt))
+SMI_tukey <- TukeyHSD(aov(data = end_vals_SMI, 
+             SMI ~ temp_tmt * humidity_tmt))
+
+ggplot(data = end_vals_SMI) +
+  geom_boxplot(aes(x = tmt,
+                   y = SMI, 
+                   color = tmt), 
+               size = 0.5,
+               outlier.shape = NA) + 
+  geom_jitter(aes(x = tmt,
+                   y = SMI, 
+                   color = tmt,
+                 fill = tmt,
+                 shape = tmt), 
+              #fill = "white",
+               size = 1,
+              alpha = 0.4,
+              position = position_jitter(height = 0, width = 0.2)) +
+  geom_point(data = end_means, 
+             aes(x = tmt,
+                   y = mean_SMI, 
+                   color = tmt,
+                 fill = tmt), 
+               size = 3,
+             shape = 23) +
+  theme_classic() + 
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_y_continuous(limits = c(7,15),
+                     breaks = c(seq(7,15, by = 2)),
+                     labels = c(seq(7,15, by = 2))) +
+  xlab("") + 
+  
+  annotate(geom = "text", x = 1, y = 12.7, label = "A", 
+           size = 3) +
+  annotate(geom = "text", x = 1, y = 12.2, label = "9.4", 
+           size = 3) +
+  annotate(geom = "text", x = 2, y = 14.2, label = "A", 
+           size = 3) +
+  annotate(geom = "text", x = 2, y = 13.7, label = "9.7", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 14.8, label = "B", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 14.3, label = "10.6", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 14.6, label = "B", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 14.1, label = "10.8", 
+           size = 3) +
+  
+  ylab("Body Condition (g')") + 
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        #axis.text.x = element_blank(),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 12),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = unit(c(0, #top
+                              0, #right
+                              0, #bottom
+                              3.4), "mm")
+        ) -> SMI_end_boxplot
+SMI_end_boxplot
+```
+
+
+
+
+
+## Hct 
+
+### Ind + Means
+
+```{r hct actual fig}
+ggplot() +
+  geom_line(data = dat[complete.cases(dat$hematocrit_percent),],
+            aes(x = day_n,
+                y = hematocrit_percent, 
+                color = tmt,
+                group = individual_ID),
+            alpha = 0.2) +
+  geom_line(data = means[complete.cases(means$mean_hct),],
+            aes(x = day_n,
+                y = mean_hct, 
+                color = tmt,
+                group = tmt),
+            alpha = 1, 
+            size = 1) +
+  geom_point(data = pt_means,
+            aes(x = day_n,
+                y = mean_hct, 
+                color = tmt,
+                shape = tmt),
+            alpha = 1, 
+            size = 5) +
+  geom_vline(xintercept = 9,
+             linetype = "dashed",
+             color = "darkgrey") +
+  theme_classic() + 
+  scale_shape_manual(values = c(15:18), name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_color_brewer(palette = "Set2", name = "") +
+  xlab("") + 
+  ylab("Hematocrit (%)") + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = unit(c(0.1, #top
+                             0.1, #right
+                             0.1, #bottom
+                             0.41 #left
+                             ), "cm")
+        ) -> hct_fig
+hct_fig
+```
+
+
+
+### Means Only
+
+```{r hct actual-minimal fig}
+ggplot() +
+  geom_smooth(data = dat_no_rehab[complete.cases(dat_no_rehab$hematocrit_percent),],
+                  aes(x = day_n,
+                y = hematocrit_percent, 
+                color = tmt,
+                group = tmt),
+              method = "lm",
+              se = F,
+              size = 0.7) +
+  geom_errorbar(data = means[complete.cases(means$mean_hct),],
+                  aes(x = day_n,
+                y = mean_hct, 
+                color = tmt,
+                group = tmt,
+                ymin = mean_hct-se_hct, 
+                ymax = mean_hct+se_hct),
+                width = .1,
+                #position=position_dodge(.1),
+                alpha = 0.7) +
+  #geom_line(data = means[complete.cases(means$mean_hct),],
+   #         aes(x = day_n,
+    #            y = mean_hct, 
+     #           color = tmt,
+      #          #linetype = tmt,
+       #         group = tmt),
+        #    alpha = 1, 
+         #   size = 0.5) +
+  geom_point(data = pt_means,
+            aes(x = day_n,
+                y = mean_hct, 
+                color = tmt,
+                #fill = tmt,
+                shape = tmt),
+            alpha = 1, 
+            fill = "white",
+            size = 3) +
+  theme_classic() + 
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  #scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
+   #                     name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_y_continuous(breaks = c(25, 30, 35, 40),
+                     labels = c(25, 30, 35, 40),) +
+  xlab("") + 
+  ylab("Hematocrit (%)") + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  geom_vline(xintercept = 9,
+             linetype = "dashed",
+             color = "darkgrey") +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 12),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = margin(t = 6, r = 6, b = 0, l = 10.8, unit = "pt")
+        ) -> hct_fig_min
+hct_fig_min
+```
+
+
+
+### Ending Values Boxplot
+
+
+```{r hct ending vals}
+end_vals_hct <- dat %>%
+  dplyr::filter(day_n == 8) %>%
+  dplyr::filter(complete.cases(hematocrit_percent))
+
+hct_aov <- summary(aov(data = end_vals_hct, 
+             hematocrit_percent ~ temp_tmt * humidity_tmt))
+hct_tukey <- TukeyHSD(aov(data = end_vals_hct, 
+             hematocrit_percent ~ temp_tmt * humidity_tmt))
+
+ggplot(data = end_vals_hct) +
+  geom_boxplot(aes(x = tmt,
+                   y = hematocrit_percent, 
+                   color = tmt), 
+               size = 0.5,
+               outlier.shape = NA) + 
+  geom_jitter(aes(x = tmt,
+                   y = hematocrit_percent, 
+                   color = tmt,
+                 fill = tmt,
+                 shape = tmt), 
+               size = 1,
+              alpha = 0.4,
+              position = position_jitter(height = 0, width = 0.2)) +
+  geom_point(data = end_means, 
+             aes(x = tmt,
+                   y = mean_hct, 
+                   color = tmt,
+                 fill = tmt), 
+               size = 3,
+             shape = 23) +
+  theme_classic() + 
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
+  xlab("") + 
+  scale_y_continuous(limits = c(10,55),
+                     breaks = c(seq(10,50, by = 10)),
+                     labels = c(seq(10,50, by = 10))) +
+  
+  annotate(geom = "text", x = 1, y = 47.6, label = "AB", 
+           size = 3) +
+  annotate(geom = "text", x = 1, y = 45, label = "28", 
+           size = 3) +
+  annotate(geom = "text", x = 2, y = 44.6, label = "A", 
+           size = 3) +
+  annotate(geom = "text", x = 2, y = 42, label = "26", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 54.6, label = "B", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 52, label = "30", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 54.6, label = "B", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 52, label = "30", 
+           size = 3) +
+  
+  ylab("Hematocrit (%)") + 
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 12),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = unit(c(0, #top
+                              0, #right
+                              0, #bottom
+                              2.24), "mm")
+        ) -> hct_end_boxplot
+hct_end_boxplot
+```
+
+
+
+
+## Osml 
+
+### Ind + Means
+
+
+```{r osmolality actual fig}
+ggplot() + 
+  geom_line(data = dat[complete.cases(dat$osmolality_mmol_kg_mean),],
+            aes(x = day_n,
+                y = osmolality_mmol_kg_mean, 
+                color = tmt,
+                group = individual_ID),
+            alpha = 0.2) +
+  geom_line(data = means[complete.cases(means$mean_osml),],
+            aes(x = day_n,
+                y = mean_osml, 
+                color = tmt,
+                group = tmt),
+            alpha = 1, 
+            size = 1) +
+  geom_point(data = pt_means,
+            aes(x = day_n,
+                y = mean_osml, 
+                color = tmt,
+                shape = tmt),
+            alpha = 1, 
+            size = 5) +
+  geom_vline(xintercept = 9,
+             linetype = "dashed",
+             color = "darkgrey") +
+  scale_shape_manual(values = c(15:18), name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  ylim(300,450) +
+  scale_color_brewer(palette = "Set2", name = "") +
+  xlab("") + 
+  ylab("Plasma Osmolality (mmol/kg)") + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme_classic() +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = unit(c(0.6, #top
+                             0.1, #right
+                             0.1, #bottom
+                             0.1 #left
+                             ), "cm")
+        ) -> osml_fig
+osml_fig
+```
+
+
+### Means Only
+
+
+```{r osmolality actual-minimal fig}
+ggplot() + 
+  geom_smooth(data = dat_no_rehab[complete.cases(dat_no_rehab$osmolality_mmol_kg_mean),],
+                  aes(x = day_n,
+                y = osmolality_mmol_kg_mean, 
+                color = tmt,
+                group = tmt),
+              method = "lm",
+              se = F,
+              size = 0.7) +
+  geom_errorbar(data = means,
+                  aes(x = day_n,
+                y = mean_osml, 
+                color = tmt,
+                group = tmt,
+                ymin = mean_osml-se_osml, 
+                ymax = mean_osml+se_osml),
+                width = .1,
+                #position=position_dodge(.1),
+                alpha = 0.7) +
+  #geom_line(data = means[complete.cases(means$mean_osml),],
+   #         aes(x = day_n,
+    #            y = mean_osml, 
+     #           color = tmt,
+      #          #linetype = tmt,
+       #         group = tmt),
+        #    alpha = 1, 
+         #   size = 0.5) +
+  geom_point(data = pt_means,
+            aes(x = day_n,
+                y = mean_osml, 
+                color = tmt,
+                #fill = tmt,
+                shape = tmt),
+            fill = "white",
+            alpha = 1, 
+            size = 3) +
+  theme_classic() + 
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  #scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
+   #                     name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_y_continuous(breaks = c(seq(320,400, by = 10)),
+                     labels = c(seq(320,400, by = 10))) +
+  xlab("") + 
+  ylab(bquote('Osmolality (mmol '*kg^-1*')')) + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  geom_vline(xintercept = 9,
+             linetype = "dashed",
+             color = "darkgrey") +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 12),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = margin(t = 6, r = 6, b = 0, l = 1, unit = "pt")
+        ) -> osml_fig_min
+osml_fig_min
+```
+
+
+### Stats! Check Pairwise Diffs ~ Time
+
+Since Plasma osmolality has such a nonlinear trend, we need to test whether the elevated values in the middle of the experiment are significantly different than the values taken before and/or after.
+
+```{r}
+# first make sub-dfs for each tmt group
+HH <- dat_no_rehab %>%
+  dplyr::filter(tmt == "Hot Humid")
+HD <- dat_no_rehab %>%
+  dplyr::filter(tmt == "Hot Dry")
+CH <- dat_no_rehab %>%
+  dplyr::filter(tmt == "Cool Humid")
+CD <- dat_no_rehab %>%
+  dplyr::filter(tmt == "Cool Dry")
+
+# next do pairwise tests for osml on the diff exp days, for each tmt group
+pair_HH <- TukeyHSD(aov(data = HH, osmolality_mmol_kg_mean ~ day_factor)) #nonsig
+pair_HD <- TukeyHSD(aov(data = HD, osmolality_mmol_kg_mean ~ day_factor)) #nonsig
+pair_CH <- TukeyHSD(aov(data = CH, osmolality_mmol_kg_mean ~ day_factor)) #nonsig
+pair_CD <- TukeyHSD(aov(data = CD, osmolality_mmol_kg_mean ~ day_factor)) #nonsig
+
+# put into a df and export
+osml_pairwise_df <- as.data.frame(pair_HD[[1]]) %>%
+  rbind(as.data.frame(pair_HH[[1]])) %>%
+  rbind(as.data.frame(pair_CD[[1]])) %>%
+  rbind(as.data.frame(pair_CH[[1]])) %>%
+  mutate(day_diff = paste("day", substr(rownames(.), 1, 3)),
+         tmt = c(rep("Hot Dry",3),
+                 rep("Hot Humid",3),
+                 rep("Cool Dry",3),
+                 rep("Cool Humid",3)),
+         CI_95 = paste(round(lwr, digits = 2), round(upr, digits = 2), sep = ", "),
+         diff = round(diff, digits = 2)) %>%
+  dplyr::select(tmt, day_diff, diff, CI_95, p_adj = "p adj")
+write.csv(osml_pairwise_df, "./results_statistics/osmolality_pairwise_diffs.csv")
+```
+
+nope, none of the differences between days within tmt groups are significantly different 
+
+
+### LM + SE
+
+
+```{r osmolality lm fig}
+ggplot() + 
+  stat_smooth(data = dat_no_rehab,
+              aes(x = day_n,
+                  y = osmolality_mmol_kg_mean, 
+                  color = tmt,
+                  fill = tmt,
+                  group = tmt),
+              formula = y ~ x, 
+              method = "lm", 
+              se = T, 
+              size = 2, 
+              alpha = 0.1) + 
+  theme_classic() + 
+  #scale_shape_manual(values = c(15:18), name = "") +
+  scale_x_continuous(limits = c(0,8), 
+                     breaks = c(0, 2, 4, 6, 8)) +
+  scale_color_brewer(palette = "Set2", name = "") +
+  scale_fill_brewer(palette = "Set2", name = "") +
+  xlab("Acclimation Day") + 
+  #ylim(340,370) + #CANNOT put ylimits in bc gets rid of pts that are used to make lines
+  ylab("Plasma Osmolality\n(mmol/kg)") + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 30),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 20),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none"
+        ) -> osml_lm_fig
+osml_lm_fig
+```
+
+
+
+### Ending Values Boxplot
+
+```{r osml ending vals}
+end_vals_osml <- dat %>%
+  dplyr::filter(day_n == 8) %>%
+  dplyr::filter(complete.cases(osmolality_mmol_kg_mean))
+
+osml_aov <- summary(aov(data = end_vals_osml, 
+             osmolality_mmol_kg_mean ~ temp_tmt * humidity_tmt))
+osml_tukey <- TukeyHSD(aov(data = end_vals_osml, 
+             osmolality_mmol_kg_mean ~ temp_tmt * humidity_tmt))
+
+ggplot(data = end_vals_osml) +
+  geom_boxplot(aes(x = tmt,
+                   y = osmolality_mmol_kg_mean, 
+                   color = tmt), 
+               size = 0.5,
+               outlier.shape = NA) + 
+  geom_jitter(aes(x = tmt,
+                   y = osmolality_mmol_kg_mean, 
+                   color = tmt,
+                 fill = tmt,
+                 shape = tmt), 
+               size = 1,
+              alpha = 0.4,
+              position = position_jitter(height = 0, width = 0.2)) +
+  geom_point(data = end_means, 
+             aes(x = tmt,
+                   y = mean_osml, 
+                   color = tmt,
+                 fill = tmt), 
+               size = 3,
+             shape = 23) +
+  theme_classic() + 
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_y_continuous(limits = c(290,470),
+                     breaks = c(seq(300,450, by = 50)),
+                     labels = c(seq(300,450, by = 50))) +
+  xlab("") + 
+  
+  annotate(geom = "text", x = 1, y = 427, label = "A", 
+           size = 3) +
+  annotate(geom = "text", x = 1, y = 417, label = "360", 
+           size = 3) +
+  annotate(geom = "text", x = 2, y = 452, label = "A", 
+           size = 3) +
+  annotate(geom = "text", x = 2, y = 442, label = "351", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 437, label = "A", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 427, label = "347", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 470, label = "A", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 460, label = "346", 
+           size = 3) +
+  
+  ylab(bquote('Osmolality (mmol '*kg^-1*')')) + 
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        #axis.text.x = element_blank(),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 12),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = unit(c(0, #top
+                              0, #right
+                              0, #bottom
+                              0), "mm")
+        ) -> osml_end_boxplot
+osml_end_boxplot
+```
+
+
+
+## CEWL
+
+### Ind + Means
+
+
+```{r CEWL actual fig}
+ggplot() + 
+  geom_line(data = dat[complete.cases(dat$CEWL_g_m2h_mean),],
+            aes(x = day_n,
+                y = CEWL_g_m2h_mean, 
+                color = tmt,
+                group = individual_ID),
+            alpha = 0.2) +
+  geom_line(data = means[complete.cases(means$mean_CEWL),],
+            aes(x = day_n,
+                y = mean_CEWL, 
+                color = tmt,
+                group = tmt),
+            alpha = 1, 
+            size = 1) +
+  geom_point(data = pt_means[complete.cases(pt_means$mean_CEWL),],
+            aes(x = day_n,
+                y = mean_CEWL, 
+                color = tmt,
+                shape = tmt),
+            alpha = 1, 
+            size = 5) +
+  theme_classic() + 
+  scale_shape_manual(values = c(15:18), name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
+  scale_color_brewer(palette = "Set2", name = "") +
+  xlab("Day") + 
+  ylim(0,60) +
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 22),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 16),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "bottom"
+        #legend.position = c(0.25,0.85)
+        ) -> CEWL_fig
+CEWL_fig
+#ggsave(filename = "CEWL_fig1.jpeg",
+ #      plot = CEWL_fig,
+  #     path = "./results_figures",
+   #    device = "jpeg",
+    #   dpi = 1200,
+     #  width = 6, height = 6)
+```
+
+
+
+### Means Only
+
+```{r CEWL actual fig minimal}
+ggplot() + 
+  geom_errorbar(data = means[complete.cases(means$mean_CEWL),],
+                  aes(x = day_n,
+                y = mean_CEWL, 
+                color = tmt,
+                group = tmt,
+                ymin = mean_CEWL-se_CEWL, 
+                ymax = mean_CEWL+se_CEWL),
+                width = .1,
+                #position=position_dodge(.1),
+                alpha = 0.7) +
+  geom_line(data = means[complete.cases(means$mean_CEWL),],
+            aes(x = day_n,
+                y = mean_CEWL, 
+                color = tmt,
+                #linetype = tmt,
+                group = tmt),
+            alpha = 1, 
+            size = .5) +
+  geom_point(data = pt_means[complete.cases(pt_means$mean_CEWL),],
+            aes(x = day_n,
+                y = mean_CEWL, 
+                color = tmt,
+                shape = tmt),
+            fill = "white",
+            alpha = 1, 
+            size = 3) +
+  theme_classic() + 
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  #scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
+   #                     name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
+  scale_y_continuous(breaks = c(20, 25, 30, 35, 40),
+                     limits = c(18,40)) +
+  xlab("Day") + 
+  ylab(bquote('CEWL (g '*m^-2*' '*h^-1*')')) + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 12),
+        legend.text.align = 0,
+        legend.position = "none"
+        #legend.position = c(0.25,0.85)
+        ) -> CEWL_fig_min
+CEWL_fig_min
+
+# use ggarrange so legend is centered
+CEWL_fig_formatted <- ggarrange(CEWL_fig_min,
+                                ncol = 1, nrow = 1,
+                                common.legend = TRUE,
+                                legend = "bottom")
+# save
+ggsave(filename = "experiment_CEWL_fig.pdf",
+       plot = CEWL_fig_formatted,
+       path = "./results_figures",
+       device = "pdf",
+       dpi = 600,
+       units = "mm",
+       width = 80, height = 80)
+
+```
+
+
+
+
+### LM + SE
+
+
+```{r CEWL lm fig}
+ggplot() + 
+  stat_smooth(data = dat,
+              aes(x = day_n,
+                  y = CEWL_g_m2h_mean, 
+                  color = tmt,
+                  fill = tmt,
+                  group = tmt),
+              formula = y ~ x, 
+              method = "lm", 
+              se = T, 
+              size = 2, 
+              alpha = 0.2) + 
+  theme_classic() + 
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
+  scale_color_brewer(palette = "Set2", name = "") +
+  scale_fill_brewer(palette = "Set2", name = "") +
+  xlab("Acclimation Day") + 
+  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 30),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 20),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 22),
+        legend.text.align = 0,
+        legend.position = "none"
+        #legend.position = c(0.25,0.85)
+        ) -> CEWL_lm_fig
+CEWL_lm_fig
+```
+
+
+
+
+### Ending Values Boxplot
+
+```{r}
+end_vals_CEWL <- dat %>%
+  dplyr::filter(day_n == 8) %>%
+  dplyr::filter(complete.cases(CEWL_g_m2h_mean))
+
+CEWL_tukey <- TukeyHSD(aov(data = end_vals_CEWL, 
+             CEWL_g_m2h_mean ~ temp_tmt * humidity_tmt))
+
+
+ggplot(data = end_vals_CEWL) +
+  geom_boxplot(aes(x = tmt,
+                   y = CEWL_g_m2h_mean, 
+                   color = tmt), 
+               size = 0.5,
+               outlier.shape = NA) + 
+  geom_jitter(aes(x = tmt,
+                   y = CEWL_g_m2h_mean, 
+                   color = tmt,
+                 fill = tmt,
+                 shape = tmt), 
+               size = 1,
+              alpha = 0.4,
+              position = position_jitter(height = 0, width = 0.2)) +
+  geom_point(data = end_means, 
+             aes(x = tmt,
+                   y = mean_CEWL, 
+                   color = tmt,
+                 fill = tmt), 
+               size = 3,
+             shape = 23) +
+  theme_classic() + 
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_y_continuous(limits = c(9,63),
+                     breaks = c(seq(10,60, by = 10)),
+                     labels = c(seq(10,60, by = 10))) +
+  xlab("") + 
+  ylab(bquote('CEWL (g '*m^-2*' '*h^-1*')')) + 
+  
+  annotate(geom = "text", x = 1, y = 50, label = "A", 
+           size = 3) +
+  annotate(geom = "text", x = 1, y = 47, label = "25", 
+           size = 3) +
+  annotate(geom = "text", x = 2, y = 63, label = "B", 
+           size = 3) +
+  annotate(geom = "text", x = 2, y = 60, label = "37", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 41, label = "A", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 38, label = "24", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 52, label = "C", 
+           size = 3) +
+  annotate(geom = "text", x = 4, y = 49, label = "30", 
+           size = 3) +
+  
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        #axis.text.x = element_blank(),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 12),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = unit(c(0, #top
+                              0, #right
+                              0, #bottom
+                              0), "mm")
+        ) -> CEWL_end_boxplot
+CEWL_end_boxplot
+```
+
+
+
+
+## CEWL ~ Osml
+
+```{r CEWL osml fig}
+end_vals_CEWL_osml <- dat %>%
+  dplyr::filter(day_n == 8) %>%
+  dplyr::filter(complete.cases(CEWL_g_m2h_mean, osmolality_mmol_kg_mean))
+
+ggplot(end_vals_CEWL_osml) + 
+  aes(x = osmolality_mmol_kg_mean,
+      y = CEWL_g_m2h_mean,
+      color = tmt,
+      shape = tmt) +
+  geom_point(size = 1.5, 
+             alpha = 0.8) + 
+  stat_smooth(formula = y ~ x, 
+              method = "lm", 
+              se = F, 
+              size = 1, 
+              alpha = 0.9) + 
+  theme_classic() + 
+  xlab(bquote('Osmolality (mmol '*kg^-1*')')) + 
+  ylab(bquote('CEWL (g '*m^-2*' '*h^-1*')')) + 
+  #xlim(300, 400) +
+  #ylim(0, 40) +
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_x_continuous(breaks = c(300, 350, 400, 450)) +
+  scale_y_continuous(breaks = c(20, 30, 40, 50),
+                     limits = c(12,57)) +
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.position = "bottom"
+        #axis.text.y = element_blank(),
+        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
+        ) -> exp_end_CEWL_osml_fig
+exp_end_CEWL_osml_fig
+
+# will need to save using figure arrange to make legend centered if I use that fig
+ggsave(filename = "exp_CEWL_osml_fig.pdf",
+       plot = exp_end_CEWL_osml_fig,
+       path = "./results_figures",
+       device = "pdf",
+       dpi = 600,
+       units = "mm",
+       width = 80, height = 90)
+```
+
+
+
+## Multi-Figures
+
+over time:
+
+```{r arrange figs}
+ggarrange(osml_fig_min, 
+          hct_fig_min, 
+          SMI_fig_min,
+          ncol = 1, nrow = 3,
+          labels = c("A", "B", "C"),
+          common.legend = TRUE,
+          legend = "bottom"
+          ) -> experiment_multi_fig
+#experiment_multi_fig
+# export figure
+ggsave(filename = "experiment_multi_fig.pdf",
+       plot = experiment_multi_fig,
+       path = "./results_figures",
+       device = "pdf",
+       dpi = 600,
+       units = "mm",
+       width = 80, height = 210)
+```
+
+
+end values:
+
+```{r}
+ggarrange(CEWL_end_boxplot, 
+          osml_end_boxplot, 
+          hct_end_boxplot,
+          SMI_end_boxplot, 
+          ncol = 2, nrow = 2,
+          labels = c("A", "B", "C", "D"),
+          widths = c(2, 2.045), heights = c(2, 2),
+          common.legend = FALSE
+          ) -> ending_values_multi_fig
+#ending_values_multi_fig
+
+ggsave(filename = "exp_end_val_multi_fig.pdf",
+       plot = ending_values_multi_fig,
+       path = "./results_figures",
+       device = "pdf",
+       dpi = 600,
+       units = "mm",
+       width = 180, height = 150)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

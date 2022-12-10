@@ -60,10 +60,11 @@ Make sub-dataframes without rehab data / with only rehab-related data:
 dat_no_rehab <- dat %>%
   dplyr::filter(day_n %in% c(seq(0,8))) %>%
   # add the per tmt group calculation of VPD from analysis_HOBO
-  mutate(VPD_kPa = case_when(tmt == "Hot Dry" ~ 3.82,
-                             tmt == "Hot Humid" ~ 1.07,
-                             tmt == "Cool Dry" ~ 2.50,
-                             tmt == "Cool Humid" ~ 0.64))
+  mutate(VPD_kPa = case_when(substr(tmt, 1, 6) == "Hot Dr" ~ 3.82,
+                             substr(tmt, 1, 6) == "Hot Hu" ~ 1.07,
+                             substr(tmt, 1, 6) == "Cool D" ~ 2.50,
+                             substr(tmt, 1, 6) == "Cool H" ~ 0.64))
+
 dat_for_rehab <- dat %>%
   dplyr::filter(day_n %in% c(8, 10))
 ```
@@ -229,11 +230,15 @@ SMI_mod_best1 <- lmerTest::lmer(data = dat_no_rehab,
                                 SMI ~ day_n * (VPD_kPa + temp_tmt) +
                                  (1|trial_number/individual_ID))
 summary(SMI_mod_best1)
-SMI_stats <- broom.mixed::tidy(SMI_mod_best1) %>%
-  mutate(response = "Body Condition (g')")
+
 SMI_SS <- data.frame(anova(SMI_mod3)) %>%
-  mutate(variable = row.names(.),
-         response = "Body Condition (g')")
+  mutate(term = row.names(.),
+         term = case_when(substr(term, (nchar(term)-5), nchar(term)) == "mp_tmt" ~ paste(term, "Cool", sep = ""),
+                          substr(term, (nchar(term)-5), nchar(term)) != "mp_tmt" ~ term))
+
+SMI_stats <- broom.mixed::tidy(SMI_mod_best1) %>%
+  mutate(response = "Body Condition (g')") %>%
+  left_join(SMI_SS, by = 'term')
 ```
 
 
@@ -337,11 +342,15 @@ hct_mod_best1 <- lmerTest::lmer(data = dat_no_rehab,
                         hematocrit_percent ~ day_n * temp_tmt +
                          (1|trial_number/individual_ID))
 summary(hct_mod_best1)
-hct_stats <- broom.mixed::tidy(hct_mod_best1) %>%
-  mutate(response = "Hematocrit (%)")
+
 hct_SS <- data.frame(anova(hct_mod2)) %>%
-  mutate(variable = row.names(.),
-         response = "Hematocrit (%)")
+  mutate(term = row.names(.),
+         term = case_when(substr(term, (nchar(term)-5), nchar(term)) == "mp_tmt" ~ paste(term, "Cool", sep = ""),
+                          substr(term, (nchar(term)-5), nchar(term)) != "mp_tmt" ~ term))
+
+hct_stats <- broom.mixed::tidy(hct_mod_best1) %>%
+  mutate(response = "Hematocrit (%)") %>%
+  left_join(hct_SS, by = 'term')
 ```
 
 
@@ -474,13 +483,16 @@ osml_mod_best1 <- lmerTest::lmer(data = dat_no_rehab,
                           day_n * (VPD_kPa + humidity_tmt + temp_tmt) +
                          (1|trial_number/individual_ID))
 summary(osml_mod_best1)
-#anova(osml_mod_best1) # gives type 3, not what we want
-anova(osml_mod4)
-osml_stats <- broom.mixed::tidy(osml_mod_best1) %>%
-  mutate(response = "Plasma Osmolality (mmol/kg)")
+
 osml_SS <- data.frame(anova(osml_mod4)) %>%
-  mutate(variable = row.names(.),
-         response = "Plasma Osmolality (mmol/kg)")
+  mutate(term = row.names(.),
+         term = case_when(substr(term, (nchar(term)-5), nchar(term)) == "mp_tmt" ~ paste(term, "Cool", sep = ""),
+                          substr(term, (nchar(term)-5), nchar(term)) == "ty_tmt" ~ paste(term, "Dry", sep = ""),
+                          substr(term, (nchar(term)-3), nchar(term)) != "_tmt" ~ term))
+
+osml_stats <- broom.mixed::tidy(osml_mod_best1) %>%
+  mutate(response = "Plasma Osmolality (mmol/kg)") %>%
+  left_join(osml_SS, by = 'term')
 ```
 
 
@@ -488,7 +500,7 @@ osml_SS <- data.frame(anova(osml_mod4)) %>%
 
 
 
-## CEWL *HELP*
+## CEWL
 
 First, get a df that only has complete observations that include CEWL values (only obs from before and after the experiment). Then, I will also calculate the CHANGE in CEWL from before to after the experiment. Because we only measured CEWL at those two time points, it makes more sense to assess the **amount of change** in CEWL for each lizard, rather than measuring the change over time.
 
@@ -496,26 +508,32 @@ First, get a df that only has complete observations that include CEWL values (on
 start_CEWL <- dat_no_rehab %>%
   dplyr::filter(day_n == 0) %>%
   dplyr::select(individual_ID, start_CEWL = CEWL_g_m2h_mean)
-dat_no_rehab_rm <- dat_no_rehab %>%
-  dplyr::filter(complete.cases(CEWL_g_m2h_mean)) %>%
-  left_join(start_CEWL, by = 'individual_ID') %>%
-  dplyr::filter(day_n == 8) %>%
-  mutate(delta_CEWL = CEWL_g_m2h_mean - start_CEWL)
-histogram(dat_no_rehab_rm$delta_CEWL, type = "count")
+dat_no_rehab_rm <- dat_no_rehab %>% # initiate new df
+  dplyr::filter(complete.cases(CEWL_g_m2h_mean)) %>% # only use obs incl CEWL
+  left_join(start_CEWL, by = 'individual_ID') %>% # add start CEWL to both obs for each lizard
+  dplyr::filter(day_n == 8) %>% # get only obs for post-exp
+  mutate(delta_CEWL = CEWL_g_m2h_mean - start_CEWL) # calculate ∆CEWL after-before experiment
+histogram(dat_no_rehab_rm$delta_CEWL, type = "count") # check ∆CEWL distribution
+```
+
+
+BODY TEMP...
+
+```{r}
 ggplot(dat_no_rehab) + 
   geom_point(aes(x = CEWL_g_m2h_mean,
-                 y = cloacal_temp_C))
+                 y = cloacal_temp_C,
+                 color = day_n))
+summary(lm(data = dat_no_rehab, CEWL_g_m2h_mean ~ cloacal_temp_C*day_factor))
 ```
+
 
 
 ### Building
 
-I can no longer include body temp (doesn't make sense to...), so should I relativize CEWL by temp before this model?
+*I can no longer include body temp (doesn't make sense to...), so should I relativize CEWL by temp before this model?*
 
-Also, doesn't work to use any interaction effects to test that... rank deficient even if I only try to use one interaction.
-
- *need to switch approach*
-
+It doesn't work to test any interaction effects... rank deficient even if I only try to use one interaction, so only test main effects.
 
 ```{r CEWL exp model 3}
 CEWL_mod3 <- lme4::lmer(data = dat_no_rehab_rm,
@@ -526,24 +544,7 @@ drop1(CEWL_mod3)
 vif(CEWL_mod3)
 ```
 
-drop humidity:
-
-```{r CEWL exp model 2}
-CEWL_mod2 <- lme4::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ humidity_tmt + temp_tmt +
-                         (1|trial_number))
-summary(CEWL_mod2)
-drop1(CEWL_mod2)
-```
-
-compare:
-
-```{r}
-anova(CEWL_mod2, CEWL_mod3)
-```
-
-The models are equally good, and we don't lose any predictive power without humidity. I'll present the full model.
-
+There is incredibly high collinearity between VPD and humidity, so this model is invalid. Also, humidity has the opposite sign for the slope than expected, and sign change is a symptom of collinearity. So then, the best way to go about this will be to test each main effect individually, then compare the Rsq and RMSE of the models to figure out which one is best.
 
 try each 1-variable model:
 
@@ -560,11 +561,49 @@ CEWL_mod1c <- lme4::lmer(data = dat_no_rehab_rm,
                        delta_CEWL ~ temp_tmt +
                          (1|trial_number))
 summary(CEWL_mod1c)
-anova(CEWL_mod1a, CEWL_mod1b) # b better than a
-anova(CEWL_mod1a, CEWL_mod1c) # a better than c
-anova(CEWL_mod1b, CEWL_mod1c) # b better than c
 ```
 
+can I also incorporate 2-variable interaction models this way?
+
+I will test VPD * temp and humidity * temp, but I can't do VPD * humidity because they are collinear and the model would be invalid.
+
+```{r}
+CEWL_mod1ac <- lme4::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ VPD_kPa * temp_tmt + 
+                         (1|trial_number))
+CEWL_mod1bc <- lme4::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ humidity_tmt * temp_tmt + 
+                         (1|trial_number))
+vif(CEWL_mod1ac)
+vif(CEWL_mod1bc)
+```
+
+
+compare them:
+
+```{r}
+# single-term models
+VPD_RMSE <- sqrt(mean((residuals(CEWL_mod1a))^2))
+humidity_RMSE <- sqrt(mean((residuals(CEWL_mod1b))^2))
+temp_RMSE <- sqrt(mean((residuals(CEWL_mod1c))^2))
+
+#2-term models
+VPD_temp_RMSE <- sqrt(mean((residuals(CEWL_mod1ac))^2))
+hum_temp_RMSE <- sqrt(mean((residuals(CEWL_mod1bc))^2))
+
+compare_RMSE <- data.frame(RMSE = round(c(VPD_RMSE, humidity_RMSE, temp_RMSE,
+                                    VPD_temp_RMSE, hum_temp_RMSE),
+                                    digits = 2),
+                           model = c("∆CEWL ~ VPD", 
+                                     "∆CEWL ~ Humidity",
+                                     "∆CEWL ~ Temperature",
+                                     "∆CEWL ~ VPD*Temperature",
+                                     "∆CEWL ~ Humidity*Temperature")) %>%
+  arrange((RMSE))
+compare_RMSE
+```
+
+I'm using RMSE, which is a measure of how good fit a model is to the data. Smaller RMSE values indicate better fit, but small differences in RMSE aren't very meaningful. Among models, whichever one has the lowest RMSE is the best explanation for the data.
 
 
 ### Assumptions
@@ -572,10 +611,16 @@ anova(CEWL_mod1b, CEWL_mod1c) # b better than c
 Check linear regression assumptions/conditions:
 
 ```{r CEWL exp model assumptions}
-plot(CEWL_mod3)
-simple.eda(residuals(CEWL_mod3))
-shapiro.test(residuals(CEWL_mod3))
-hist(dat_no_rehab_rm$delta_CEWL)
+plot(CEWL_mod1a)
+plot(CEWL_mod1b)
+plot(CEWL_mod1c)
+plot(CEWL_mod1bc)
+plot(CEWL_mod1ac)
+simple.eda(residuals(CEWL_mod1a))
+simple.eda(residuals(CEWL_mod1b))
+simple.eda(residuals(CEWL_mod1c))
+simple.eda(residuals(CEWL_mod1bc))
+simple.eda(residuals(CEWL_mod1ac))
 ```
 
 all assumptions good or OKAY enough.
@@ -584,19 +629,51 @@ all assumptions good or OKAY enough.
 
 ### Save
 
-Save best model stats with p-values:
+Save each model with p-values:
 
-```{r best CEWL exp model}
-CEWL_mod_best <- lmerTest::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ VPD_kPa + humidity_tmt + temp_tmt +
+```{r best CEWL exp models}
+CEWL_mod1ap <- lmerTest::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ VPD_kPa + 
                          (1|trial_number))
-summary(CEWL_mod_best)
+df_a <- broom.mixed::tidy(CEWL_mod1ap) %>%
+  mutate(model = "∆CEWL ~ VPD")
 
-CEWL_stats <- broom.mixed::tidy(CEWL_mod_best) %>%
-  mutate(response = "CEWL (g/m2h)")
-CEWL_SS <- data.frame(anova(CEWL_mod3)) %>%
-  mutate(variable = row.names(.),
-         response = "delta-CEWL (g/m2h)")
+CEWL_mod1bp <- lmerTest::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ humidity_tmt + 
+                         (1|trial_number))
+df_b <- broom.mixed::tidy(CEWL_mod1bp) %>%
+  mutate(model = "∆CEWL ~ Humidity")
+
+CEWL_mod1cp <- lmerTest::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ temp_tmt +
+                         (1|trial_number))
+df_c <- broom.mixed::tidy(CEWL_mod1cp) %>%
+  mutate(model = "∆CEWL ~ Temperature")
+
+CEWL_mod1acp <- lmerTest::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ VPD_kPa * temp_tmt + 
+                         (1|trial_number))
+df_ac <- broom.mixed::tidy(CEWL_mod1acp) %>%
+  mutate(model = "∆CEWL ~ VPD*Temperature")
+
+CEWL_mod1bcp <- lmerTest::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ humidity_tmt * temp_tmt + 
+                         (1|trial_number))
+df_bc <- broom.mixed::tidy(CEWL_mod1bcp) %>%
+  mutate(model = "∆CEWL ~ Humidity*Temperature")
+
+
+CEWL_stats <- df_a %>%
+  rbind(df_b) %>%
+  rbind(df_c) %>%
+  rbind(df_ac) %>%
+  rbind(df_bc) %>%
+  left_join(compare_RMSE, by = 'model') %>%
+  arrange(RMSE, model) %>%
+  dplyr::select(RMSE, model, predictor = term, group, estimate,
+                std.error, statistic, df, p.value)
+write.csv(CEWL_stats, 
+          "./results_statistics/exp_models_∆CEWL_only.csv")
 ```
 
 
@@ -610,8 +687,16 @@ Put all the best models, SS values, and AICc rankings into one csv each
 experiment_stats <- osml_stats %>%
   rbind(hct_stats) %>%
   rbind(SMI_stats) %>%
+  mutate(estimate = round(estimate, 2), 
+         std.error = round(std.error, 2), 
+         statistic = round(statistic, 2), 
+         df = round(df, 0), 
+         Sum.Sq = round(Sum.Sq, 2), 
+         Mean.Sq = round(Mean.Sq, 2), 
+         F.value = round(F.value, 2)) %>%
   dplyr::select(response, predictor = term, group, estimate,
-                std.error, statistic, df, p.value)
+                std.error, statistic, df, p.value,
+                Sum.Sq, Mean.Sq, F.value)
 write.csv(experiment_stats, 
           "./results_statistics/exp_models_BEST.csv")
 
@@ -626,14 +711,6 @@ write.csv(AICc_ranks, "./results_statistics/exp_model_rankings.csv")
 # CEWL mod
 write.csv(CEWL_stats, 
           "./results_statistics/exp_models_deltaCEWL.csv")
-
-# SS values for all
-exp_SS <- CEWL_SS %>%
-  rbind(osml_SS) %>%
-  rbind(hct_SS) %>%
-  rbind(SMI_SS) %>%
-  dplyr::select(response, predictor = variable, Sum.Sq, Mean.Sq, F.value)
-write.csv(exp_SS, "./results_statistics/exp_model_SS_values.csv")
 ```
 
 
@@ -710,17 +787,31 @@ SMI_per_day <- tmt_matrix %>%
   dplyr::select(tmt, SMI_per_day)
 ```
 
+
+
+
+## CEWL
+
+I'll do this one a little differently, just using the mean ∆CEWL per tmt group, and dividing that by 8 to assume linear change and get per day rate change.
+
 ```{r}
-response_per_day <- osml_per_day %>%
-  left_join(hct_per_day, by = 'tmt') %>%
-  left_join(SMI_per_day, by = 'tmt')
-write.csv(response_per_day, "./results_statistics/exp_change_per_day.csv")
+CEWL_per_day <- dat_no_rehab_rm %>%
+  group_by(tmt, VPD_kPa) %>%
+  summarise(CEWL_per_day = mean(delta_CEWL))
 ```
 
 
 
+## all
 
 
+```{r}
+response_per_day <- CEWL_per_day %>%  
+  left_join(osml_per_day, by = 'tmt') %>%
+  left_join(hct_per_day, by = 'tmt') %>%
+  left_join(SMI_per_day, by = 'tmt')
+write.csv(response_per_day, "./results_statistics/exp_change_per_day.csv")
+```
 
 
 
@@ -818,6 +909,8 @@ means <- dat %>% # use whole dat because want for both exp and rehyd
          se_osml = (sd_osml/sqrt(n_lizards)),
          se_hct = (sd_hct/sqrt(n_lizards)),
          se_SMI = (sd_SMI/sqrt(n_lizards)))
+
+# get rid of non-defined points
 means$mean_CEWL[is.nan(means$mean_CEWL)] <- NA
 means$mean_osml[is.nan(means$mean_osml)] <- NA
 means$mean_hct[is.nan(means$mean_hct)] <- NA
@@ -1048,6 +1141,10 @@ ggplot(data = end_vals_SMI) +
   scale_y_continuous(limits = c(7,15),
                      breaks = c(seq(7,15, by = 2)),
                      labels = c(seq(7,15, by = 2))) +
+  scale_x_discrete(labels = c("Hot Dry\n3.8",
+                               "Hot Humid\n1.1",
+                               "Cool Dry\n2.5",
+                               "Cool Humid\n0.6")) + 
   xlab("") + 
   
   annotate(geom = "text", x = 1, y = 12.7, label = "A", 
@@ -1264,6 +1361,10 @@ ggplot(data = end_vals_hct) +
   scale_y_continuous(limits = c(10,55),
                      breaks = c(seq(10,50, by = 10)),
                      labels = c(seq(10,50, by = 10))) +
+  scale_x_discrete(labels = c("Hot Dry\n3.8",
+                               "Hot Humid\n1.1",
+                               "Cool Dry\n2.5",
+                               "Cool Humid\n0.6")) + 
   
   annotate(geom = "text", x = 1, y = 47.6, label = "AB", 
            size = 3) +
@@ -1559,6 +1660,10 @@ ggplot(data = end_vals_osml) +
   scale_y_continuous(limits = c(290,470),
                      breaks = c(seq(300,450, by = 50)),
                      labels = c(seq(300,450, by = 50))) +
+  scale_x_discrete(labels = c("Hot Dry\n3.8",
+                               "Hot Humid\n1.1",
+                               "Cool Dry\n2.5",
+                               "Cool Humid\n0.6")) + 
   xlab("") + 
   
   annotate(geom = "text", x = 1, y = 427, label = "A", 
@@ -1778,6 +1883,93 @@ CEWL_lm_fig
 
 
 
+### ∆ CEWL Boxplot
+
+```{r}
+ggplot(data = dat_no_rehab_rm) +
+  geom_hline(yintercept = 0,
+             linetype = "dashed",
+             color = "darkgrey") +
+  geom_boxplot(aes(x = tmt,
+                   y = delta_CEWL, 
+                   color = tmt), 
+               size = 0.5,
+               outlier.shape = NA) + 
+  
+  geom_jitter(aes(x = tmt,
+                   y = delta_CEWL, 
+                   color = tmt,
+                 fill = tmt,
+                 shape = tmt), 
+               size = 1,
+              alpha = 0.4,
+              position = position_jitter(height = 0, width = 0.2)) +
+  geom_point(data = CEWL_per_day, 
+             aes(x = tmt,
+                   y = CEWL_per_day, 
+                   color = tmt,
+                 fill = tmt), 
+               size = 3,
+             shape = 23) +
+  theme_classic() + 
+  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
+  #scale_y_continuous(limits = c(9,63),
+   #                  breaks = c(seq(10,60, by = 10)),
+    #                 labels = c(seq(10,60, by = 10))) +
+  xlab("") + 
+  ylab(expression(Delta ~ 'CEWL')) + 
+  
+  #annotate(geom = "text", x = 1, y = 50, label = "A", 
+   #        size = 3) +
+  #annotate(geom = "text", x = 1, y = 47, label = "25", 
+   #        size = 3) +
+  #annotate(geom = "text", x = 2, y = 63, label = "B", 
+   #        size = 3) +
+  #annotate(geom = "text", x = 2, y = 60, label = "37", 
+   #        size = 3) +
+  #annotate(geom = "text", x = 3, y = 41, label = "A", 
+   #        size = 3) +
+  #annotate(geom = "text", x = 3, y = 38, label = "24", 
+   #        size = 3) +
+  #annotate(geom = "text", x = 4, y = 52, label = "C", 
+   #        size = 3) +
+  #annotate(geom = "text", x = 4, y = 49, label = "30", 
+   #        size = 3) +
+  
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        #axis.text.x = element_blank(),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 12),
+        legend.text.align = 0,
+        legend.position = "none",
+        #plot.margin = unit(c(0, #top
+         #                     0, #right
+          #                    0, #bottom
+           #                   0), "mm")
+        ) -> CEWL_delta_boxplot
+CEWL_delta_boxplot
+
+# save
+ggsave(filename = "experiment_CEWL_delta_boxplot.pdf",
+       plot = CEWL_delta_boxplot,
+       path = "./results_figures",
+       device = "pdf",
+       dpi = 600,
+       units = "mm",
+       width = 80, height = 60)
+```
+
+
+
+
 ### Ending Values Boxplot
 
 ```{r}
@@ -1812,8 +2004,12 @@ ggplot(data = end_vals_CEWL) +
              shape = 23) +
   theme_classic() + 
   scale_shape_manual(values = c(21,19, 22,15), name = "") +
-  scale_fill_brewer(palette = "Spectral", name = "") +
-  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_fill_brewer(palette = "Spectral") +
+  scale_color_brewer(palette = "Spectral") +
+  scale_x_discrete(labels = c("Hot Dry\n3.8",
+                               "Hot Humid\n1.1",
+                               "Cool Dry\n2.5",
+                               "Cool Humid\n0.6")) + 
   scale_y_continuous(limits = c(9,63),
                      breaks = c(seq(10,60, by = 10)),
                      labels = c(seq(10,60, by = 10))) +
@@ -1860,7 +2056,7 @@ CEWL_end_boxplot
 
 
 
-## CEWL ~ Osml
+## Exp CEWL ~ Osml
 
 ```{r CEWL osml fig}
 end_vals_CEWL_osml <- dat %>%

@@ -524,7 +524,6 @@ The best models to predict the variation in baseline plasma osmolality included 
 
 It looks like there are meaningful differences in CEWL across individuals/dates (probably confounded), and based on cloacal temp, capture temp, capture VPD, capture wind, and capture solar radiation.
 
-*I didn't calculate holding time*!!!!!!!!!!!!!!!!!!!
 
 ### Models
 

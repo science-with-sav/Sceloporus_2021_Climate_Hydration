@@ -212,6 +212,7 @@ The Day * (VPD + Temp) is the best model.
 Check linear regression assumptions/conditions:
 
 ```{r SMI exp model assumptions}
+vif(SMI_mod3)
 plot(SMI_mod3)
 simple.eda(residuals(SMI_mod3))
 shapiro.test(residuals(SMI_mod3))
@@ -324,6 +325,7 @@ Model 2 with only predictors Day*Temp is the best by a good margin.
 Check linear regression assumptions/conditions:
 
 ```{r hct exp model assumptions}
+vif(hct_mod2)
 plot(hct_mod2)
 simple.eda(residuals(hct_mod2))
 shapiro.test(residuals(hct_mod2))
@@ -463,6 +465,7 @@ Surprisingly, the full model is the best by far.
 Check linear regression assumptions/conditions:
 
 ```{r osml exp model assumptions}
+vif(osml_mod4)
 plot(osml_mod4)
 simple.eda(residuals(osml_mod4))
 shapiro.test(residuals(osml_mod4))
@@ -797,7 +800,8 @@ I'll do this one a little differently, just using the mean ∆CEWL per tmt group
 ```{r}
 CEWL_per_day <- dat_no_rehab_rm %>%
   group_by(tmt, VPD_kPa) %>%
-  summarise(CEWL_per_day = mean(delta_CEWL))
+  summarise(mean_delta_CEWL = mean(delta_CEWL),
+            CEWL_per_day = mean_delta_CEWL/8)
 ```
 
 
@@ -810,7 +814,7 @@ response_per_day <- CEWL_per_day %>%
   left_join(osml_per_day, by = 'tmt') %>%
   left_join(hct_per_day, by = 'tmt') %>%
   left_join(SMI_per_day, by = 'tmt')
-write.csv(response_per_day, "./results_statistics/exp_change_per_day.csv")
+#write.csv(response_per_day, "./results_statistics/exp_change_per_day.csv")
 ```
 
 
@@ -1135,7 +1139,7 @@ ggplot(data = end_vals_SMI) +
                size = 3,
              shape = 23) +
   theme_classic() + 
-  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
   scale_fill_brewer(palette = "Spectral", name = "") +
   scale_color_brewer(palette = "Spectral", name = "") +
   scale_y_continuous(limits = c(7,15),
@@ -1354,7 +1358,7 @@ ggplot(data = end_vals_hct) +
                size = 3,
              shape = 23) +
   theme_classic() + 
-  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
   scale_fill_brewer(palette = "Spectral", name = "") +
   scale_color_brewer(palette = "Spectral", name = "") +
   xlab("") + 
@@ -1654,7 +1658,7 @@ ggplot(data = end_vals_osml) +
                size = 3,
              shape = 23) +
   theme_classic() + 
-  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
   scale_fill_brewer(palette = "Spectral", name = "") +
   scale_color_brewer(palette = "Spectral", name = "") +
   scale_y_continuous(limits = c(290,470),
@@ -1906,7 +1910,7 @@ ggplot(data = dat_no_rehab_rm) +
               position = position_jitter(height = 0, width = 0.2)) +
   geom_point(data = CEWL_per_day, 
              aes(x = tmt,
-                   y = CEWL_per_day, 
+                   y = mean_delta_CEWL, 
                    color = tmt,
                  fill = tmt), 
                size = 3,
@@ -1969,6 +1973,85 @@ ggsave(filename = "experiment_CEWL_delta_boxplot.pdf",
 
 
 
+### ∆ CEWL line compare
+
+```{r}
+ggplot(data = dat_no_rehab_rm) +
+  #geom_hline(yintercept = 0,
+   #          linetype = "dashed",
+    #         color = "darkgrey") +
+  geom_abline(intercept = -7.9, slope = 11,
+              linetype = "solid",
+             color = "lightgrey") +
+  geom_abline(intercept = 37.9, slope = -11,
+              linetype = "dashed",
+             color = "black") +
+  geom_point(aes(x = VPD_kPa,
+                   y = delta_CEWL, 
+                   color = tmt,
+                 fill = tmt,
+                 shape = tmt), 
+               size = 2,
+              alpha = 0.4,
+              position = position_jitter(height = 0, width = 0.15)
+             ) +
+  geom_point(data = CEWL_per_day, 
+             aes(x = VPD_kPa,
+                   y = mean_delta_CEWL, 
+                   #color = tmt,
+                 fill = tmt,
+                 shape = tmt), 
+               size = 5,
+             color = "black",
+             alpha = 1) +
+  theme_classic() + 
+  scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
+  scale_fill_brewer(palette = "Spectral", name = "") +
+  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_y_continuous(limits = c(-13,40),
+                     breaks = c(seq(-10,40, by = 10)),
+                     labels = c(seq(-10,40, by = 10))
+                     ) +
+  scale_x_continuous(limits = c(0,4),
+                     breaks = c(0.6, 1.1, 2.5, 3.8),
+                     labels = c("0.6\nCool Humid", 
+                                "1.1\nHot Humid", 
+                                "2.5\nCool Dry", 
+                                "3.8\nHot Dry")) +
+  xlab("Vapor Pressure Deficit (kPa)") + 
+  ylab(expression(Delta ~ 'CEWL')) + 
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        #axis.text.x = element_blank(),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 12),
+        legend.text.align = 0,
+        legend.position = "none",
+        #plot.margin = unit(c(0, #top
+         #                     0, #right
+          #                    0, #bottom
+           #                   0), "mm")
+        ) -> CEWL_delta_lines
+CEWL_delta_lines
+
+# save
+ggsave(filename = "experiment_CEWL_delta_lines.pdf",
+       plot = CEWL_delta_lines,
+       path = "./results_figures",
+       device = "pdf",
+       dpi = 600,
+       units = "mm",
+       width = 80, height = 60)
+```
+
+
+
+
 
 ### Ending Values Boxplot
 
@@ -2003,7 +2086,7 @@ ggplot(data = end_vals_CEWL) +
                size = 3,
              shape = 23) +
   theme_classic() + 
-  scale_shape_manual(values = c(21,19, 22,15), name = "") +
+  scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
   scale_fill_brewer(palette = "Spectral") +
   scale_color_brewer(palette = "Spectral") +
   scale_x_discrete(labels = c("Hot Dry\n3.8",

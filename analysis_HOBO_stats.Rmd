@@ -256,13 +256,6 @@ format_HOBO_data %>%
 ## Treatment Differences
 
 ```{r}
-format_HOBO_data %>%
-  group_by(humidity_tmt) %>%
-  summarise(temp_mean = mean(temp_C),
-            temp_SD = sd(temp_C),
-            humidity_mean = mean(relative_humidity),
-            humidity_SD = sd(relative_humidity))
-
 tmt_only_means <- format_HOBO_data %>%
   group_by(tmt) %>%
   summarise(temp_mean = mean(temp_C),
@@ -276,8 +269,7 @@ tmt_only_means <- format_HOBO_data %>%
          #e_a_kPa = e_s_kPa * (humidity_mean/100), # Riddell
          #e_a_kPa = ,# Campbell & Normal 1998
          # VPD
-         VPD_kPa = e_s_kPa*(1 - (humidity_mean/100))) %>%
-  dplyr::select(tmt, VPD_kPa)
+         VPD_kPa = e_s_kPa*(1 - (humidity_mean/100))) 
 tmt_only_means
 ```
 

@@ -23,6 +23,7 @@ if (!require("UsingR")) install.packages("UsingR")
 library("UsingR") # simple.eda model assumption checker
 if (!require("broom.mixed")) install.packages("broom.mixed")
 library("broom.mixed") # lmer model export
+install.packages('emmeans')
 if (!require("car")) install.packages("car")
 library("car") # VIFs
 if (!require("AICcmodavg")) install.packages("AICcmodavg")
@@ -230,7 +231,15 @@ Save best model stats with p-values:
 SMI_mod_best1 <- lmerTest::lmer(data = dat_no_rehab, 
                                 SMI ~ day_n * (VPD_kPa + temp_tmt) +
                                  (1|trial_number/individual_ID))
-summary(SMI_mod_best1)
+
+anova(SMI_mod_best1, type = "1", ddf = "Kenward-Roger")
+summary(try)
+
+# test getting effect sizes
+emm <- emmeans(fiber.lm, "machine")
+eff_size(emm, sigma = sigma(fiber.lm), edf = df.residual(fiber.lm))
+
+
 
 SMI_SS <- data.frame(anova(SMI_mod3)) %>%
   mutate(term = row.names(.),
@@ -534,8 +543,21 @@ summary(lm(data = dat_no_rehab, CEWL_g_m2h_mean ~ cloacal_temp_C*day_factor))
 
 ### Building
 
-*I can no longer include body temp (doesn't make sense to...), so should I relativize CEWL by temp before this model?*
+*I can no longer include body temp (doesn't make sense to...) for ∆CEWL, so check if there's any relationship of raw CEWL ~ body temp on day 8 measurements:
 
+```{r}
+body_temp_test_dat <- dat_no_rehab %>%
+  dplyr::filter(complete.cases(CEWL_g_m2h_mean)) %>%
+  dplyr::filter(day_n == 8)
+
+CEWL_body_temp_mod <- lm(data = body_temp_test_dat, 
+                         CEWL_g_m2h_mean ~ cloacal_temp_C)
+summary(CEWL_body_temp_mod)
+```
+
+No relationship! So, continue on without.
+
+Next problem... 
 It doesn't work to test any interaction effects... rank deficient even if I only try to use one interaction, so only test main effects.
 
 ```{r CEWL exp model 3}
@@ -576,13 +598,18 @@ CEWL_mod1ac <- lme4::lmer(data = dat_no_rehab_rm,
                          (1|trial_number))
 CEWL_mod1bc <- lme4::lmer(data = dat_no_rehab_rm,
                        delta_CEWL ~ humidity_tmt * temp_tmt + 
+                         (1|trial_number)) # interaction is significantly better
+CEWL_mod1bc2 <- lme4::lmer(data = dat_no_rehab_rm,
+                       delta_CEWL ~ humidity_tmt + temp_tmt + 
                          (1|trial_number))
+anova(CEWL_mod1bc, CEWL_mod1bc2)
+
 vif(CEWL_mod1ac)
 vif(CEWL_mod1bc)
 ```
 
 
-compare them:
+compare RMSE values between the models:
 
 ```{r}
 # single-term models
@@ -604,6 +631,16 @@ compare_RMSE <- data.frame(RMSE = round(c(VPD_RMSE, humidity_RMSE, temp_RMSE,
                                      "∆CEWL ~ Humidity*Temperature")) %>%
   arrange((RMSE))
 compare_RMSE
+
+# check AIC for VPD vs temp*RH tmt groups
+anova(CEWL_mod1a, CEWL_mod1bc)
+
+AIC <- data.frame(model = c("∆CEWL ~ VPD", 
+                            "∆CEWL ~ Humidity*Temperature"),
+                  AIC = c(935.78, 914.90))
+
+compare_RMSE_AIC <- compare_RMSE %>%
+  left_join(AIC, by = 'model')
 ```
 
 I'm using RMSE, which is a measure of how good fit a model is to the data. Smaller RMSE values indicate better fit, but small differences in RMSE aren't very meaningful. Among models, whichever one has the lowest RMSE is the best explanation for the data.
@@ -667,13 +704,13 @@ df_bc <- broom.mixed::tidy(CEWL_mod1bcp) %>%
 
 
 CEWL_stats <- df_a %>%
-  rbind(df_b) %>%
-  rbind(df_c) %>%
-  rbind(df_ac) %>%
+  #rbind(df_b) %>%
+  #rbind(df_c) %>%
+  #rbind(df_ac) %>%
   rbind(df_bc) %>%
-  left_join(compare_RMSE, by = 'model') %>%
+  left_join(compare_RMSE_AIC, by = 'model') %>%
   arrange(RMSE, model) %>%
-  dplyr::select(RMSE, model, predictor = term, group, estimate,
+  dplyr::select(AIC, RMSE, model, predictor = term, group, estimate,
                 std.error, statistic, df, p.value)
 write.csv(CEWL_stats, 
           "./results_statistics/exp_models_∆CEWL_only.csv")

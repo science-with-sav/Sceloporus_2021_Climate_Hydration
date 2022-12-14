@@ -23,11 +23,14 @@ if (!require("UsingR")) install.packages("UsingR")
 library("UsingR") # simple.eda model assumption checker
 if (!require("broom.mixed")) install.packages("broom.mixed")
 library("broom.mixed") # lmer model export
-install.packages('emmeans')
+if (!require("emmeans")) install.packages('emmeans')
+library('emmeans')
 if (!require("car")) install.packages("car")
 library("car") # VIFs
 if (!require("AICcmodavg")) install.packages("AICcmodavg")
 library("AICcmodavg") # model selection
+if (!require("MuMIn")) install.packages("MuMIn")
+library("MuMIn") # model selection
 if (!require("RColorBrewer")) install.packages("RColorBrewer")
 library("RColorBrewer") # color
 ```
@@ -45,7 +48,15 @@ This data was collected June - August by Master's student Savannah Weaver, advis
 Read-in data that was compiled, formatted, and checked for completeness in 'wrangling_general'. See that file for information related to the variables.
 
 ```{r load data}
-dat <- read_rds("./data/analysis_data_experiment.RDS")
+dat <- read_rds("./data/analysis_data_experiment.RDS") %>%
+  # add VPD values by tmt and trial group
+  left_join(read_rds("./data/HOBO_tmt_trial_diffs.RDS"), 
+            by = c('tmt', 'trial_number'='trial')) %>%
+  # add the per tmt group calculation of VPD from analysis_HOBO
+  mutate(VPD_kPa = case_when(substr(tmt, 1, 6) == "Hot Dr" ~ 3.82,
+                             substr(tmt, 1, 6) == "Hot Hu" ~ 1.07,
+                             substr(tmt, 1, 6) == "Cool D" ~ 2.50,
+                             substr(tmt, 1, 6) == "Cool H" ~ 0.64))
 summary(dat)
 ```
 
@@ -59,12 +70,7 @@ Make sub-dataframes without rehab data / with only rehab-related data:
 
 ```{r sub-dfs}
 dat_no_rehab <- dat %>%
-  dplyr::filter(day_n %in% c(seq(0,8))) %>%
-  # add the per tmt group calculation of VPD from analysis_HOBO
-  mutate(VPD_kPa = case_when(substr(tmt, 1, 6) == "Hot Dr" ~ 3.82,
-                             substr(tmt, 1, 6) == "Hot Hu" ~ 1.07,
-                             substr(tmt, 1, 6) == "Cool D" ~ 2.50,
-                             substr(tmt, 1, 6) == "Cool H" ~ 0.64))
+  dplyr::filter(day_n %in% c(seq(0,8))) 
 
 dat_for_rehab <- dat %>%
   dplyr::filter(day_n %in% c(8, 10))
@@ -127,129 +133,197 @@ dat_no_rehab %>%
 
 
 
+## Means by Day
+
+Calculate mean values per day per tmt group.
+
+```{r means}
+means <- dat %>% # use whole dat because want for both exp and rehyd
+  group_by(day_n, tmt) %>%
+  summarise(n_lizards = n(),
+            mean_CEWL = mean(CEWL_g_m2h_mean, na.rm = T),
+            sd_CEWL = sd(CEWL_g_m2h_mean, na.rm = T),
+            mean_osml = mean(osmolality_mmol_kg_mean, na.rm = T),
+            sd_osml = sd(osmolality_mmol_kg_mean, na.rm = T),
+            mean_hct = mean(hematocrit_percent, na.rm = T),
+            sd_hct = sd(hematocrit_percent, na.rm = T),
+            mean_SMI = mean(SMI, na.rm = T),
+            sd_SMI = sd(SMI, na.rm = T)) %>%
+  mutate(se_CEWL = (sd_CEWL/sqrt(n_lizards)),
+         se_osml = (sd_osml/sqrt(n_lizards)),
+         se_hct = (sd_hct/sqrt(n_lizards)),
+         se_SMI = (sd_SMI/sqrt(n_lizards)))
+
+# get rid of non-defined points
+means$mean_CEWL[is.nan(means$mean_CEWL)] <- NA
+means$mean_osml[is.nan(means$mean_osml)] <- NA
+means$mean_hct[is.nan(means$mean_hct)] <- NA
+means$mean_SMI[is.nan(means$mean_SMI)] <- NA
+means
+
+# get only means for the very end
+end_means <- means %>%
+  dplyr::filter(day_n == 8)
+write.csv(end_means, "./results_statistics/exp_end_means.csv")
+```
+
+
+## End Values Only
+
+Select for only day=8 values.
+
+```{r}
+end_vals <- dat %>%
+  dplyr::filter(day_n == 8)
+```
+
+
+## ∆ CEWL
+
+Get a df that only has complete observations that include CEWL values (only obs from before and after the experiment). Then, calculate the CHANGE (∆) in CEWL from before to after the experiment. Because we only measured CEWL at those two time points, it makes more sense to assess the **amount of change** in CEWL for each lizard, rather than measuring the change over time.
+
+```{r}
+start_CEWL <- dat_no_rehab %>%
+  dplyr::filter(day_n == 0) %>%
+  dplyr::select(individual_ID, start_CEWL = CEWL_g_m2h_mean)
+dat_no_rehab_deltaCEWL <- dat_no_rehab %>% # initiate new df
+  dplyr::filter(complete.cases(CEWL_g_m2h_mean)) %>% # only use obs incl CEWL
+  dplyr::filter(day_n == 8) %>% # get only obs for post-exp
+  left_join(start_CEWL, by = 'individual_ID') %>% # add start CEWL to both obs for each lizard
+  mutate(delta_CEWL = CEWL_g_m2h_mean - start_CEWL) # calculate ∆CEWL after-before experiment
+```
+
+
 
 # Experiment Models
 
-We predicted that there would be effects of day, humidity, and temperature, but we only expect those **interactions with day** to have an effect because we're observing changes over time.
+We predicted that there would be effects of day, humidity treatment, temperature treatment, and treatment VPD. However, we can't use the standard backwards model selection because the three treatment variables are collinear (VIF much higher than acceptable) and it leads to issues with changing the sign of the estimates when all three are included together. So, we will run singular models with each treatment variable alone:
 
-So, each full model will include the following: day_n, day_n:humidity_tmt, day_n:temp_tmt, and day_n:humidity_tmt:temp_tmt. Then I'll test whether dropping any variables will improve the model.
+response ~ day*humidity
+response ~ day*temperature
+response ~ day*VPD
 
-## SMI
+Then, we will use AIC, RMSE, and R-sq to assess which treatment effect is most important to that response variable.
+
+
+## Body Condition
 
 ### Building
 
-Models are named based on the number of predictors.
+Build each treatment effect model.
 
-```{r SMI exp model 4}
-SMI_mod4 <- lme4::lmer(data = dat_no_rehab,
-                       SMI ~ day_n * (VPD_kPa + humidity_tmt + temp_tmt) +
-                         (1|trial_number/individual_ID))
-#anova(SMI_mod4) # not sure when to use this
-drop1(SMI_mod4)
+```{r SMI exp models}
+SMI_mod_VPD <- lmerTest::lmer(data = dat_no_rehab,
+                              SMI ~ day_n * VPD_kPa +
+                              (1|trial_number/individual_ID))
+SMI_mod_hum <- lmerTest::lmer(data = dat_no_rehab,
+                              SMI ~ day_n * humidity_tmt +
+                              (1|trial_number/individual_ID))
+SMI_mod_temp <- lmerTest::lmer(data = dat_no_rehab,
+                              SMI ~ day_n * temp_tmt +
+                              (1|trial_number/individual_ID))
 ```
 
-drop humidity and compare:
-
-```{r}
-SMI_mod3 <- lme4::lmer(data = dat_no_rehab,
-                       SMI ~ day_n * (VPD_kPa + temp_tmt) +
-                         (1|trial_number/individual_ID))
-anova(SMI_mod4, SMI_mod3)
-drop1(SMI_mod3)
-```
-
-
-
-This is the best model based on AIC, but we will check ANOVA comparisons of dropping either VPD or temp, or adding their interaction.
-
-```{r SMI exp models 3a, 2a, 2b}
-SMI_mod3a <- lme4::lmer(data = dat_no_rehab,
-                       SMI ~ day_n * VPD_kPa * temp_tmt +
-                         (1|trial_number/individual_ID))
-anova(SMI_mod3, SMI_mod3a) # 3 better based on AIC & no loss of predictive power without interaction
-
-SMI_mod2a <- lme4::lmer(data = dat_no_rehab,
-                       SMI ~ day_n * temp_tmt +
-                         (1|trial_number/individual_ID))
-anova(SMI_mod3, SMI_mod2a) # 3 better based on AIC & lose pred power without VPD
-
-SMI_mod2b <- lme4::lmer(data = dat_no_rehab,
-                       SMI ~ day_n * VPD_kPa +
-                         (1|trial_number/individual_ID))
-anova(SMI_mod3, SMI_mod2b) # 3 better based on AIC & lose pred power without temp
-```
-
-Model 3 is the best version. The three-way interaction doesn't add anything, and dropping either VPD or temp results in significant loss of power.
-
-
-
-
-### Selection
-
-
-```{r SMI mod compare}
-SMI_models <- list(SMI_mod4, SMI_mod3, SMI_mod3a, SMI_mod2a, SMI_mod2b)
-
-EXP_mod_names <- data.frame(predictors = 
-                 c('Day * (VPD + Humidity + Temp)', #4
-                   'Day * (VPD + Temp)', #3
-                   'Day * (VPD * Temp)', #3b
-                   'Day * Temp', #2a
-                   'Day * VPD' #2b
-                   ))
-rownames(EXP_mod_names) <- c('4', '3', '3a', '2a', '2b')
-#calculate AIC of each model
-SMI_AICc <- data.frame(aictab(cand.set = SMI_models, 
-                                 modnames = EXP_mod_names)) %>%
-  mutate(response = "Body Condition (g')")
-SMI_AICc
-```
-
-The Day * (VPD + Temp) is the best model.
 
 
 ### Assumptions
 
-Check linear regression assumptions/conditions:
+Check linear regression assumptions/conditions.
 
 ```{r SMI exp model assumptions}
-vif(SMI_mod3)
-plot(SMI_mod3)
-simple.eda(residuals(SMI_mod3))
-shapiro.test(residuals(SMI_mod3))
+# distribution of SMI
 hist(dat_no_rehab$SMI)
+
+# VPD model
+plot(SMI_mod_VPD)
+simple.eda(residuals(SMI_mod_VPD))
+shapiro.test(residuals(SMI_mod_VPD))
+
+# humidity model
+plot(SMI_mod_hum)
+simple.eda(residuals(SMI_mod_hum))
+shapiro.test(residuals(SMI_mod_hum))
+
+# temperature model
+plot(SMI_mod_temp)
+simple.eda(residuals(SMI_mod_temp))
+shapiro.test(residuals(SMI_mod_temp))
 ```
 
-Equal error variance and linearity look fantastic. Normality of the residuals is pretty bad, but with our large sample size that should not effect results, and the SMI variable is perfectly evenly distributed, so it should be fine. 
+
+Normality is violated, but linearity, equal error variance, and independence are all good.
 
 
-### Save
+### Comparison
 
-Save best model stats with p-values:
+Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values of the variables for each model.
 
-```{r best SMI exp model}
-SMI_mod_best1 <- lmerTest::lmer(data = dat_no_rehab, 
-                                SMI ~ day_n * (VPD_kPa + temp_tmt) +
-                                 (1|trial_number/individual_ID))
+We... 
+calculate RMSE manually, 
+use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects, 
+use the aictab function in the AICmodavg package to get AIC and ∆AIC values, and
+get the sum of squares, F, and p-values for each variable from the anova table for each model.
 
-anova(SMI_mod_best1, type = "1", ddf = "Kenward-Roger")
-summary(try)
+```{r SMI mod compare}
+# calculate RMSE & R^2
+SMI_RMSE_Rsq <- data.frame(model = 
+                               c('Day * VPD',
+                                 'Day * Humidity',
+                                 'Day * Temp'
+                                 ),
+                           RMSE = c(sqrt(mean((residuals(SMI_mod_VPD))^2)),
+                                    sqrt(mean((residuals(SMI_mod_hum))^2)),
+                                    sqrt(mean((residuals(SMI_mod_temp))^2))),
+                           # marginal Rsq for the amount of variance
+                           # explained by fixed effects only
+                           Rsq = c(MuMIn::r.squaredGLMM(SMI_mod_VPD)[,"R2m"],
+                                   MuMIn::r.squaredGLMM(SMI_mod_hum)[,"R2m"],
+                                   MuMIn::r.squaredGLMM(SMI_mod_temp)[,"R2m"]))
 
-# test getting effect sizes
-emm <- emmeans(fiber.lm, "machine")
-eff_size(emm, sigma = sigma(fiber.lm), edf = df.residual(fiber.lm))
+# calculate AIC
+SMI_models <- list(SMI_mod_VPD, SMI_mod_hum, SMI_mod_temp)
+EXP_mod_names <- data.frame(model = 
+                               c('Day * VPD',
+                                 'Day * Humidity',
+                                 'Day * Temp'
+                                 ))
+SMI_AICc <- data.frame(aictab(cand.set = SMI_models, 
+                                 modnames = EXP_mod_names))
 
-
-
-SMI_SS <- data.frame(anova(SMI_mod3)) %>%
-  mutate(term = row.names(.),
-         term = case_when(substr(term, (nchar(term)-5), nchar(term)) == "mp_tmt" ~ paste(term, "Cool", sep = ""),
-                          substr(term, (nchar(term)-5), nchar(term)) != "mp_tmt" ~ term))
-
-SMI_stats <- broom.mixed::tidy(SMI_mod_best1) %>%
+# compare across models
+SMI_across <- SMI_RMSE_Rsq %>%
+  left_join(SMI_AICc, by = 'model') %>%
   mutate(response = "Body Condition (g')") %>%
-  left_join(SMI_SS, by = 'term')
+  arrange(Delta_AICc)
+
+# calculate F & p-values
+SMI_VPD_p <- data.frame(anova(SMI_mod_VPD, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Day * VPD',
+         predictor = rownames(.))
+SMI_hum_p <- data.frame(anova(SMI_mod_hum, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Day * Humidity',
+         predictor = rownames(.))
+SMI_temp_p <- data.frame(anova(SMI_mod_temp, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Day * Temp',
+         predictor = rownames(.))
+
+# save within model values
+SMI_within <- SMI_VPD_p %>%
+  rbind(SMI_hum_p) %>%
+  rbind(SMI_temp_p) %>%
+  mutate(df = paste((NumDF), round(DenDF, 0), sep = ", "),
+         response = "Body Condition (g')")
 ```
+
+
+
+
 
 
 
@@ -257,114 +331,112 @@ SMI_stats <- broom.mixed::tidy(SMI_mod_best1) %>%
 
 ### Building
 
+Build each treatment effect model.
 
-```{r hct exp model 4}
-hct_mod4 <- lme4::lmer(data = dat_no_rehab,
-               hematocrit_percent ~ day_n * (VPD_kPa + humidity_tmt + temp_tmt) +
-                         (1|trial_number/individual_ID))
-drop1(hct_mod4)
+```{r hct exp models}
+hct_mod_VPD <- lmerTest::lmer(data = dat_no_rehab,
+                               hematocrit_percent ~ day_n * VPD_kPa +
+                              (1|trial_number/individual_ID))
+hct_mod_hum <- lmerTest::lmer(data = dat_no_rehab,
+                              hematocrit_percent ~ day_n * humidity_tmt +
+                              (1|trial_number/individual_ID))
+hct_mod_temp <- lmerTest::lmer(data = dat_no_rehab,
+                              hematocrit_percent ~ day_n * temp_tmt +
+                              (1|trial_number/individual_ID))
 ```
 
-Try dropping either humidity or VPD:
-
-```{r hct exp model 3a}
-hct_mod3a <- lme4::lmer(data = dat_no_rehab,
-                       hematocrit_percent ~ day_n * (VPD_kPa + temp_tmt) +
-                         (1|trial_number/individual_ID))
-hct_mod3b <- lme4::lmer(data = dat_no_rehab,
-                       hematocrit_percent ~ day_n * (humidity_tmt + temp_tmt) +
-                         (1|trial_number/individual_ID))
-
-# compare
-anova(hct_mod4, hct_mod3a)
-anova(hct_mod4, hct_mod3b)
-anova(hct_mod3a, hct_mod3b)
-```
-
-Dropping either VPD or humidity significantly improves the model without losing predictive power, but there isn't a difference between *which* one to drop.
-
-Test next drops for each of them:
-
-```{r}
-drop1(hct_mod3a)
-drop1(hct_mod3b)
-```
-
-
-Each now suggests dropping the other... So both models indicate that a model with only temperature is best.
-
-```{r}
-hct_mod2 <- lme4::lmer(data = dat_no_rehab,
-                       hematocrit_percent ~ day_n * temp_tmt +
-                         (1|trial_number/individual_ID))
-drop1(hct_mod2)
-anova(hct_mod2, hct_mod3a)
-anova(hct_mod2, hct_mod3b)
-```
-
-The only-temperature model is definitely best.
-
-
-
-### Selection
-
-
-```{r hct mod compare}
-hct_models <- list(hct_mod4, hct_mod3a, hct_mod3b, hct_mod2)
-
-EXP_mod_names1 <- data.frame(predictors = 
-                 c('Day * (VPD + Humidity + Temp)', #4
-                   'Day * (VPD + Temp)', #3a
-                   'Day * (Humidity + Temp)', #3b
-                   'Day* Temp' #2
-                   ))
-rownames(EXP_mod_names1) <- c('4', '3a', '3b', '2')
-#calculate AIC of each model
-hct_AICc <- data.frame(aictab(cand.set = hct_models, 
-                                 modnames = EXP_mod_names1)) %>%
-  mutate(response = "Hematocrit (%)")
-hct_AICc
-```
-
-Model 2 with only predictors Day*Temp is the best by a good margin.
 
 
 ### Assumptions
 
-Check linear regression assumptions/conditions:
+Check linear regression assumptions/conditions.
 
 ```{r hct exp model assumptions}
-vif(hct_mod2)
-plot(hct_mod2)
-simple.eda(residuals(hct_mod2))
-shapiro.test(residuals(hct_mod2))
+# distribution of 
+hist(dat_no_rehab$hematocrit_percent)
+
+# VPD model
+plot(hct_mod_VPD)
+simple.eda(residuals(hct_mod_VPD))
+shapiro.test(residuals(hct_mod_VPD))
+
+# humidity model
+plot(hct_mod_hum)
+simple.eda(residuals(hct_mod_hum))
+shapiro.test(residuals(hct_mod_hum))
+
+# temperature model
+plot(hct_mod_temp)
+simple.eda(residuals(hct_mod_temp))
+shapiro.test(residuals(hct_mod_temp))
 ```
 
-All assumptions are satisfied (and beautiful). 
+
+All assumptions, normality, linearity, equal error variance, and independence are all good.
 
 
+### Comparison
 
-### Save
+Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values of the variables for each model.
 
-Save best model stats (2) with p-values:
+We... 
+calculate RMSE manually, 
+use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects, 
+use the aictab function in the AICmodavg package to get AIC and ∆AIC values, and
+get the sum of squares, F, and p-values for each variable from the anova table for each model.
 
-```{r best hct exp model}
-hct_mod_best1 <- lmerTest::lmer(data = dat_no_rehab,
-                        hematocrit_percent ~ day_n * temp_tmt +
-                         (1|trial_number/individual_ID))
-summary(hct_mod_best1)
+```{r hct mod compare}
+# calculate RMSE & R^2
+hct_RMSE_Rsq <- data.frame(model = 
+                               c('Day * VPD',
+                                 'Day * Humidity',
+                                 'Day * Temp'
+                                 ),
+                           RMSE = c(sqrt(mean((residuals(hct_mod_VPD))^2)),
+                                    sqrt(mean((residuals(hct_mod_hum))^2)),
+                                    sqrt(mean((residuals(hct_mod_temp))^2))),
+                           # marginal Rsq for the amount of variance
+                           # explained by fixed effects only
+                           Rsq = c(MuMIn::r.squaredGLMM(hct_mod_VPD)[,"R2m"],
+                                   MuMIn::r.squaredGLMM(hct_mod_hum)[,"R2m"],
+                                   MuMIn::r.squaredGLMM(hct_mod_temp)[,"R2m"]))
 
-hct_SS <- data.frame(anova(hct_mod2)) %>%
-  mutate(term = row.names(.),
-         term = case_when(substr(term, (nchar(term)-5), nchar(term)) == "mp_tmt" ~ paste(term, "Cool", sep = ""),
-                          substr(term, (nchar(term)-5), nchar(term)) != "mp_tmt" ~ term))
+# calculate AIC
+hct_models <- list(hct_mod_VPD, hct_mod_hum, hct_mod_temp)
+hct_AICc <- data.frame(aictab(cand.set = hct_models, 
+                                 modnames = EXP_mod_names))
 
-hct_stats <- broom.mixed::tidy(hct_mod_best1) %>%
+# compare across models
+hct_across <- hct_RMSE_Rsq %>%
+  left_join(hct_AICc, by = 'model') %>%
   mutate(response = "Hematocrit (%)") %>%
-  left_join(hct_SS, by = 'term')
+  arrange(Delta_AICc)
+
+# calculate F & p-values
+hct_VPD_p <- data.frame(anova(hct_mod_VPD, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Day * VPD',
+         predictor = rownames(.))
+hct_hum_p <- data.frame(anova(hct_mod_hum, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Day * Humidity',
+         predictor = rownames(.))
+hct_temp_p <- data.frame(anova(hct_mod_temp, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Day * Temp',
+         predictor = rownames(.))
+
+# save within model values
+hct_within <- hct_VPD_p %>%
+  rbind(hct_hum_p) %>%
+  rbind(hct_temp_p) %>%
+  mutate(df = paste((NumDF), round(DenDF, 0), sep = ", "),
+         response = "Hematocrit (%)")
 ```
-
-
+ 
 
 
 
@@ -375,175 +447,127 @@ hct_stats <- broom.mixed::tidy(hct_mod_best1) %>%
 
 ### Building
 
+Build each treatment effect model.
 
-```{r osml exp model 4}
-osml_mod4 <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ 
-                         day_n * (VPD_kPa + humidity_tmt + temp_tmt) +
-                         (1|trial_number/individual_ID))
-drop1(osml_mod4)
+```{r osml exp models}
+osml_mod_VPD <- lmerTest::lmer(data = dat_no_rehab,
+                               osmolality_mmol_kg_mean ~ day_n * VPD_kPa +
+                              (1|trial_number/individual_ID))
+osml_mod_hum <- lmerTest::lmer(data = dat_no_rehab,
+                               osmolality_mmol_kg_mean ~ day_n * humidity_tmt +
+                              (1|trial_number/individual_ID))
+osml_mod_temp <- lmerTest::lmer(data = dat_no_rehab,
+                               osmolality_mmol_kg_mean ~ day_n * temp_tmt +
+                              (1|trial_number/individual_ID))
 ```
 
-Try dropping either humidity or VPD:
-
-```{r osml exp model 3}
-osml_mod3a <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ 
-                         day_n * (VPD_kPa + temp_tmt) +
-                         (1|trial_number/individual_ID))
-osml_mod3b <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ 
-                         day_n * (humidity_tmt + temp_tmt) +
-                         (1|trial_number/individual_ID))
-
-# compare
-anova(osml_mod4, osml_mod3a)
-anova(osml_mod4, osml_mod3b)
-anova(osml_mod3b, osml_mod3a)
-```
-
-Mods 3b and 3a are each better than mod 4, but they are equal to each other...
-
-Test next drops for each of them:
-
-```{r}
-drop1(osml_mod3a)
-drop1(osml_mod3b)
-```
-
-
-The VPD model suggests dropping temp, but the humidity model suggests dropping humidity. Try each... 
-
-```{r}
-osml_mod2 <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ day_n * temp_tmt +
-                         (1|trial_number/individual_ID))
-osml_mod2a <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ day_n * VPD_kPa +
-                         (1|trial_number/individual_ID))
-osml_mod2b <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ day_n * humidity_tmt +
-                         (1|trial_number/individual_ID))
-drop1(osml_mod2)
-drop1(osml_mod2a)
-drop1(osml_mod2b)
-```
-
-Okay, also test the day-only model... 
-
-```{r osml exp model 1}
-osml_mod1 <- lme4::lmer(data = dat_no_rehab,
-                       osmolality_mmol_kg_mean ~ 
-                         day_n + 
-                         (1|trial_number/individual_ID))
-```
-
-
-
-### Selection
-
-
-```{r osml mod compare}
-osml_models <- list(osml_mod4, osml_mod3a, osml_mod3b, 
-                    osml_mod2, osml_mod2a, osml_mod2b,
-                    osml_mod1)
-
-EXP_mod_names2 <- data.frame(predictors = 
-                 c('Day * (VPD + Humid + Temp)', #4
-                   'Day * (VPD + Temp)', #3a
-                   'Day * (Humid + Temp)', #3b
-                   'Day * Temp', #2
-                   'Day * VPD', #2a
-                   'Day * Humid', #2b
-                   'Day' # day only
-                   ))
-rownames(EXP_mod_names2) <- c('4', '3a', '3b', '2', '2a', '2b', '1')
-#calculate AIC of each model
-osml_AICc <- data.frame(aictab(cand.set = osml_models, 
-                                 modnames = EXP_mod_names2)) %>%
-  mutate(response = "Plasma Osmolality (mmol/kg)")
-osml_AICc
-```
-
-
-Surprisingly, the full model is the best by far.
 
 
 ### Assumptions
 
-Check linear regression assumptions/conditions:
+Check linear regression assumptions/conditions.
 
 ```{r osml exp model assumptions}
-vif(osml_mod4)
-plot(osml_mod4)
-simple.eda(residuals(osml_mod4))
-shapiro.test(residuals(osml_mod4))
+# distribution of 
 hist(dat_no_rehab$osmolality_mmol_kg_mean)
+
+# VPD model
+plot(osml_mod_VPD)
+simple.eda(residuals(osml_mod_VPD))
+shapiro.test(residuals(osml_mod_VPD))
+
+# humidity model
+plot(osml_mod_hum)
+simple.eda(residuals(osml_mod_hum))
+shapiro.test(residuals(osml_mod_hum))
+
+# temperature model
+plot(osml_mod_temp)
+simple.eda(residuals(osml_mod_temp))
+shapiro.test(residuals(osml_mod_temp))
 ```
 
-All assumptions are OKAY. Normality of the residuals is statistically, but not necessarily visually, violated. Osmolality values are slightly skewed to the right, but not enough to transform the variable.
+
+Normality is violated, but linearity, equal error variance, and independence are all okay.
 
 
+### Comparison
 
-### Save
+Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values of the variables for each model.
 
-Save best model stats with p-values:
+We... 
+calculate RMSE manually, 
+use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects, 
+use the aictab function in the AICmodavg package to get AIC and ∆AIC values, and
+get the sum of squares, F, and p-values for each variable from the anova table for each model.
 
-```{r best osml exp models}
-osml_mod_best1 <- lmerTest::lmer(data = dat_no_rehab,
-                        osmolality_mmol_kg_mean ~ 
-                          day_n * (VPD_kPa + humidity_tmt + temp_tmt) +
-                         (1|trial_number/individual_ID))
-summary(osml_mod_best1)
+```{r osml mod compare}
+# calculate RMSE & R^2
+osml_RMSE_Rsq <- data.frame(model = 
+                               c('Day * VPD',
+                                 'Day * Humidity',
+                                 'Day * Temp'
+                                 ),
+                           RMSE = c(sqrt(mean((residuals(osml_mod_VPD))^2)),
+                                    sqrt(mean((residuals(osml_mod_hum))^2)),
+                                    sqrt(mean((residuals(osml_mod_temp))^2))),
+                           # marginal Rsq for the amount of variance
+                           # explained by fixed effects only
+                           Rsq = c(MuMIn::r.squaredGLMM(osml_mod_VPD)[,"R2m"],
+                                   MuMIn::r.squaredGLMM(osml_mod_hum)[,"R2m"],
+                                   MuMIn::r.squaredGLMM(osml_mod_temp)[,"R2m"]))
 
-osml_SS <- data.frame(anova(osml_mod4)) %>%
-  mutate(term = row.names(.),
-         term = case_when(substr(term, (nchar(term)-5), nchar(term)) == "mp_tmt" ~ paste(term, "Cool", sep = ""),
-                          substr(term, (nchar(term)-5), nchar(term)) == "ty_tmt" ~ paste(term, "Dry", sep = ""),
-                          substr(term, (nchar(term)-3), nchar(term)) != "_tmt" ~ term))
+# calculate AIC
+osml_models <- list(osml_mod_VPD, osml_mod_hum, osml_mod_temp)
+osml_AICc <- data.frame(aictab(cand.set = osml_models, 
+                                 modnames = EXP_mod_names))
 
-osml_stats <- broom.mixed::tidy(osml_mod_best1) %>%
+# compare across models
+osml_across <- osml_RMSE_Rsq %>%
+  left_join(osml_AICc, by = 'model') %>%
   mutate(response = "Plasma Osmolality (mmol/kg)") %>%
-  left_join(osml_SS, by = 'term')
+  arrange(Delta_AICc)
+
+# calculate F & p-values
+osml_VPD_p <- data.frame(anova(osml_mod_VPD, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Day * VPD',
+         predictor = rownames(.))
+osml_hum_p <- data.frame(anova(osml_mod_hum, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Day * Humidity',
+         predictor = rownames(.))
+osml_temp_p <- data.frame(anova(osml_mod_temp, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Day * Temp',
+         predictor = rownames(.))
+
+# save within model values
+osml_within <- osml_VPD_p %>%
+  rbind(osml_hum_p) %>%
+  rbind(osml_temp_p) %>%
+  mutate(df = paste((NumDF), round(DenDF, 0), sep = ", "),
+         response = "Plasma Osmolality (mmol/kg)")
 ```
 
 
 
 
+## Body Temp
 
-
-## CEWL
-
-First, get a df that only has complete observations that include CEWL values (only obs from before and after the experiment). Then, I will also calculate the CHANGE in CEWL from before to after the experiment. Because we only measured CEWL at those two time points, it makes more sense to assess the **amount of change** in CEWL for each lizard, rather than measuring the change over time.
-
-```{r}
-start_CEWL <- dat_no_rehab %>%
-  dplyr::filter(day_n == 0) %>%
-  dplyr::select(individual_ID, start_CEWL = CEWL_g_m2h_mean)
-dat_no_rehab_rm <- dat_no_rehab %>% # initiate new df
-  dplyr::filter(complete.cases(CEWL_g_m2h_mean)) %>% # only use obs incl CEWL
-  left_join(start_CEWL, by = 'individual_ID') %>% # add start CEWL to both obs for each lizard
-  dplyr::filter(day_n == 8) %>% # get only obs for post-exp
-  mutate(delta_CEWL = CEWL_g_m2h_mean - start_CEWL) # calculate ∆CEWL after-before experiment
-histogram(dat_no_rehab_rm$delta_CEWL, type = "count") # check ∆CEWL distribution
-```
-
-
-BODY TEMP...
+I need to double check whether CEWL has a relationship with body temperature at the point of measurement, to make sure I do not need to account for it.
 
 ```{r}
 ggplot(dat_no_rehab) + 
   geom_point(aes(x = CEWL_g_m2h_mean,
                  y = cloacal_temp_C,
                  color = day_n))
-summary(lm(data = dat_no_rehab, CEWL_g_m2h_mean ~ cloacal_temp_C*day_factor))
 ```
 
-
-
-### Building
-
-*I can no longer include body temp (doesn't make sense to...) for ∆CEWL, so check if there's any relationship of raw CEWL ~ body temp on day 8 measurements:
+Test an lm of raw CEWL ~ body temp for day 8 measurements only.
 
 ```{r}
 body_temp_test_dat <- dat_no_rehab %>%
@@ -557,302 +581,295 @@ summary(CEWL_body_temp_mod)
 
 No relationship! So, continue on without.
 
-Next problem... 
-It doesn't work to test any interaction effects... rank deficient even if I only try to use one interaction, so only test main effects.
-
-```{r CEWL exp model 3}
-CEWL_mod3 <- lme4::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ VPD_kPa + humidity_tmt + temp_tmt +
-                         (1|trial_number))
-summary(CEWL_mod3)
-drop1(CEWL_mod3)
-vif(CEWL_mod3)
-```
-
-There is incredibly high collinearity between VPD and humidity, so this model is invalid. Also, humidity has the opposite sign for the slope than expected, and sign change is a symptom of collinearity. So then, the best way to go about this will be to test each main effect individually, then compare the Rsq and RMSE of the models to figure out which one is best.
-
-try each 1-variable model:
-
-```{r}
-CEWL_mod1a <- lme4::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ VPD_kPa + 
-                         (1|trial_number))
-summary(CEWL_mod1a)
-CEWL_mod1b <- lme4::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ humidity_tmt + 
-                         (1|trial_number))
-summary(CEWL_mod1b)
-CEWL_mod1c <- lme4::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ temp_tmt +
-                         (1|trial_number))
-summary(CEWL_mod1c)
-```
-
-can I also incorporate 2-variable interaction models this way?
-
-I will test VPD * temp and humidity * temp, but I can't do VPD * humidity because they are collinear and the model would be invalid.
-
-```{r}
-CEWL_mod1ac <- lme4::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ VPD_kPa * temp_tmt + 
-                         (1|trial_number))
-CEWL_mod1bc <- lme4::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ humidity_tmt * temp_tmt + 
-                         (1|trial_number)) # interaction is significantly better
-CEWL_mod1bc2 <- lme4::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ humidity_tmt + temp_tmt + 
-                         (1|trial_number))
-anova(CEWL_mod1bc, CEWL_mod1bc2)
-
-vif(CEWL_mod1ac)
-vif(CEWL_mod1bc)
-```
-
-
-compare RMSE values between the models:
-
-```{r}
-# single-term models
-VPD_RMSE <- sqrt(mean((residuals(CEWL_mod1a))^2))
-humidity_RMSE <- sqrt(mean((residuals(CEWL_mod1b))^2))
-temp_RMSE <- sqrt(mean((residuals(CEWL_mod1c))^2))
-
-#2-term models
-VPD_temp_RMSE <- sqrt(mean((residuals(CEWL_mod1ac))^2))
-hum_temp_RMSE <- sqrt(mean((residuals(CEWL_mod1bc))^2))
-
-compare_RMSE <- data.frame(RMSE = round(c(VPD_RMSE, humidity_RMSE, temp_RMSE,
-                                    VPD_temp_RMSE, hum_temp_RMSE),
-                                    digits = 2),
-                           model = c("∆CEWL ~ VPD", 
-                                     "∆CEWL ~ Humidity",
-                                     "∆CEWL ~ Temperature",
-                                     "∆CEWL ~ VPD*Temperature",
-                                     "∆CEWL ~ Humidity*Temperature")) %>%
-  arrange((RMSE))
-compare_RMSE
-
-# check AIC for VPD vs temp*RH tmt groups
-anova(CEWL_mod1a, CEWL_mod1bc)
-
-AIC <- data.frame(model = c("∆CEWL ~ VPD", 
-                            "∆CEWL ~ Humidity*Temperature"),
-                  AIC = c(935.78, 914.90))
-
-compare_RMSE_AIC <- compare_RMSE %>%
-  left_join(AIC, by = 'model')
-```
-
-I'm using RMSE, which is a measure of how good fit a model is to the data. Smaller RMSE values indicate better fit, but small differences in RMSE aren't very meaningful. Among models, whichever one has the lowest RMSE is the best explanation for the data.
-
-
-### Assumptions
-
-Check linear regression assumptions/conditions:
-
-```{r CEWL exp model assumptions}
-plot(CEWL_mod1a)
-plot(CEWL_mod1b)
-plot(CEWL_mod1c)
-plot(CEWL_mod1bc)
-plot(CEWL_mod1ac)
-simple.eda(residuals(CEWL_mod1a))
-simple.eda(residuals(CEWL_mod1b))
-simple.eda(residuals(CEWL_mod1c))
-simple.eda(residuals(CEWL_mod1bc))
-simple.eda(residuals(CEWL_mod1ac))
-```
-
-all assumptions good or OKAY enough.
-
-
-
-### Save
-
-Save each model with p-values:
-
-```{r best CEWL exp models}
-CEWL_mod1ap <- lmerTest::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ VPD_kPa + 
-                         (1|trial_number))
-df_a <- broom.mixed::tidy(CEWL_mod1ap) %>%
-  mutate(model = "∆CEWL ~ VPD")
-
-CEWL_mod1bp <- lmerTest::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ humidity_tmt + 
-                         (1|trial_number))
-df_b <- broom.mixed::tidy(CEWL_mod1bp) %>%
-  mutate(model = "∆CEWL ~ Humidity")
-
-CEWL_mod1cp <- lmerTest::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ temp_tmt +
-                         (1|trial_number))
-df_c <- broom.mixed::tidy(CEWL_mod1cp) %>%
-  mutate(model = "∆CEWL ~ Temperature")
-
-CEWL_mod1acp <- lmerTest::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ VPD_kPa * temp_tmt + 
-                         (1|trial_number))
-df_ac <- broom.mixed::tidy(CEWL_mod1acp) %>%
-  mutate(model = "∆CEWL ~ VPD*Temperature")
-
-CEWL_mod1bcp <- lmerTest::lmer(data = dat_no_rehab_rm,
-                       delta_CEWL ~ humidity_tmt * temp_tmt + 
-                         (1|trial_number))
-df_bc <- broom.mixed::tidy(CEWL_mod1bcp) %>%
-  mutate(model = "∆CEWL ~ Humidity*Temperature")
-
-
-CEWL_stats <- df_a %>%
-  #rbind(df_b) %>%
-  #rbind(df_c) %>%
-  #rbind(df_ac) %>%
-  rbind(df_bc) %>%
-  left_join(compare_RMSE_AIC, by = 'model') %>%
-  arrange(RMSE, model) %>%
-  dplyr::select(AIC, RMSE, model, predictor = term, group, estimate,
-                std.error, statistic, df, p.value)
-write.csv(CEWL_stats, 
-          "./results_statistics/exp_models_∆CEWL_only.csv")
-```
-
-
-
-## Group Export
-
-Put all the best models, SS values, and AICc rankings into one csv each
-
-```{r export exp stats}
-# continuous mods
-experiment_stats <- osml_stats %>%
-  rbind(hct_stats) %>%
-  rbind(SMI_stats) %>%
-  mutate(estimate = round(estimate, 2), 
-         std.error = round(std.error, 2), 
-         statistic = round(statistic, 2), 
-         df = round(df, 0), 
-         Sum.Sq = round(Sum.Sq, 2), 
-         Mean.Sq = round(Mean.Sq, 2), 
-         F.value = round(F.value, 2)) %>%
-  dplyr::select(response, predictor = term, group, estimate,
-                std.error, statistic, df, p.value,
-                Sum.Sq, Mean.Sq, F.value)
-write.csv(experiment_stats, 
-          "./results_statistics/exp_models_BEST.csv")
-
-# continuous mod ranks
-AICc_ranks <- osml_AICc %>%
-  rbind(hct_AICc) %>%
-  rbind(SMI_AICc) %>%
-  dplyr::select(response, predictors, K, AICc, Delta_AICc, 
-                ModelLik, AICcWt, Res.LL, Cum.Wt)
-write.csv(AICc_ranks, "./results_statistics/exp_model_rankings.csv")
-
-# CEWL mod
-write.csv(CEWL_stats, 
-          "./results_statistics/exp_models_deltaCEWL.csv")
-```
-
-
-
-
-
-# Effect Estimates (from coefficients)
-
-I want to know what the change in the response variables was per day for each treatment group, on average.
-
-So, first make a matrix expressing the 4 treatment groups with 0s (is not) and 1s (it is). For example, if the baseline states (1s) express Cool and Dry, then hot-dry would have a 0 for temperature and 1 for humidity.
-
-```{r}
-tmt_matrix <- data.frame(tmt = c("Hot Humid", "Hot Dry", 
-                                 "Cool Humid", "Cool Dry"),
-                         temp_state = c(0,0,1,1),
-                         humid_state = c(0,1,0,1),
-                         VPD = c(1.07, 3.82, 0.64, 2.50))
-
-tmt_matrix
-```
-
-
-## Osmolality
-
-```{r}
-# get coefficients
-osml_day_n <- experiment_stats %>% 
-  dplyr::filter(response == "Plasma Osmolality (mmol/kg)") %>% 
-  dplyr::filter(substr(predictor, 1, 5) == "day_n") %>%
-  dplyr::select(predictor, estimate)
-
-# calculate slopes per tmt
-osml_per_day <- tmt_matrix %>%
-  mutate(osml_per_day = 0.08397487 + # day_n
-           0.37090731	* VPD +
-           0.08625962	* humid_state +
-           (-0.96737050) * temp_state) %>%
-  dplyr::select(tmt, osml_per_day)
-```
-
-
-## Hematocrit
-
-```{r}
-# get coefficients
-hct_day_n <- experiment_stats %>% 
-  dplyr::filter(response == "Hematocrit (%)") %>% 
-  dplyr::filter(substr(predictor, 1, 5) == "day_n") %>%
-  dplyr::select(predictor, estimate)
-
-# calculate slopes per tmt
-hct_per_day <- tmt_matrix %>%
-  mutate(hct_per_day = (-1.4520009) + # day_n
-           0.2971501 * temp_state) %>%
-  dplyr::select(tmt, hct_per_day)
-```
-
-
-## SMI
-
-```{r}
-# get coefficients
-SMI_day_n <- experiment_stats %>% 
-  dplyr::filter(response == "Body Condition (g')") %>% 
-  dplyr::filter(substr(predictor, 1, 5) == "day_n") %>%
-  dplyr::select(predictor, estimate)
-
-# calculate slopes per tmt
-SMI_per_day <- tmt_matrix %>%
-  mutate(SMI_per_day = (-0.21557043) + # day_n
-           (-0.02250005) * VPD + 
-           0.11057532	 * temp_state) %>%
-  dplyr::select(tmt, SMI_per_day)
-```
-
 
 
 
 ## CEWL
 
-I'll do this one a little differently, just using the mean ∆CEWL per tmt group, and dividing that by 8 to assume linear change and get per day rate change.
 
-```{r}
-CEWL_per_day <- dat_no_rehab_rm %>%
-  group_by(tmt, VPD_kPa) %>%
-  summarise(mean_delta_CEWL = mean(delta_CEWL),
-            CEWL_per_day = mean_delta_CEWL/8)
+
+### Building
+
+Build each treatment effect model.
+
+```{r CEWL exp models}
+CEWL_mod_VPD <- lmerTest::lmer(data = dat_no_rehab_deltaCEWL,
+                               delta_CEWL ~ VPD_kPa +
+                              (1|trial_number))
+CEWL_mod_hum <- lmerTest::lmer(data = dat_no_rehab_deltaCEWL,
+                               delta_CEWL ~ humidity_tmt +
+                              (1|trial_number))
+CEWL_mod_temp <- lmerTest::lmer(data = dat_no_rehab_deltaCEWL,
+                               delta_CEWL ~ temp_tmt +
+                              (1|trial_number))
 ```
 
 
 
-## all
+### Assumptions
 
+Check linear regression assumptions/conditions.
 
-```{r}
-response_per_day <- CEWL_per_day %>%  
-  left_join(osml_per_day, by = 'tmt') %>%
-  left_join(hct_per_day, by = 'tmt') %>%
-  left_join(SMI_per_day, by = 'tmt')
-#write.csv(response_per_day, "./results_statistics/exp_change_per_day.csv")
+```{r CEWL exp model assumptions}
+# distribution of 
+hist(dat_no_rehab_deltaCEWL$delta_CEWL)
+
+# VPD model
+plot(CEWL_mod_VPD)
+simple.eda(residuals(CEWL_mod_VPD))
+shapiro.test(residuals(CEWL_mod_VPD))
+
+# humidity model
+plot(CEWL_mod_hum)
+simple.eda(residuals(CEWL_mod_hum))
+shapiro.test(residuals(CEWL_mod_hum))
+
+# temperature model
+plot(CEWL_mod_temp)
+simple.eda(residuals(CEWL_mod_temp))
+shapiro.test(residuals(CEWL_mod_temp))
 ```
+
+
+All assumptions are fine.
+
+
+### Comparison
+
+Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values of the variables for each model.
+
+We... 
+calculate RMSE manually, 
+use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects, 
+use the aictab function in the AICmodavg package to get AIC and ∆AIC values, and
+get the sum of squares, F, and p-values for each variable from the anova table for each model.
+
+```{r CEWL mod compare}
+# calculate RMSE & R^2
+CEWL_RMSE_Rsq <- data.frame(model = 
+                               c('VPD',
+                                 'Humidity',
+                                 'Temp'
+                                 ),
+                           RMSE = c(sqrt(mean((residuals(CEWL_mod_VPD))^2)),
+                                    sqrt(mean((residuals(CEWL_mod_hum))^2)),
+                                    sqrt(mean((residuals(CEWL_mod_temp))^2))),
+                           # marginal Rsq for the amount of variance
+                           # explained by fixed effects only
+                           Rsq = c(MuMIn::r.squaredGLMM(CEWL_mod_VPD)[,"R2m"],
+                                   MuMIn::r.squaredGLMM(CEWL_mod_hum)[,"R2m"],
+                                   MuMIn::r.squaredGLMM(CEWL_mod_temp)[,"R2m"]))
+
+# calculate AIC
+CEWL_models <- list(CEWL_mod_VPD, CEWL_mod_hum, CEWL_mod_temp)
+CEWL_mod_names <- data.frame(model = 
+                               c('VPD',
+                                 'Humidity',
+                                 'Temp'
+                                 ))
+CEWL_AICc <- data.frame(aictab(cand.set = CEWL_models, 
+                                 modnames = CEWL_mod_names))
+
+# compare across models
+CEWL_across <- CEWL_RMSE_Rsq %>%
+  left_join(CEWL_AICc, by = 'model') %>%
+  mutate(response = "∆CEWL") %>%
+  arrange(Delta_AICc)
+
+# calculate F & p-values
+CEWL_VPD_p <- data.frame(anova(CEWL_mod_VPD, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'VPD',
+         predictor = rownames(.))
+CEWL_hum_p <- data.frame(anova(CEWL_mod_hum, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Humidity',
+         predictor = rownames(.))
+CEWL_temp_p <- data.frame(anova(CEWL_mod_temp, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Temp',
+         predictor = rownames(.))
+
+# save within model values
+CEWL_within <- CEWL_VPD_p %>%
+  rbind(CEWL_hum_p) %>%
+  rbind(CEWL_temp_p) %>%
+  mutate(df = paste((NumDF), round(DenDF, 0), sep = ", "),
+         response = "∆CEWL")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+## Group Export
+
+Put all the model statistics into one df/csv - one for among-model comparisons, and one for within-model stats.
+
+```{r export exp stats}
+experiment_model_compare <- CEWL_across %>%
+  rbind(osml_across) %>%
+  rbind(hct_across) %>%
+  rbind(SMI_across) %>%
+  dplyr::select(response, model, 
+                RMSE, Rsq, AICc, Delta_AICc) %>%
+  mutate(RMSE = round(RMSE, 2), 
+         Rsq = round(Rsq, 2), 
+         AICc = round(AICc, 2), 
+         Delta_AICc = round(Delta_AICc, 2)) 
+write.csv(experiment_model_compare, 
+          "./results_statistics/exp_model_comparisons.csv")
+
+experiment_model_values <- CEWL_within %>%
+  rbind(osml_within) %>%
+  rbind(hct_within) %>%
+  rbind(SMI_within) %>%
+  dplyr::select(response, model, predictor, 
+                seq_sum_of_squares = Sum.Sq, 
+                df, 
+                F_statistic = F.value, 
+                p_value = Pr..F.) %>%
+  mutate(seq_sum_of_squares = round(seq_sum_of_squares, 0), 
+         F_statistic = round(F_statistic, 2)) 
+write.csv(experiment_model_values, "./results_statistics/exp_model_values.csv")
+```
+
+
+
+
+
+# Effect Estimates 
+
+## End Value CIs
+
+Now, we can use the emmeans function from the emmeans package to estimate marginal means and confidence intervals for the values among treatment groups at the end of the experiment. But, to get for each treatment group, we need to run a new model with day 8 data only and tmt as a single, 4-category variable.
+
+```{r emmeans}
+# Body Condition
+SMI_mod_end <- lmerTest::lmer(data = end_vals,
+                              SMI ~ tmt + 
+                              (1|trial_number))
+SMI_emmeans <- data.frame(emmeans(SMI_mod_end, "tmt")) %>%
+  mutate(response = "Body Condition (g')")
+SMI_pairwise <- data.frame(pairs(emmeans(SMI_mod_end, "tmt"))) %>%
+  mutate(response = "Body Condition (g')")
+
+# Hematocrit
+hct_mod_end <- lmerTest::lmer(data = end_vals,
+                              hematocrit_percent ~ tmt + 
+                              (1|trial_number))
+hct_emmeans <- data.frame(emmeans(hct_mod_end, "tmt")) %>%
+  mutate(response = "Hematocrit (%)")
+hct_pairwise <- data.frame(pairs(emmeans(hct_mod_end, "tmt"))) %>%
+  mutate(response = "Hematocrit (%)")
+
+# Plasma Osmolality
+osml_mod_end <- lmerTest::lmer(data = end_vals,
+                              osmolality_mmol_kg_mean ~ tmt + 
+                              (1|trial_number))
+osml_emmeans <- data.frame(emmeans(osml_mod_end, "tmt")) %>%
+  mutate(response = "Plasma Osmolality (mmol/kg)")
+osml_pairwise <- data.frame(pairs(emmeans(osml_mod_end, "tmt"))) %>%
+  mutate(response = "Plasma Osmolality (mmol/kg)")
+
+# CEWL
+CEWL_mod_end <- lmerTest::lmer(data = end_vals,
+                              CEWL_g_m2h_mean ~ tmt + 
+                              (1|trial_number))
+CEWL_emmeans <- data.frame(emmeans(CEWL_mod_end, "tmt")) %>%
+  mutate(response = "CEWL (g/m2h)")
+CEWL_pairwise <- data.frame(pairs(emmeans(CEWL_mod_end, "tmt"))) %>%
+  mutate(response = "CEWL (g/m2h)")
+
+# put together?
+# use indiv for boxplots
+```
+
+
+
+## Rate of Change
+
+```{r emtrends}
+# Body Condition
+SMI_mod_day <- lmerTest::lmer(data = dat_no_rehab,
+                              SMI ~ day_n * tmt + 
+                              (1|trial_number/individual_ID))
+SMI_emtrends <- data.frame(emtrends(SMI_mod_day, "tmt", var = "day_n")) %>%
+  mutate(response = "Body Condition (g')")
+SMI_pairtrend <- data.frame(pairs(emtrends(SMI_mod_day, "tmt", var = "day_n"))) %>%
+  mutate(response = "Body Condition (g')")
+
+# Hematocrit
+hct_mod_day <- lmerTest::lmer(data = dat_no_rehab,
+                              hematocrit_percent ~ day_n * tmt + 
+                              (1|trial_number/individual_ID))
+hct_emtrends <- data.frame(emtrends(hct_mod_day, "tmt", var = "day_n")) %>%
+  mutate(response = "Hematocrit (%)")
+hct_pairtrend <- data.frame(pairs(emtrends(hct_mod_day, "tmt", var = "day_n"))) %>%
+  mutate(response = "Hematocrit (%)")
+
+# Plasma Osmolality
+osml_mod_day <- lmerTest::lmer(data = dat_no_rehab,
+                              osmolality_mmol_kg_mean ~ day_n * tmt + 
+                              (1|trial_number/individual_ID))
+osml_emtrends <- data.frame(emtrends(osml_mod_day, "tmt", var = "day_n")) %>%
+  mutate(response = "Plasma Osmolality (mmol/kg)")
+osml_pairtrend <- data.frame(pairs(emtrends(osml_mod_day, "tmt", var = "day_n"))) %>%
+  mutate(response = "Plasma Osmolality (mmol/kg)")
+
+# CEWL
+CEWL_mod_day <- lmerTest::lmer(data = dat_no_rehab,
+                              CEWL_g_m2h_mean ~ day_n * tmt + 
+                              (1|trial_number))
+CEWL_emtrends <- data.frame(emtrends(CEWL_mod_day, "tmt", var = "day_n")) %>%
+  mutate(response = "CEWL (g/m2h)")
+CEWL_pairtrend <- data.frame(pairs(emtrends(CEWL_mod_day, "tmt", var = "day_n"))) %>%
+  mutate(response = "CEWL (g/m2h)")
+
+# put together
+all_emtrends <- CEWL_emtrends %>%
+  rbind(osml_emtrends) %>%
+  rbind(hct_emtrends) %>%
+  rbind(SMI_emtrends) %>%
+  mutate(confint95 = paste(round(lower.CL, 2), round(upper.CL, 2), sep = ", ")) %>%
+  dplyr::select(response, tmt, 
+                per_day_change = day_n.trend,
+                confint95,
+                SE, df)
+write.csv(all_emtrends, "./results_statistics/exp_emtrends_per_day_change.csv")
+```
+
+
+
+
+
+
+
+
+# CEWL ~ VPD
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -930,42 +947,7 @@ write.csv(rehydration_stats,
 
 # Figures
 
-## Means to Overlay
 
-mean values per day per tmt group:
-
-```{r means}
-means <- dat %>% # use whole dat because want for both exp and rehyd
-  group_by(day_n, tmt) %>%
-  summarise(n_lizards = n(),
-            mean_CEWL = mean(CEWL_g_m2h_mean, na.rm = T),
-            sd_CEWL = sd(CEWL_g_m2h_mean, na.rm = T),
-            mean_osml = mean(osmolality_mmol_kg_mean, na.rm = T),
-            sd_osml = sd(osmolality_mmol_kg_mean, na.rm = T),
-            mean_hct = mean(hematocrit_percent, na.rm = T),
-            sd_hct = sd(hematocrit_percent, na.rm = T),
-            mean_SMI = mean(SMI, na.rm = T),
-            sd_SMI = sd(SMI, na.rm = T)) %>%
-  mutate(se_CEWL = (sd_CEWL/sqrt(n_lizards)),
-         se_osml = (sd_osml/sqrt(n_lizards)),
-         se_hct = (sd_hct/sqrt(n_lizards)),
-         se_SMI = (sd_SMI/sqrt(n_lizards)))
-
-# get rid of non-defined points
-means$mean_CEWL[is.nan(means$mean_CEWL)] <- NA
-means$mean_osml[is.nan(means$mean_osml)] <- NA
-means$mean_hct[is.nan(means$mean_hct)] <- NA
-means$mean_SMI[is.nan(means$mean_SMI)] <- NA
-means
-
-# make only for days 0,8,10 for points to plot
-pt_means <- means %>%
-  dplyr::filter(day_n %in% c(0,4,8,10))
-
-end_means <- means %>%
-  dplyr::filter(day_n == 8)
-write.csv(end_means, "./results_statistics/exp_end_means.csv")
-```
 
 
 ## SMI 
@@ -1029,7 +1011,7 @@ SMI_fig
      #  width = 6, height = 6)
 ```
 
-### Means Only
+### Means Only *MS*
 
 ```{r SMI actual-min fig}
 ggplot() + 
@@ -1141,40 +1123,36 @@ SMI_lm_fig
 ```
 
 
-### Ending Values Boxplot
+### Ending Values *MS*
 
 ```{r SMI ending vals}
-end_vals_SMI <- dat %>%
-  dplyr::filter(day_n == 8) %>%
-  dplyr::filter(complete.cases(SMI))
-
-SMI_aov <- summary(aov(data = end_vals_SMI, 
-             SMI ~ temp_tmt * humidity_tmt))
-SMI_tukey <- TukeyHSD(aov(data = end_vals_SMI, 
-             SMI ~ temp_tmt * humidity_tmt))
-
-ggplot(data = end_vals_SMI) +
-  geom_boxplot(aes(x = tmt,
-                   y = SMI, 
-                   color = tmt), 
-               size = 0.5,
-               outlier.shape = NA) + 
-  geom_jitter(aes(x = tmt,
+ggplot() +
+  geom_jitter(data = end_vals,
+              aes(x = tmt,
                    y = SMI, 
                    color = tmt,
                  fill = tmt,
                  shape = tmt), 
-              #fill = "white",
                size = 1,
               alpha = 0.4,
               position = position_jitter(height = 0, width = 0.2)) +
-  geom_point(data = end_means, 
+  geom_errorbar(data = SMI_emmeans,
+                aes(x = tmt,
+                    y = emmean, 
+                    color = tmt,
+                    group = tmt,
+                    ymin = lower.CL, 
+                    ymax = upper.CL),
+                width = .1,
+                alpha = 0.9) +
+  geom_point(data = SMI_emmeans, 
              aes(x = tmt,
-                   y = mean_SMI, 
-                   color = tmt,
+                   y = emmean, 
+                   #color = tmt,
+                 shape = tmt,
                  fill = tmt), 
-               size = 3,
-             shape = 23) +
+             color = "black",
+               size = 4) +
   theme_classic() + 
   scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
   scale_fill_brewer(palette = "Spectral", name = "") +
@@ -1182,10 +1160,10 @@ ggplot(data = end_vals_SMI) +
   scale_y_continuous(limits = c(7,15),
                      breaks = c(seq(7,15, by = 2)),
                      labels = c(seq(7,15, by = 2))) +
-  scale_x_discrete(labels = c("Hot Dry\n3.8",
-                               "Hot Humid\n1.1",
-                               "Cool Dry\n2.5",
-                               "Cool Humid\n0.6")) + 
+  scale_x_discrete(labels = c("Hot Dry\n3.8 kPa",
+                               "Hot Humid\n1.1 kPa",
+                               "Cool Dry\n2.5 kPa",
+                               "Cool Humid\n0.6 kPa")) + 
   xlab("") + 
   
   annotate(geom = "text", x = 1, y = 12.7, label = "A", 
@@ -1194,11 +1172,11 @@ ggplot(data = end_vals_SMI) +
            size = 3) +
   annotate(geom = "text", x = 2, y = 14.2, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 13.7, label = "9.7", 
+  annotate(geom = "text", x = 2, y = 13.7, label = "9.6", 
            size = 3) +
   annotate(geom = "text", x = 3, y = 14.8, label = "B", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 14.3, label = "10.6", 
+  annotate(geom = "text", x = 3, y = 14.3, label = "10.7", 
            size = 3) +
   annotate(geom = "text", x = 4, y = 14.6, label = "B", 
            size = 3) +
@@ -1224,6 +1202,8 @@ ggplot(data = end_vals_SMI) +
                               3.4), "mm")
         ) -> SMI_end_boxplot
 SMI_end_boxplot
+SMI_emmeans
+SMI_pairwise
 ```
 
 
@@ -1288,7 +1268,7 @@ hct_fig
 
 
 
-### Means Only
+### Means Only *MS*
 
 ```{r hct actual-minimal fig}
 ggplot() +
@@ -1360,26 +1340,13 @@ hct_fig_min
 
 
 
-### Ending Values Boxplot
+### Ending Values *MS*
 
 
 ```{r hct ending vals}
-end_vals_hct <- dat %>%
-  dplyr::filter(day_n == 8) %>%
-  dplyr::filter(complete.cases(hematocrit_percent))
-
-hct_aov <- summary(aov(data = end_vals_hct, 
-             hematocrit_percent ~ temp_tmt * humidity_tmt))
-hct_tukey <- TukeyHSD(aov(data = end_vals_hct, 
-             hematocrit_percent ~ temp_tmt * humidity_tmt))
-
-ggplot(data = end_vals_hct) +
-  geom_boxplot(aes(x = tmt,
-                   y = hematocrit_percent, 
-                   color = tmt), 
-               size = 0.5,
-               outlier.shape = NA) + 
-  geom_jitter(aes(x = tmt,
+ggplot() +
+  geom_jitter(data = end_vals,
+              aes(x = tmt,
                    y = hematocrit_percent, 
                    color = tmt,
                  fill = tmt,
@@ -1387,13 +1354,23 @@ ggplot(data = end_vals_hct) +
                size = 1,
               alpha = 0.4,
               position = position_jitter(height = 0, width = 0.2)) +
-  geom_point(data = end_means, 
+  geom_errorbar(data = hct_emmeans,
+                aes(x = tmt,
+                    y = emmean, 
+                    color = tmt,
+                    group = tmt,
+                    ymin = lower.CL, 
+                    ymax = upper.CL),
+                width = .1,
+                alpha = 0.9) +
+  geom_point(data = hct_emmeans, 
              aes(x = tmt,
-                   y = mean_hct, 
-                   color = tmt,
+                   y = emmean, 
+                   #color = tmt,
+                 shape = tmt,
                  fill = tmt), 
-               size = 3,
-             shape = 23) +
+             color = "black",
+               size = 4) +
   theme_classic() + 
   scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
   scale_fill_brewer(palette = "Spectral", name = "") +
@@ -1402,10 +1379,10 @@ ggplot(data = end_vals_hct) +
   scale_y_continuous(limits = c(10,55),
                      breaks = c(seq(10,50, by = 10)),
                      labels = c(seq(10,50, by = 10))) +
-  scale_x_discrete(labels = c("Hot Dry\n3.8",
-                               "Hot Humid\n1.1",
-                               "Cool Dry\n2.5",
-                               "Cool Humid\n0.6")) + 
+  scale_x_discrete(labels = c("Hot Dry\n3.8 kPa",
+                               "Hot Humid\n1.1 kPa",
+                               "Cool Dry\n2.5 kPa",
+                               "Cool Humid\n0.6 kPa")) + 
   
   annotate(geom = "text", x = 1, y = 47.6, label = "AB", 
            size = 3) +
@@ -1442,6 +1419,8 @@ ggplot(data = end_vals_hct) +
                               2.24), "mm")
         ) -> hct_end_boxplot
 hct_end_boxplot
+hct_emmeans
+hct_pairwise
 ```
 
 
@@ -1506,7 +1485,7 @@ osml_fig
 ```
 
 
-### Means Only
+### Means Only *MS*
 
 
 ```{r osmolality actual-minimal fig}
@@ -1661,25 +1640,12 @@ osml_lm_fig
 
 
 
-### Ending Values Boxplot
+### Ending Values *MS*
 
 ```{r osml ending vals}
-end_vals_osml <- dat %>%
-  dplyr::filter(day_n == 8) %>%
-  dplyr::filter(complete.cases(osmolality_mmol_kg_mean))
-
-osml_aov <- summary(aov(data = end_vals_osml, 
-             osmolality_mmol_kg_mean ~ temp_tmt * humidity_tmt))
-osml_tukey <- TukeyHSD(aov(data = end_vals_osml, 
-             osmolality_mmol_kg_mean ~ temp_tmt * humidity_tmt))
-
-ggplot(data = end_vals_osml) +
-  geom_boxplot(aes(x = tmt,
-                   y = osmolality_mmol_kg_mean, 
-                   color = tmt), 
-               size = 0.5,
-               outlier.shape = NA) + 
-  geom_jitter(aes(x = tmt,
+ggplot() +
+  geom_jitter(data = end_vals,
+              aes(x = tmt,
                    y = osmolality_mmol_kg_mean, 
                    color = tmt,
                  fill = tmt,
@@ -1687,13 +1653,23 @@ ggplot(data = end_vals_osml) +
                size = 1,
               alpha = 0.4,
               position = position_jitter(height = 0, width = 0.2)) +
-  geom_point(data = end_means, 
+  geom_errorbar(data = osml_emmeans,
+                aes(x = tmt,
+                    y = emmean, 
+                    color = tmt,
+                    group = tmt,
+                    ymin = lower.CL, 
+                    ymax = upper.CL),
+                width = .1,
+                alpha = 0.9) +
+  geom_point(data = osml_emmeans, 
              aes(x = tmt,
-                   y = mean_osml, 
-                   color = tmt,
+                   y = emmean, 
+                   #color = tmt,
+                 shape = tmt,
                  fill = tmt), 
-               size = 3,
-             shape = 23) +
+             color = "black",
+               size = 4) +
   theme_classic() + 
   scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
   scale_fill_brewer(palette = "Spectral", name = "") +
@@ -1701,27 +1677,27 @@ ggplot(data = end_vals_osml) +
   scale_y_continuous(limits = c(290,470),
                      breaks = c(seq(300,450, by = 50)),
                      labels = c(seq(300,450, by = 50))) +
-  scale_x_discrete(labels = c("Hot Dry\n3.8",
-                               "Hot Humid\n1.1",
-                               "Cool Dry\n2.5",
-                               "Cool Humid\n0.6")) + 
+  scale_x_discrete(labels = c("Hot Dry\n3.8 kPa",
+                               "Hot Humid\n1.1 kPa",
+                               "Cool Dry\n2.5 kPa",
+                               "Cool Humid\n0.6 kPa")) + 
   xlab("") + 
   
   annotate(geom = "text", x = 1, y = 427, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 1, y = 417, label = "360", 
+  annotate(geom = "text", x = 1, y = 417, label = "362", 
            size = 3) +
   annotate(geom = "text", x = 2, y = 452, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 442, label = "351", 
+  annotate(geom = "text", x = 2, y = 442, label = "354", 
            size = 3) +
   annotate(geom = "text", x = 3, y = 437, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 427, label = "347", 
+  annotate(geom = "text", x = 3, y = 427, label = "349", 
            size = 3) +
   annotate(geom = "text", x = 4, y = 470, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 460, label = "346", 
+  annotate(geom = "text", x = 4, y = 460, label = "350", 
            size = 3) +
   
   ylab(bquote('Osmolality (mmol '*kg^-1*')')) + 
@@ -1743,7 +1719,10 @@ ggplot(data = end_vals_osml) +
                               0), "mm")
         ) -> osml_end_boxplot
 osml_end_boxplot
+osml_emmeans
+osml_pairwise
 ```
+
 
 
 
@@ -1806,7 +1785,7 @@ CEWL_fig
 
 
 
-### Means Only
+### Means Only *MS*
 
 ```{r CEWL actual fig minimal}
 ggplot() + 
@@ -2010,20 +1989,11 @@ ggsave(filename = "experiment_CEWL_delta_boxplot.pdf",
 
 
 
-### ∆ CEWL line compare
+### ∆ CEWL ~ VPD
 
 ```{r}
-ggplot(data = dat_no_rehab_rm) +
-  #geom_hline(yintercept = 0,
-   #          linetype = "dashed",
-    #         color = "darkgrey") +
-  geom_abline(intercept = -7.9, slope = 11,
-              linetype = "solid",
-             color = "lightgrey") +
-  geom_abline(intercept = 37.9, slope = -11,
-              linetype = "dashed",
-             color = "black") +
-  geom_point(aes(x = VPD_kPa,
+ggplot(data = dat_no_rehab_deltaCEWL) +
+  geom_point(aes(x = VPD_kPa_tmttrial,
                    y = delta_CEWL, 
                    color = tmt,
                  fill = tmt,
@@ -2032,15 +2002,18 @@ ggplot(data = dat_no_rehab_rm) +
               alpha = 0.4,
               position = position_jitter(height = 0, width = 0.15)
              ) +
-  geom_point(data = CEWL_per_day, 
-             aes(x = VPD_kPa,
-                   y = mean_delta_CEWL, 
-                   #color = tmt,
-                 fill = tmt,
-                 shape = tmt), 
-               size = 5,
-             color = "black",
-             alpha = 1) +
+  geom_smooth(aes(x = VPD_kPa_tmttrial,
+                   y = delta_CEWL), 
+              se= F) +
+  #geom_point(data = CEWL_emmeans, 
+   #          aes(x = VPD_kPa,
+    #               y = emmean, 
+     #              #color = tmt,
+      #           fill = tmt,
+       #          shape = tmt), 
+        #       size = 5,
+         #    color = "black",
+          #   alpha = 1) +
   theme_classic() + 
   scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
   scale_fill_brewer(palette = "Spectral", name = "") +
@@ -2073,12 +2046,12 @@ ggplot(data = dat_no_rehab_rm) +
          #                     0, #right
           #                    0, #bottom
            #                   0), "mm")
-        ) -> CEWL_delta_lines
-CEWL_delta_lines
+        ) -> CEWL_VPD
+CEWL_VPD
 
 # save
-ggsave(filename = "experiment_CEWL_delta_lines.pdf",
-       plot = CEWL_delta_lines,
+ggsave(filename = "exp_CEWL_delta_VPD.pdf",
+       plot = CEWL_VPD,
        path = "./results_figures",
        device = "pdf",
        dpi = 600,
@@ -2090,24 +2063,12 @@ ggsave(filename = "experiment_CEWL_delta_lines.pdf",
 
 
 
-### Ending Values Boxplot
+### Ending Values *MS*
 
 ```{r}
-end_vals_CEWL <- dat %>%
-  dplyr::filter(day_n == 8) %>%
-  dplyr::filter(complete.cases(CEWL_g_m2h_mean))
-
-CEWL_tukey <- TukeyHSD(aov(data = end_vals_CEWL, 
-             CEWL_g_m2h_mean ~ temp_tmt * humidity_tmt))
-
-
-ggplot(data = end_vals_CEWL) +
-  geom_boxplot(aes(x = tmt,
-                   y = CEWL_g_m2h_mean, 
-                   color = tmt), 
-               size = 0.5,
-               outlier.shape = NA) + 
-  geom_jitter(aes(x = tmt,
+ggplot() +
+  geom_jitter(data = end_vals,
+              aes(x = tmt,
                    y = CEWL_g_m2h_mean, 
                    color = tmt,
                  fill = tmt,
@@ -2115,21 +2076,31 @@ ggplot(data = end_vals_CEWL) +
                size = 1,
               alpha = 0.4,
               position = position_jitter(height = 0, width = 0.2)) +
-  geom_point(data = end_means, 
+  geom_errorbar(data = CEWL_emmeans,
+                aes(x = tmt,
+                    y = emmean, 
+                    color = tmt,
+                    group = tmt,
+                    ymin = lower.CL, 
+                    ymax = upper.CL),
+                width = .1,
+                alpha = 0.9) +
+  geom_point(data = CEWL_emmeans, 
              aes(x = tmt,
-                   y = mean_CEWL, 
-                   color = tmt,
+                   y = emmean, 
+                   #color = tmt,
+                 shape = tmt,
                  fill = tmt), 
-               size = 3,
-             shape = 23) +
+             color = "black",
+               size = 4) +
   theme_classic() + 
   scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
   scale_fill_brewer(palette = "Spectral") +
   scale_color_brewer(palette = "Spectral") +
-  scale_x_discrete(labels = c("Hot Dry\n3.8",
-                               "Hot Humid\n1.1",
-                               "Cool Dry\n2.5",
-                               "Cool Humid\n0.6")) + 
+  scale_x_discrete(labels = c("Hot Dry\n3.8 kPa",
+                               "Hot Humid\n1.1 kPa",
+                               "Cool Dry\n2.5 kPa",
+                               "Cool Humid\n0.6 kPa")) + 
   scale_y_continuous(limits = c(9,63),
                      breaks = c(seq(10,60, by = 10)),
                      labels = c(seq(10,60, by = 10))) +
@@ -2171,6 +2142,8 @@ ggplot(data = end_vals_CEWL) +
                               0), "mm")
         ) -> CEWL_end_boxplot
 CEWL_end_boxplot
+CEWL_emmeans
+CEWL_pairwise
 ```
 
 

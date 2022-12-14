@@ -262,13 +262,8 @@ tmt_only_means <- format_HOBO_data %>%
             temp_SD = sd(temp_C),
             humidity_mean = mean(relative_humidity),
             humidity_SD = sd(relative_humidity)) %>%
-  mutate(#e_s_kPa = 0.611*exp((2500000/461.5)*
-          #                        ((1/273)-(1/(temp_mean + 273.15)))),# Riddell
-         e_s_kPa = 0.611 * exp((17.502*temp_mean)/(temp_mean + 240.97)), # saturation VP, Campbell & Normal 1998
-         # actual vapor pressure
-         #e_a_kPa = e_s_kPa * (humidity_mean/100), # Riddell
-         #e_a_kPa = ,# Campbell & Normal 1998
-         # VPD
+  mutate(e_s_kPa = 0.611 * exp((17.502*temp_mean)/(temp_mean + 240.97)), # saturation VP, Campbell & Normal 1998
+         # VPD, Campbell & Normal 1998
          VPD_kPa = e_s_kPa*(1 - (humidity_mean/100))) 
 tmt_only_means
 ```
@@ -284,14 +279,36 @@ tmt_only_means
 ```{r}
 tmt_trial_means <- format_HOBO_data %>%
   group_by(tmt, trial) %>%
-  summarise(temp_mean = mean(temp_C),
-            temp_SD = sd(temp_C),
-            humidity_mean = mean(relative_humidity),
-            humidity_SD = sd(relative_humidity)) %>%
-  arrange(trial)
+  summarise(temp_mean_tmttrial = mean(temp_C),
+            temp_SD_tmttrial = sd(temp_C),
+            humidity_mean_tmttrial = mean(relative_humidity),
+            humidity_SD_tmttrial = sd(relative_humidity)) %>%
+  arrange(trial) %>%
+  mutate(e_s_kPa = 0.611 * exp((17.502*temp_mean_tmttrial)/(temp_mean_tmttrial + 240.97)),
+         VPD_kPa_tmttrial = e_s_kPa*(1 - (humidity_mean_tmttrial/100)) # Campbell&Norman1998
+         )
 tmt_trial_means
+```
+
+
+reformat and save:
+
+```{r}
+tmt_trial_means$tmt <- factor(tmt_trial_means$tmt,
+                           levels = c("cool-humid",
+                                      "hot-humid", 
+                                      "cool-dry", 
+                                      "hot-dry"),
+                           labels = c("Cool Humid (0.6 kPa)", 
+                                      "Hot Humid (1.1 kPa)", 
+                                      "Cool Dry (2.5 kPa)", 
+                                      "Hot Dry (3.8 kPa)"))
+
+summary(tmt_trial_means)
+write_rds(tmt_trial_means, "./data/HOBO_tmt_trial_diffs.RDS")
 write.csv(tmt_trial_means, "./results_statistics/HOBO_mean_diffs.csv")
 ```
+
 
 
 

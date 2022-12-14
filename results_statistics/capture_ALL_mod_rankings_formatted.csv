@@ -1,7 +1,0 @@
-Response,Predictors,Parameters (n) 2,AICc,delta_AICc,Model Likelihood,AICc Weight,Residual log-Likelihood *,Cumulative Model Weight
-CEWL (g m-2 h-1),"Temperature at Measurement, VPD at Measurement, Plasma Osmolality, Wind Speed at Capture, VPD at Capture, Hold Time",9,650.13,0,1,0.52,-315.28,0.52
-,"Temperature at Measurement, VPD at Measurement, Plasma Osmolality, Wind Speed at Capture, Hold Time",8,651.1,0.97,0.62,0.32,-316.92,0.84
-Plasma Osmolality (mmol kg-1),"Solar Radiation at Capture, VPD at Capture, SVL, Body Condition",7,1016.98,0,1,0.38,-501.01,0.38
-,"Solar Radiation at Capture, VPD at Capture, SVL",6,1017.1,0.12,0.94,0.36,-502.19,0.74
-Hematocrit (%),"Wind Speed at Capture, Solar Radiation at Capture, Body Condition",5,758.23,0,1,0.5,-373.86,0.5
-,"Wind Speed at Capture, Solar Radiation at Capture, VPD at Capture, Body Condition",6,759.89,1.67,0.43,0.22,-373.59,0.72

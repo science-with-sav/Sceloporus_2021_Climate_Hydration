@@ -64,16 +64,36 @@ summary(dat)
 
 
 
-## Split & Add VPD
+## Split
 
-Make sub-dataframes without rehab data / with only rehab-related data:
+Make sub-dataframes without recovery data / with only recovery-related data:
 
 ```{r sub-dfs}
 dat_no_rehab <- dat %>%
   dplyr::filter(day_n %in% c(seq(0,8))) 
 
-dat_for_rehab <- dat %>%
-  dplyr::filter(day_n %in% c(8, 10))
+recovery_values <- dat %>%
+  dplyr::filter(day_n == 10) %>%
+  dplyr::select(individual_ID,
+                end_hct = hematocrit_percent,
+                end_osml = osmolality_mmol_kg_mean,
+                end_SMI = SMI)
+
+recovery_v_post_exp <- dat %>%
+  dplyr::filter(day_n == 8) %>%
+  left_join(recovery_values, by = 'individual_ID') %>%
+  mutate(delta_osml_10_8 = end_osml - osmolality_mmol_kg_mean,
+         delta_hct_10_8 = end_hct - hematocrit_percent,
+         delta_SMI_10_8 = end_SMI - SMI)
+summary(recovery_v_post_exp)
+
+recovery_v_pre_exp <- dat %>%
+  dplyr::filter(day_n == 0) %>%
+  left_join(recovery_values, by = 'individual_ID') %>%
+  mutate(delta_osml_10_0 = end_osml - osmolality_mmol_kg_mean,
+         delta_hct_10_0 = end_hct - hematocrit_percent,
+         delta_SMI_10_0 = end_SMI - SMI)
+summary(recovery_v_pre_exp)
 ```
 
 
@@ -164,7 +184,7 @@ means
 # get only means for the very end
 end_means <- means %>%
   dplyr::filter(day_n == 8)
-write.csv(end_means, "./results_statistics/exp_end_means.csv")
+#write.csv(end_means, "./results_statistics/exp_end_means.csv")
 ```
 
 
@@ -846,7 +866,7 @@ all_emtrends <- CEWL_emtrends %>%
                 per_day_change = day_n.trend,
                 confint95,
                 SE, df)
-write.csv(all_emtrends, "./results_statistics/exp_emtrends_per_day_change.csv")
+#write.csv(all_emtrends, "./results_statistics/exp_emtrends_per_day_change.csv")
 ```
 
 
@@ -858,6 +878,14 @@ write.csv(all_emtrends, "./results_statistics/exp_emtrends_per_day_change.csv")
 
 # CEWL ~ VPD
 
+```{r}
+CEWL_VPD <- lm(data = dat_no_rehab_deltaCEWL,
+                               delta_CEWL ~ VPD_kPa_tmttrial)
+anova(CEWL_VPD)
+plot(CEWL_VPD)
+simple.eda(residuals(CEWL_VPD))
+shapiro.test(residuals(CEWL_VPD))
+```
 
 
 
@@ -873,16 +901,31 @@ write.csv(all_emtrends, "./results_statistics/exp_emtrends_per_day_change.csv")
 
 
 
-# Rehydration Models
+# Recovery Models
 
-**I assume I will need to redo with ∆values, rather than raw**
+I want to know how the 2-day recovery period affects physiology relative to post- and pre- experiment. 
+
+First/only calculate the mean ∆ and SEM?
+
+```{r}
+recovery_v_post_exp_summary <- recovery_v_post_exp %>%
+  group_by(type) %>%
+  summarise(mean_delta_osml = mean(delta_osml_10_8, na.rm = T),
+            mean_delta_hct = mean(delta_hct_10_8, na.rm = T),
+            mean_delta_SMI = mean(delta_SMI_10_8, na.rm = T))
+```
+
+
+
+
+
 
 
 ## SMI
 
 
 ```{r best SMI rehydration models}
-SMI_rmod_best1 <- lmerTest::lmer(data = dat_for_rehab,
+SMI_rmod_postexp <- lmerTest::lmer(data = dat_for_rehab,
                        SMI ~  type + 
                          (1|trial_number/individual_ID))
 summary(SMI_rmod_best1)
@@ -947,6 +990,29 @@ write.csv(rehydration_stats,
 
 # Figures
 
+## Colors & Shapes
+
+```{r}
+CH_color <- brewer.pal(4, "Spectral")[c(4)]
+HH_color <- brewer.pal(4, "Spectral")[c(2)]
+CD_color <- brewer.pal(4, "Spectral")[c(3)]
+HD_color <- brewer.pal(4, "Spectral")[c(1)]
+my_colors <- c(CH_color, HH_color, CD_color, HD_color)
+
+CH_shp <- 15
+HH_shp <- 19
+CD_shp <- 22
+HD_shp <- 21
+CH_shp_box <- 22
+HH_shp_box <- 21
+my_shapes <- c(CH_shp, HH_shp, CD_shp, HD_shp)
+my_shapes_box <- c(CH_shp_box, HH_shp_box, CD_shp, HD_shp)
+
+my_labels <- c("Cool Humid\n0.6 kPa",
+                               "Hot Humid\n1.1 kPa",
+                               "Cool Dry\n2.5 kPa",
+                               "Hot Dry\n3.8 kPa")
+```
 
 
 
@@ -1053,11 +1119,12 @@ ggplot() +
             size = 3) +
   
   theme_classic() + 
-  scale_shape_manual(values = c(21,19, 22,15), name = "") +
-  #scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
-   #                     name = "") +
-  scale_fill_brewer(palette = "Spectral", name = "") +
-  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_shape_manual(values = my_shapes, name = "",
+                     labels = my_labels) +
+  scale_fill_manual(values = my_colors, name = "",
+                     labels = my_labels) +
+  scale_color_manual(values = my_colors, name = "",
+                     labels = my_labels) +
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
   scale_y_continuous(breaks = c(seq(8,12)),
                      labels = c(seq(8,12))) +
@@ -1154,33 +1221,33 @@ ggplot() +
              color = "black",
                size = 4) +
   theme_classic() + 
-  scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
-  scale_fill_brewer(palette = "Spectral", name = "") +
-  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_shape_manual(values = my_shapes_box, name = "") +
+  scale_fill_manual(values = my_colors, name = "") +
+  scale_color_manual(values = my_colors, name = "") +
   scale_y_continuous(limits = c(7,15),
                      breaks = c(seq(7,15, by = 2)),
                      labels = c(seq(7,15, by = 2))) +
-  scale_x_discrete(labels = c("Hot Dry\n3.8 kPa",
+  scale_x_discrete(labels = c("Cool Humid\n0.6 kPa",
                                "Hot Humid\n1.1 kPa",
                                "Cool Dry\n2.5 kPa",
-                               "Cool Humid\n0.6 kPa")) + 
+                               "Hot Dry\n3.8 kPa")) + 
   xlab("") + 
   
-  annotate(geom = "text", x = 1, y = 12.7, label = "A", 
+  annotate(geom = "text", x = 4, y = 12.7, label = "B", 
            size = 3) +
-  annotate(geom = "text", x = 1, y = 12.2, label = "9.4", 
+  annotate(geom = "text", x = 4, y = 12.2, label = "9.4", #HD
            size = 3) +
-  annotate(geom = "text", x = 2, y = 14.2, label = "A", 
+  annotate(geom = "text", x = 2, y = 14.2, label = "B", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 13.7, label = "9.6", 
+  annotate(geom = "text", x = 2, y = 13.7, label = "9.6", #HH
            size = 3) +
-  annotate(geom = "text", x = 3, y = 14.8, label = "B", 
+  annotate(geom = "text", x = 3, y = 14.8, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 14.3, label = "10.7", 
+  annotate(geom = "text", x = 3, y = 14.3, label = "10.7", #CD
            size = 3) +
-  annotate(geom = "text", x = 4, y = 14.6, label = "B", 
+  annotate(geom = "text", x = 1, y = 14.6, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 14.1, label = "10.8", 
+  annotate(geom = "text", x = 1, y = 14.1, label = "10.8", #CH
            size = 3) +
   
   ylab("Body Condition (g')") + 
@@ -1298,7 +1365,7 @@ ggplot() +
        #         group = tmt),
         #    alpha = 1, 
          #   size = 0.5) +
-  geom_point(data = pt_means,
+  geom_point(data = means[complete.cases(means$mean_hct),],
             aes(x = day_n,
                 y = mean_hct, 
                 color = tmt,
@@ -1308,11 +1375,12 @@ ggplot() +
             fill = "white",
             size = 3) +
   theme_classic() + 
-  scale_shape_manual(values = c(21,19, 22,15), name = "") +
-  #scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
-   #                     name = "") +
-  scale_fill_brewer(palette = "Spectral", name = "") +
-  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_shape_manual(values = my_shapes, name = "",
+                     labels = my_labels) +
+  scale_fill_manual(values = my_colors, name = "",
+                     labels = my_labels) +
+  scale_color_manual(values = my_colors, name = "",
+                     labels = my_labels) +
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
   scale_y_continuous(breaks = c(25, 30, 35, 40),
                      labels = c(25, 30, 35, 40),) +
@@ -1372,33 +1440,33 @@ ggplot() +
              color = "black",
                size = 4) +
   theme_classic() + 
-  scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
-  scale_fill_brewer(palette = "Spectral", name = "") +
-  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_shape_manual(values = my_shapes_box, name = "") +
+  scale_fill_manual(values = my_colors, name = "") +
+  scale_color_manual(values = my_colors, name = "") +
   xlab("") + 
   scale_y_continuous(limits = c(10,55),
                      breaks = c(seq(10,50, by = 10)),
                      labels = c(seq(10,50, by = 10))) +
-  scale_x_discrete(labels = c("Hot Dry\n3.8 kPa",
+  scale_x_discrete(labels = c("Cool Humid\n0.6 kPa",
                                "Hot Humid\n1.1 kPa",
                                "Cool Dry\n2.5 kPa",
-                               "Cool Humid\n0.6 kPa")) + 
+                               "Hot Dry\n3.8 kPa")) + 
   
-  annotate(geom = "text", x = 1, y = 47.6, label = "AB", 
+  annotate(geom = "text", x = 4, y = 47.6, label = "AB", 
            size = 3) +
-  annotate(geom = "text", x = 1, y = 45, label = "28", 
+  annotate(geom = "text", x = 4, y = 45, label = "28", #HD
            size = 3) +
-  annotate(geom = "text", x = 2, y = 44.6, label = "A", 
+  annotate(geom = "text", x = 2, y = 44.6, label = "B", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 42, label = "26", 
+  annotate(geom = "text", x = 2, y = 42, label = "26", #HH
            size = 3) +
-  annotate(geom = "text", x = 3, y = 54.6, label = "B", 
+  annotate(geom = "text", x = 3, y = 54.6, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 52, label = "30", 
+  annotate(geom = "text", x = 3, y = 52, label = "30", #CD
            size = 3) +
-  annotate(geom = "text", x = 4, y = 54.6, label = "B", 
+  annotate(geom = "text", x = 1, y = 54.6, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 52, label = "30", 
+  annotate(geom = "text", x = 1, y = 52, label = "30", #CH
            size = 3) +
   
   ylab("Hematocrit (%)") + 
@@ -1516,7 +1584,7 @@ ggplot() +
        #         group = tmt),
         #    alpha = 1, 
          #   size = 0.5) +
-  geom_point(data = pt_means,
+  geom_point(data = means,
             aes(x = day_n,
                 y = mean_osml, 
                 color = tmt,
@@ -1526,11 +1594,12 @@ ggplot() +
             alpha = 1, 
             size = 3) +
   theme_classic() + 
-  scale_shape_manual(values = c(21,19, 22,15), name = "") +
-  #scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
-   #                     name = "") +
-  scale_fill_brewer(palette = "Spectral", name = "") +
-  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_shape_manual(values = my_shapes, name = "",
+                     labels = my_labels) +
+  scale_fill_manual(values = my_colors, name = "",
+                     labels = my_labels) +
+  scale_color_manual(values = my_colors, name = "",
+                     labels = my_labels) +
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
   scale_y_continuous(breaks = c(seq(320,400, by = 10)),
                      labels = c(seq(320,400, by = 10))) +
@@ -1671,33 +1740,33 @@ ggplot() +
              color = "black",
                size = 4) +
   theme_classic() + 
-  scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
-  scale_fill_brewer(palette = "Spectral", name = "") +
-  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_shape_manual(values = my_shapes_box, name = "") +
+  scale_fill_manual(values = my_colors, name = "") +
+  scale_color_manual(values = my_colors, name = "") +
   scale_y_continuous(limits = c(290,470),
                      breaks = c(seq(300,450, by = 50)),
                      labels = c(seq(300,450, by = 50))) +
-  scale_x_discrete(labels = c("Hot Dry\n3.8 kPa",
+  scale_x_discrete(labels = c("Cool Humid\n0.6 kPa",
                                "Hot Humid\n1.1 kPa",
                                "Cool Dry\n2.5 kPa",
-                               "Cool Humid\n0.6 kPa")) + 
+                               "Hot Dry\n3.8 kPa")) + 
   xlab("") + 
   
-  annotate(geom = "text", x = 1, y = 427, label = "A", 
+  annotate(geom = "text", x = 4, y = 427, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 1, y = 417, label = "362", 
+  annotate(geom = "text", x = 4, y = 417, label = "362", #HD
            size = 3) +
   annotate(geom = "text", x = 2, y = 452, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 442, label = "354", 
+  annotate(geom = "text", x = 2, y = 442, label = "354", #HH
            size = 3) +
   annotate(geom = "text", x = 3, y = 437, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 427, label = "349", 
+  annotate(geom = "text", x = 3, y = 427, label = "349", #CD
            size = 3) +
-  annotate(geom = "text", x = 4, y = 470, label = "A", 
+  annotate(geom = "text", x = 1, y = 470, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 460, label = "350", 
+  annotate(geom = "text", x = 1, y = 460, label = "350", #CH
            size = 3) +
   
   ylab(bquote('Osmolality (mmol '*kg^-1*')')) + 
@@ -1807,7 +1876,7 @@ ggplot() +
                 group = tmt),
             alpha = 1, 
             size = .5) +
-  geom_point(data = pt_means[complete.cases(pt_means$mean_CEWL),],
+  geom_point(data = means[complete.cases(means$mean_CEWL),],
             aes(x = day_n,
                 y = mean_CEWL, 
                 color = tmt,
@@ -1816,11 +1885,12 @@ ggplot() +
             alpha = 1, 
             size = 3) +
   theme_classic() + 
-  scale_shape_manual(values = c(21,19, 22,15), name = "") +
-  #scale_linetype_manual(values = c("solid", "longdash", "solid", "longdash"), 
-   #                     name = "") +
-  scale_fill_brewer(palette = "Spectral", name = "") +
-  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_shape_manual(values = my_shapes, name = "",
+                     labels = my_labels) +
+  scale_fill_manual(values = my_colors, name = "",
+                     labels = my_labels) +
+  scale_color_manual(values = my_colors, name = "",
+                     labels = my_labels) +
   scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
   scale_y_continuous(breaks = c(20, 25, 30, 35, 40),
                      limits = c(18,40)) +
@@ -1854,7 +1924,7 @@ ggsave(filename = "experiment_CEWL_fig.pdf",
        device = "pdf",
        dpi = 600,
        units = "mm",
-       width = 80, height = 80)
+       width = 80, height = 90)
 
 ```
 
@@ -2004,7 +2074,16 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
              ) +
   geom_smooth(aes(x = VPD_kPa_tmttrial,
                    y = delta_CEWL), 
-              se= F) +
+              se = F,
+              formula = y ~ x,
+              method = "lm",
+              color = "black") +
+  geom_smooth(aes(x = VPD_kPa_tmttrial,
+                   y = delta_CEWL), 
+              se = F,
+              formula = y ~ x,
+              method = "loess",
+              color = "red") +
   #geom_point(data = CEWL_emmeans, 
    #          aes(x = VPD_kPa,
     #               y = emmean, 
@@ -2015,9 +2094,9 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
          #    color = "black",
           #   alpha = 1) +
   theme_classic() + 
-  scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
-  scale_fill_brewer(palette = "Spectral", name = "") +
-  scale_color_brewer(palette = "Spectral", name = "") +
+  scale_shape_manual(values = my_shapes, name = "") +
+  scale_fill_manual(values = my_colors, name = "") +
+  scale_color_manual(values = my_colors, name = "") +
   scale_y_continuous(limits = c(-13,40),
                      breaks = c(seq(-10,40, by = 10)),
                      labels = c(seq(-10,40, by = 10))
@@ -2046,12 +2125,12 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
          #                     0, #right
           #                    0, #bottom
            #                   0), "mm")
-        ) -> CEWL_VPD
-CEWL_VPD
+        ) -> CEWL_VPD_fig
+CEWL_VPD_fig
 
 # save
 ggsave(filename = "exp_CEWL_delta_VPD.pdf",
-       plot = CEWL_VPD,
+       plot = CEWL_VPD_fig,
        path = "./results_figures",
        device = "pdf",
        dpi = 600,
@@ -2094,34 +2173,34 @@ ggplot() +
              color = "black",
                size = 4) +
   theme_classic() + 
-  scale_shape_manual(values = c(21, 21, 22, 22), name = "") +
-  scale_fill_brewer(palette = "Spectral") +
-  scale_color_brewer(palette = "Spectral") +
-  scale_x_discrete(labels = c("Hot Dry\n3.8 kPa",
+  scale_shape_manual(values = my_shapes_box, name = "") +
+  scale_fill_manual(values = my_colors, name = "") +
+  scale_color_manual(values = my_colors, name = "") +
+  scale_x_discrete(labels = c("Cool Humid\n0.6 kPa",
                                "Hot Humid\n1.1 kPa",
                                "Cool Dry\n2.5 kPa",
-                               "Cool Humid\n0.6 kPa")) + 
+                               "Hot Dry\n3.8 kPa")) + 
   scale_y_continuous(limits = c(9,63),
                      breaks = c(seq(10,60, by = 10)),
                      labels = c(seq(10,60, by = 10))) +
   xlab("") + 
   ylab(bquote('CEWL (g '*m^-2*' '*h^-1*')')) + 
   
-  annotate(geom = "text", x = 1, y = 50, label = "A", 
+  annotate(geom = "text", x = 4, y = 50, label = "C", 
            size = 3) +
-  annotate(geom = "text", x = 1, y = 47, label = "25", 
+  annotate(geom = "text", x = 4, y = 47, label = "25", #HD
            size = 3) +
   annotate(geom = "text", x = 2, y = 63, label = "B", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 60, label = "37", 
+  annotate(geom = "text", x = 2, y = 60, label = "37", #HH
            size = 3) +
-  annotate(geom = "text", x = 3, y = 41, label = "A", 
+  annotate(geom = "text", x = 3, y = 41, label = "C", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 38, label = "24", 
+  annotate(geom = "text", x = 3, y = 38, label = "24", #CD
            size = 3) +
-  annotate(geom = "text", x = 4, y = 52, label = "C", 
+  annotate(geom = "text", x = 1, y = 52, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 49, label = "30", 
+  annotate(geom = "text", x = 1, y = 49, label = "30", #CH
            size = 3) +
   
   theme(text = element_text(color = "black", 

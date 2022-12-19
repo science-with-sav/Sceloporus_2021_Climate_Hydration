@@ -1,0 +1,7 @@
+"","estimate","statistic","p.value","parameter","conf.low","conf.high","method","alternative","response","pre_post_exp"
+"1",12.1882951653944,3.75004277082792,0.000265104438981455,130,5.75821268244256,18.6183776483462,"One Sample t-test","two.sided","Plasma Osmolality (mmol/kg)","pre"
+"2",10.0512295081967,3.47823246232959,0.000702116866130164,121,4.33020304879071,15.7722559676027,"One Sample t-test","two.sided","Plasma Osmolality (mmol/kg)","post"
+"3",-12.4,-22.2486006382799,5.48091900588929e-46,129,-13.5027077205085,-11.2972922794915,"One Sample t-test","two.sided","Hematocrit (%)","pre"
+"4",-2.06299212598425,-4.20831769167749,4.84966453531677e-05,126,-3.03311868689833,-1.09286556507017,"One Sample t-test","two.sided","Hematocrit (%)","post"
+"5",-1.14618833697392,-11.5424028094604,1.07095323172845e-21,131,-1.34263217790102,-0.949744496046816,"One Sample t-test","two.sided","Body Condition (g')","pre"
+"6",0.450632434989274,6.6769947041374,6.29218012307648e-10,131,0.317120504933285,0.584144365045264,"One Sample t-test","two.sided","Body Condition (g')","post"

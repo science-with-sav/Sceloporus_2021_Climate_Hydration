@@ -879,23 +879,59 @@ all_emtrends <- CEWL_emtrends %>%
 # CEWL ~ VPD
 
 ```{r}
-CEWL_VPD <- lm(data = dat_no_rehab_deltaCEWL,
+CEWL_VPD_lm <- lm(data = dat_no_rehab_deltaCEWL,
                                delta_CEWL ~ VPD_kPa_tmttrial)
-anova(CEWL_VPD)
-plot(CEWL_VPD)
-simple.eda(residuals(CEWL_VPD))
-shapiro.test(residuals(CEWL_VPD))
+plot(CEWL_VPD_lm)
+simple.eda(residuals(CEWL_VPD_lm))
+shapiro.test(residuals(CEWL_VPD_lm))
+summary(CEWL_VPD_lm)
 ```
 
+Even though the data is slightly nonlinear, a linear model does a fine job explaining the data.
+
+We will double check a comparison of a polynomial model, just to be sure:
+
+```{r}
+CEWL_VPD_poly <- lm(data = dat_no_rehab_deltaCEWL,
+                               delta_CEWL ~ poly(VPD_kPa_tmttrial, 2))
+plot(CEWL_VPD_poly)
+simple.eda(residuals(CEWL_VPD_poly))
+shapiro.test(residuals(CEWL_VPD_poly))
+summary(CEWL_VPD_poly)
+```
+
+LINE assumptions are equally-well-met.
+
+The polynomial factor is not significant, but the R-sq is slightly higher for the poly model. 
+
+Compare RMSE and AIC:
+
+```{r}
+sqrt(mean((residuals(CEWL_VPD_lm))^2))
+sqrt(mean((residuals(CEWL_VPD_poly))^2))
+
+CEWL_VPD_models <- list(CEWL_VPD_lm, CEWL_VPD_poly)
+CEWL_VPD_mod_names <- data.frame(model = 
+                               c('linear',
+                                 'polynomial'
+                                 ))
+CEWL_VPD_AICc <- data.frame(aictab(cand.set = CEWL_VPD_models, 
+                                 modnames = CEWL_VPD_mod_names))
+CEWL_VPD_AICc
+```
+
+RMSE is slightly lower for the polynomial model. But, AIC is not meaningfully different between the two versions.
 
 
 
+I'll use the lm as the best model/
 
+```{r}
+summary(CEWL_VPD_lm)
+anova(CEWL_VPD_lm)
+```
 
-
-
-
-
+(estimate = -2.96, SE = 0.6, df = (1, 131), F = 24.82, p < 0.0001, Rsq = 0.16)
 
 
 
@@ -903,9 +939,9 @@ shapiro.test(residuals(CEWL_VPD))
 
 # Recovery Models
 
-I want to know how the 2-day recovery period affects physiology relative to post- and pre- experiment. 
+I want to know how the 2-day recovery period affects physiology relative to post- and pre- experiment. To do this, I'll use a two-sided t-test comparing ∆ to the hypothesis of mu=0.
 
-First/only calculate the mean ∆ and SEM?
+First, calculate the mean ∆ and SEM?
 
 ```{r}
 recovery_v_post_exp_summary <- recovery_v_post_exp %>%
@@ -917,18 +953,16 @@ recovery_v_post_exp_summary <- recovery_v_post_exp %>%
 
 
 
-
-
-
-
 ## SMI
 
 
 ```{r best SMI rehydration models}
-SMI_rmod_postexp <- lmerTest::lmer(data = dat_for_rehab,
-                       SMI ~  type + 
-                         (1|trial_number/individual_ID))
-summary(SMI_rmod_best1)
+SMI_rmod_post_exp <- t.test(recovery_v_post_exp$delta_SMI_10_8, 
+                           mu = 0, alternative = "two.sided")
+SMI_rmod_post_exp
+SMI_rmod_pre_exp <- t.test(recovery_v_pre_exp$delta_SMI_10_0, 
+                           mu = 0, alternative = "two.sided")
+SMI_rmod_pre_exp
 ```
 
 
@@ -938,11 +972,13 @@ summary(SMI_rmod_best1)
 
 
 ```{r best hct rehydration models}
-hct_rmod_best1 <- lmerTest::lmer(data = dat_for_rehab,
-                       hematocrit_percent ~ 
-                         type + 
-                         (1|trial_number/individual_ID))
-summary(hct_rmod_best1)
+hct_rmod_post_exp <- t.test(recovery_v_post_exp$delta_hct_10_8, 
+                           mu = 0, alternative = "two.sided")
+hct_rmod_post_exp
+
+hct_rmod_pre_exp <- t.test(recovery_v_pre_exp$delta_hct_10_0, 
+                           mu = 0, alternative = "two.sided")
+hct_rmod_pre_exp
 ```
 
 
@@ -953,11 +989,13 @@ summary(hct_rmod_best1)
 
 
 ```{r best osml rehydration model}
-osml_rmod_best1 <- lmerTest::lmer(data = dat_for_rehab,
-                       osmolality_mmol_kg_mean ~
-                         type + 
-                         (1|trial_number/individual_ID))
-summary(osml_rmod_best1)
+osml_rmod_post_exp <- t.test(recovery_v_post_exp$delta_osml_10_8, 
+                           mu = 0, alternative = "two.sided")
+osml_rmod_post_exp
+
+osml_rmod_pre_exp <- t.test(recovery_v_pre_exp$delta_osml_10_0, 
+                           mu = 0, alternative = "two.sided")
+osml_rmod_pre_exp
 ```
 
 
@@ -966,14 +1004,18 @@ summary(osml_rmod_best1)
 
 
 ```{r best rehydration models all vars}
-rehydration_stats <- broom.mixed::tidy(osml_rmod_best1) %>%
-  rbind(broom.mixed::tidy(hct_rmod_best1)) %>%
-  rbind(broom.mixed::tidy(SMI_rmod_best1)) %>%
-  mutate(response = c(rep("Plasma Osmolality (mmol/kg)", 5),
-                      rep("Hematocrit (%)", 5),
-                      rep("Body Condition (g)", 5)))
-write.csv(rehydration_stats, 
-          "./results_statistics/rehydration_best_models.csv")
+recovery_stats <- broom.mixed::tidy(osml_rmod_pre_exp) %>%
+  rbind(broom.mixed::tidy(osml_rmod_post_exp)) %>%
+  rbind(broom.mixed::tidy(hct_rmod_pre_exp)) %>%
+  rbind(broom.mixed::tidy(hct_rmod_post_exp)) %>%
+  rbind(broom.mixed::tidy(SMI_rmod_pre_exp)) %>%
+  rbind(broom.mixed::tidy(SMI_rmod_post_exp)) %>%
+  mutate(response = c(rep("Plasma Osmolality (mmol/kg)", 2),
+                      rep("Hematocrit (%)", 2),
+                      rep("Body Condition (g')", 2)),
+         pre_post_exp = c(rep(c("pre", "post"), 3)))
+write.csv(recovery_stats, 
+          "./results_statistics/recovery_stats.csv")
 ```
 
 
@@ -1035,7 +1077,7 @@ ggplot() +
                 group = tmt),
             alpha = 1, 
             size = 1) +
-  geom_point(data = pt_means,
+  geom_point(data = means,
             aes(x = day_n,
                 y = mean_SMI, 
                 color = tmt,
@@ -1296,7 +1338,7 @@ ggplot() +
                 group = tmt),
             alpha = 1, 
             size = 1) +
-  geom_point(data = pt_means,
+  geom_point(data = means,
             aes(x = day_n,
                 y = mean_hct, 
                 color = tmt,
@@ -1514,7 +1556,7 @@ ggplot() +
                 group = tmt),
             alpha = 1, 
             size = 1) +
-  geom_point(data = pt_means,
+  geom_point(data = means,
             aes(x = day_n,
                 y = mean_osml, 
                 color = tmt,
@@ -1633,13 +1675,13 @@ Since Plasma osmolality has such a nonlinear trend, we need to test whether the 
 ```{r}
 # first make sub-dfs for each tmt group
 HH <- dat_no_rehab %>%
-  dplyr::filter(tmt == "Hot Humid")
+  dplyr::filter(substr(tmt, 1, 6) == "Hot Hu")
 HD <- dat_no_rehab %>%
-  dplyr::filter(tmt == "Hot Dry")
+  dplyr::filter(substr(tmt, 1, 6) == "Hot Dr")
 CH <- dat_no_rehab %>%
-  dplyr::filter(tmt == "Cool Humid")
+  dplyr::filter(substr(tmt, 1, 6) == "Cool H")
 CD <- dat_no_rehab %>%
-  dplyr::filter(tmt == "Cool Dry")
+  dplyr::filter(substr(tmt, 1, 6) == "Cool D")
 
 # next do pairwise tests for osml on the diff exp days, for each tmt group
 pair_HH <- TukeyHSD(aov(data = HH, osmolality_mmol_kg_mean ~ day_factor)) #nonsig
@@ -1815,7 +1857,7 @@ ggplot() +
                 group = tmt),
             alpha = 1, 
             size = 1) +
-  geom_point(data = pt_means[complete.cases(pt_means$mean_CEWL),],
+  geom_point(data = means[complete.cases(means$mean_CEWL),],
             aes(x = day_n,
                 y = mean_CEWL, 
                 color = tmt,
@@ -1973,90 +2015,6 @@ CEWL_lm_fig
 
 
 
-### ∆ CEWL Boxplot
-
-```{r}
-ggplot(data = dat_no_rehab_rm) +
-  geom_hline(yintercept = 0,
-             linetype = "dashed",
-             color = "darkgrey") +
-  geom_boxplot(aes(x = tmt,
-                   y = delta_CEWL, 
-                   color = tmt), 
-               size = 0.5,
-               outlier.shape = NA) + 
-  
-  geom_jitter(aes(x = tmt,
-                   y = delta_CEWL, 
-                   color = tmt,
-                 fill = tmt,
-                 shape = tmt), 
-               size = 1,
-              alpha = 0.4,
-              position = position_jitter(height = 0, width = 0.2)) +
-  geom_point(data = CEWL_per_day, 
-             aes(x = tmt,
-                   y = mean_delta_CEWL, 
-                   color = tmt,
-                 fill = tmt), 
-               size = 3,
-             shape = 23) +
-  theme_classic() + 
-  scale_shape_manual(values = c(21,19, 22,15), name = "") +
-  scale_fill_brewer(palette = "Spectral", name = "") +
-  scale_color_brewer(palette = "Spectral", name = "") +
-  #scale_y_continuous(limits = c(9,63),
-   #                  breaks = c(seq(10,60, by = 10)),
-    #                 labels = c(seq(10,60, by = 10))) +
-  xlab("") + 
-  ylab(expression(Delta ~ 'CEWL')) + 
-  
-  #annotate(geom = "text", x = 1, y = 50, label = "A", 
-   #        size = 3) +
-  #annotate(geom = "text", x = 1, y = 47, label = "25", 
-   #        size = 3) +
-  #annotate(geom = "text", x = 2, y = 63, label = "B", 
-   #        size = 3) +
-  #annotate(geom = "text", x = 2, y = 60, label = "37", 
-   #        size = 3) +
-  #annotate(geom = "text", x = 3, y = 41, label = "A", 
-   #        size = 3) +
-  #annotate(geom = "text", x = 3, y = 38, label = "24", 
-   #        size = 3) +
-  #annotate(geom = "text", x = 4, y = 52, label = "C", 
-   #        size = 3) +
-  #annotate(geom = "text", x = 4, y = 49, label = "30", 
-   #        size = 3) +
-  
-  theme(text = element_text(color = "black", 
-                            family = "sans", 
-                            size = 12),
-        axis.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 8),
-        #axis.text.x = element_blank(),
-        legend.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 12),
-        legend.text.align = 0,
-        legend.position = "none",
-        #plot.margin = unit(c(0, #top
-         #                     0, #right
-          #                    0, #bottom
-           #                   0), "mm")
-        ) -> CEWL_delta_boxplot
-CEWL_delta_boxplot
-
-# save
-ggsave(filename = "experiment_CEWL_delta_boxplot.pdf",
-       plot = CEWL_delta_boxplot,
-       path = "./results_figures",
-       device = "pdf",
-       dpi = 600,
-       units = "mm",
-       width = 80, height = 60)
-```
-
 
 
 ### ∆ CEWL ~ VPD
@@ -2078,21 +2036,12 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
               formula = y ~ x,
               method = "lm",
               color = "black") +
-  geom_smooth(aes(x = VPD_kPa_tmttrial,
-                   y = delta_CEWL), 
-              se = F,
-              formula = y ~ x,
-              method = "loess",
-              color = "red") +
-  #geom_point(data = CEWL_emmeans, 
-   #          aes(x = VPD_kPa,
-    #               y = emmean, 
-     #              #color = tmt,
-      #           fill = tmt,
-       #          shape = tmt), 
-        #       size = 5,
-         #    color = "black",
-          #   alpha = 1) +
+  #geom_smooth(aes(x = VPD_kPa_tmttrial,
+   #                y = delta_CEWL), 
+    #          se = F,
+     #         formula = y ~ poly(x, 2),
+      #        method = "lm",
+       #       color = "red") +
   theme_classic() + 
   scale_shape_manual(values = my_shapes, name = "") +
   scale_fill_manual(values = my_colors, name = "") +
@@ -2103,10 +2052,10 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
                      ) +
   scale_x_continuous(limits = c(0,4),
                      breaks = c(0.6, 1.1, 2.5, 3.8),
-                     labels = c("0.6\nCool Humid", 
-                                "1.1\nHot Humid", 
-                                "2.5\nCool Dry", 
-                                "3.8\nHot Dry")) +
+                     labels = c("0.6\nCH", 
+                                "1.1\nHH", 
+                                "2.5\nCD", 
+                                "3.8\nHD")) +
   xlab("Vapor Pressure Deficit (kPa)") + 
   ylab(expression(Delta ~ 'CEWL')) + 
   theme(text = element_text(color = "black", 

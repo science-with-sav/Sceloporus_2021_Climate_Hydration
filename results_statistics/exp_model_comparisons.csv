@@ -1,7 +1,7 @@
 "","response","model","RMSE","Rsq","AICc","Delta_AICc"
-"1","∆CEWL","Humidity",7.11,0.21,918.19,0
-"2","∆CEWL","VPD",7.46,0.15,932.2,14.01
-"3","∆CEWL","Temp",8.24,0.02,955.4,37.21
+"1","deltaCEWL","Humidity",7.11,0.21,918.19,0
+"2","deltaCEWL","VPD",7.46,0.15,932.2,14.01
+"3","deltaCEWL","Temp",8.24,0.02,955.4,37.21
 "4","Plasma Osmolality (mmol/kg)","Day * Temp",22.73,0.02,3583.06,0
 "5","Plasma Osmolality (mmol/kg)","Day * Humidity",22.83,0.01,3586.7,3.64
 "6","Plasma Osmolality (mmol/kg)","Day * VPD",22.76,0.01,3587.55,4.49

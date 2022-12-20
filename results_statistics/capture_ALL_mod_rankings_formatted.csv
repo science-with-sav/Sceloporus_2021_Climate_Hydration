@@ -1,0 +1,26 @@
+Response,Model,K,AICc,Delta_AICc,ModelLik,AICcWt,LL,Cum.Wt
+CEWL (g m2 h,"(model 10) ~ Temp-M, Osml, Hold Time, Solar-C, VPD-M",8,512.91,0,1,0.34,-247.65,0.34
+,"(model 9) ~ Temp-M, Osml, Hold Time, Solar-C, VPD-M, Wind-C",9,512.96,0.05,0.98,0.33,-246.46,0.68
+,"(model 12) ~ Temp-M, Osml, Hold Time",6,514.4,1.49,0.48,0.16,-250.74,0.84
+,"(model 7) ~ Temp-M, Osml, Hold Time, Solar-C, VPD-M, Wind-C, Mass, VPD-C",11,515.88,2.97,0.23,0.08,-245.41,0.91
+,"(model 8) ~ Temp-M, Osml, Hold Time, Solar-C, VPD-M, Wind-C, Mass",10,516.74,3.83,0.15,0.05,-247.11,0.97
+,"(model 6) ~ Temp-M, Osml, Hold Time, Solar-C, VPD-M, Wind-C, Mass, VPD-C, SMI",12,518.2,5.28,0.07,0.02,-245.26,0.99
+,"(model 5) ~ Temp-M, Osml, Hold Time, Solar-C, VPD-M, Wind-C, Mass, VPD-C, SMI, Clo-Temp",13,520.4,7.48,0.02,0.01,-245.03,1
+,"(model 11) ~ Temp-M, Osml, Hold Time, Solar-C",7,523.12,10.2,0.01,0,-253.94,1
+,"(model 4) ~ Temp-M, Osml, Hold Time, Solar-C, VPD-M, Wind-C, Mass, VPD-C, SMI, Clo-Temp, Hct",14,526.73,13.82,0,0,-246.84,1
+,"(model 13) ~ Temp-M, Osml",5,617.49,104.57,0,0,-303.46,1
+,(model 14) ~ Temp-M,4,619.58,106.67,0,0,-305.6,1
+,null model,3,632.3,119.39,0,0,-313.04,1
+Plasma Osmolality (mmol kg),"(model 7) ~ Temp-C, Mass, SVL",6,796.77,0,1,0.53,-391.92,0.53
+,"(model 8) ~ Temp-C, Mass",5,797.78,1.01,0.6,0.32,-393.56,0.85
+,(model 9) ~ Temp-C,4,799.78,3.01,0.22,0.12,-395.68,0.97
+,"(model 6) ~ Temp-C, Mass, SVL, Solar-C",7,803.35,6.58,0.04,0.02,-394.05,0.99
+,"(model 4) ~ Temp-C, Mass, SVL, Solar-C, Hct, Wind-C",9,805.65,8.87,0.01,0.01,-392.8,1
+,"(model 5) ~ Temp-C, Mass, SVL, Solar-C, Hct",8,806.12,9.35,0.01,0,-394.25,1
+,null model,3,916.76,119.99,0,0,-455.27,1
+Hematocrit (%),"(model 7) ~ Wind-C, SMI",4,590.8,0,1,0.56,-291.19,0.56
+,"(model 6) ~ Wind-C, SMI, Solar-C",5,592.18,1.38,0.5,0.28,-290.76,0.84
+,"(model 5) ~ Wind-C, SMI, Solar-C, VPD-C",6,594.36,3.56,0.17,0.09,-290.72,0.94
+,(model 8) ~ Wind-C,3,596.48,5.68,0.06,0.03,-295.11,0.97
+,"(model 4) ~ Wind-C, SMI, Solar-C, VPD-C, SVL",7,596.66,5.86,0.05,0.03,-290.71,1
+,null model,2,689.25,98.45,0,0,-342.57,1

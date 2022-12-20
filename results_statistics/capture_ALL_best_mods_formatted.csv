@@ -1,0 +1,13 @@
+Response,Predictor,Estimate,SE,Type 1 SS,df,F statistic,p-value
+CEWL (g m2 h,Intercept,-160.09,32.68,,,,
+,Plasma Osmolality (mmol kg),0.09,0.02,104,"1, 91",11.79,< 0.001
+,Temperature at Measurement (¡C),5.54,1.19,198,"1, 91",22.56,< 0.0001
+,Hold Time (hr),0.33,0.26,14,"1, 91",1.55,0.22
+,Random Effect: Capture Date,2.8,,,,,
+Plasma Osmolality (mmol kg),Intercept,302,19.75,,,,
+,Mass (g),1.36,0.81,615,"1, 92",3.53,0.063
+,Temperature at Capture (¡C),1.7,0.73,925,"1, 93",5.31,0.023
+,Random Effect: Capture Date,18.06,,,,,
+Hematocrit (%),Intercept,20.46,5.56,,,,
+,Body Condition (g'),1.29,0.46,121,"1, 95",5.26,0.024
+,Wind Speed at Capture (mph),1,0.24,390,"1, 95",16.96,< 0.0001

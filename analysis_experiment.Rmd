@@ -198,9 +198,9 @@ end_vals <- dat %>%
 ```
 
 
-## ∆ CEWL
+## delta CEWL
 
-Get a df that only has complete observations that include CEWL values (only obs from before and after the experiment). Then, calculate the CHANGE (∆) in CEWL from before to after the experiment. Because we only measured CEWL at those two time points, it makes more sense to assess the **amount of change** in CEWL for each lizard, rather than measuring the change over time.
+Get a df that only has complete observations that include CEWL values (only obs from before and after the experiment). Then, calculate the CHANGE (delta) in CEWL from before to after the experiment. Because we only measured CEWL at those two time points, it makes more sense to assess the **amount of change** in CEWL for each lizard, rather than measuring the change over time.
 
 ```{r}
 start_CEWL <- dat_no_rehab %>%
@@ -210,7 +210,7 @@ dat_no_rehab_deltaCEWL <- dat_no_rehab %>% # initiate new df
   dplyr::filter(complete.cases(CEWL_g_m2h_mean)) %>% # only use obs incl CEWL
   dplyr::filter(day_n == 8) %>% # get only obs for post-exp
   left_join(start_CEWL, by = 'individual_ID') %>% # add start CEWL to both obs for each lizard
-  mutate(delta_CEWL = CEWL_g_m2h_mean - start_CEWL) # calculate ∆CEWL after-before experiment
+  mutate(delta_CEWL = CEWL_g_m2h_mean - start_CEWL) # calculate deltaCEWL after-before experiment
 ```
 
 
@@ -281,7 +281,7 @@ Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values
 We... 
 calculate RMSE manually, 
 use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects, 
-use the aictab function in the AICmodavg package to get AIC and ∆AIC values, and
+use the aictab function in the AICmodavg package to get AIC and deltaAIC values, and
 get the sum of squares, F, and p-values for each variable from the anova table for each model.
 
 ```{r SMI mod compare}
@@ -402,7 +402,7 @@ Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values
 We... 
 calculate RMSE manually, 
 use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects, 
-use the aictab function in the AICmodavg package to get AIC and ∆AIC values, and
+use the aictab function in the AICmodavg package to get AIC and deltaAIC values, and
 get the sum of squares, F, and p-values for each variable from the anova table for each model.
 
 ```{r hct mod compare}
@@ -518,7 +518,7 @@ Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values
 We... 
 calculate RMSE manually, 
 use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects, 
-use the aictab function in the AICmodavg package to get AIC and ∆AIC values, and
+use the aictab function in the AICmodavg package to get AIC and deltaAIC values, and
 get the sum of squares, F, and p-values for each variable from the anova table for each model.
 
 ```{r osml mod compare}
@@ -661,7 +661,7 @@ Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values
 We... 
 calculate RMSE manually, 
 use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects, 
-use the aictab function in the AICmodavg package to get AIC and ∆AIC values, and
+use the aictab function in the AICmodavg package to get AIC and deltaAIC values, and
 get the sum of squares, F, and p-values for each variable from the anova table for each model.
 
 ```{r CEWL mod compare}
@@ -693,7 +693,7 @@ CEWL_AICc <- data.frame(aictab(cand.set = CEWL_models,
 # compare across models
 CEWL_across <- CEWL_RMSE_Rsq %>%
   left_join(CEWL_AICc, by = 'model') %>%
-  mutate(response = "∆CEWL") %>%
+  mutate(response = "deltaCEWL") %>%
   arrange(Delta_AICc)
 
 # calculate F & p-values
@@ -718,7 +718,7 @@ CEWL_within <- CEWL_VPD_p %>%
   rbind(CEWL_hum_p) %>%
   rbind(CEWL_temp_p) %>%
   mutate(df = paste((NumDF), round(DenDF, 0), sep = ", "),
-         response = "∆CEWL")
+         response = "deltaCEWL")
 ```
 
 
@@ -939,9 +939,9 @@ anova(CEWL_VPD_lm)
 
 # Recovery Models
 
-I want to know how the 2-day recovery period affects physiology relative to post- and pre- experiment. To do this, I'll use a two-sided t-test comparing ∆ to the hypothesis of mu=0.
+I want to know how the 2-day recovery period affects physiology relative to post- and pre- experiment. To do this, I'll use a two-sided t-test comparing delta to the hypothesis of mu=0.
 
-First, calculate the mean ∆ and SEM?
+First, calculate the mean delta and SEM?
 
 ```{r}
 recovery_v_post_exp_summary <- recovery_v_post_exp %>%
@@ -2017,7 +2017,7 @@ CEWL_lm_fig
 
 
 
-### ∆ CEWL ~ VPD
+### delta CEWL ~ VPD
 
 ```{r}
 ggplot(data = dat_no_rehab_deltaCEWL) +

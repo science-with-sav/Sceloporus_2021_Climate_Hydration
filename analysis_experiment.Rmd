@@ -1184,7 +1184,7 @@ ggplot() +
                                  size = 8),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 12),
+                                 size = 8),
         legend.text.align = 0,
         legend.position = "none",
         plot.margin = margin(t = 6, r = 6, b = 6, l = 10.8, unit = "pt")
@@ -1302,7 +1302,7 @@ ggplot() +
         #axis.text.x = element_blank(),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 12),
+                                 size = 8),
         legend.text.align = 0,
         legend.position = "none",
         plot.margin = unit(c(0, #top
@@ -1440,7 +1440,7 @@ ggplot() +
                                  size = 8),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 12),
+                                 size = 8),
         legend.text.align = 0,
         legend.position = "none",
         plot.margin = margin(t = 6, r = 6, b = 0, l = 10.8, unit = "pt")
@@ -1520,7 +1520,7 @@ ggplot() +
                                  size = 8),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 12),
+                                 size = 8),
         legend.text.align = 0,
         legend.position = "none",
         plot.margin = unit(c(0, #top
@@ -1659,7 +1659,7 @@ ggplot() +
                                  size = 8),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 12),
+                                 size = 8),
         legend.text.align = 0,
         legend.position = "none",
         plot.margin = margin(t = 6, r = 6, b = 0, l = 1, unit = "pt")
@@ -1821,7 +1821,7 @@ ggplot() +
         #axis.text.x = element_blank(),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 12),
+                                 size = 8),
         legend.text.align = 0,
         legend.position = "none",
         plot.margin = unit(c(0, #top
@@ -1947,7 +1947,7 @@ ggplot() +
                                  size = 8),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 12),
+                                 size = 8),
         legend.text.align = 0,
         legend.position = "none"
         #legend.position = c(0.25,0.85)
@@ -2027,8 +2027,7 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
                  fill = tmt,
                  shape = tmt), 
                size = 2,
-              alpha = 0.4,
-              position = position_jitter(height = 0, width = 0.15)
+              alpha = 0.4
              ) +
   geom_smooth(aes(x = VPD_kPa_tmttrial,
                    y = delta_CEWL), 
@@ -2161,7 +2160,7 @@ ggplot() +
         #axis.text.x = element_blank(),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 12),
+                                 size = 8),
         legend.text.align = 0,
         legend.position = "none",
         plot.margin = unit(c(0, #top

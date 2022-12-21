@@ -13,6 +13,10 @@ if (!require("tidyverse")) install.packages("tidyverse")
 library("tidyverse") # workflow and plots
 if (!require("weathermetrics")) install.packages("weathermetrics")
 library("weathermetrics") # F to C conversion
+if (!require("RColorBrewer")) install.packages("RColorBrewer")
+library("RColorBrewer") # color
+if (!require("ggpubr")) install.packages("ggpubr")
+library("ggpubr") # for multi-ggplot figs
 ```
 
 # Background
@@ -23,7 +27,7 @@ Our analyses of baseline variation in CEWL and plasma osmolality yielded VERY di
 # Load Data
 
 ```{r load and format data}
-weather_dat <- read.csv("./data/weather_long_term.csv", sep = ';') %>%
+weather_dat_XL <- read.csv("./data/weather_long_term.csv", sep = ';') %>%
   mutate(temperature_F = as.numeric(temperature_F),
          wind_speed_mph = as.numeric(wind_speed_mph),
          RH_percent = as.numeric(RH_percent),
@@ -36,11 +40,18 @@ weather_dat <- read.csv("./data/weather_long_term.csv", sep = ';') %>%
          e_s_kPa = 0.611*exp((2500000/461.5)*
                                   ((1/273)-(1/temp_K))),
          e_a_kPa = e_s_kPa * (RH_percent/100),
-         VPD_kPa = e_s_kPa - e_a_kPa
+         VPD_kPa = e_s_kPa - e_a_kPa,
+         e_s_kPa_CN98 = 0.611 * exp((17.502*temp_C)/(temp_C + 240.97)),
+         # VPD, Campbell & Normal 1998
+         VPD_kPa_CN98 = e_s_kPa_CN98*(1 - (RH_percent/100))
          ) %>%
-  dplyr::filter(complete.cases(temp_C)) %>%
+  dplyr::filter(complete.cases(temp_C, VPD_kPa_CN98)) 
+weather_dat <- weather_dat_XL %>%
   dplyr::filter(date_time >= "2021-04-01 00:00:00" & 
                   date_time <= "2021-09-01 00:00:00")
+weather_dat_active_szn <- weather_dat_XL %>%
+  dplyr::filter(date_time >= "2021-03-01 00:00:00" & 
+                  date_time <= "2021-10-01 00:00:00")
  summary(weather_dat)
 ```
 
@@ -51,7 +62,7 @@ get average daily values:
 weather_dat_daily <- weather_dat %>%
   group_by(date) %>%
   summarise(temp_C = mean(temp_C),
-            VPD_kPa = mean(VPD_kPa),
+            VPD_kPa = mean(VPD_kPa_CN98),
             RH_percent = mean(RH_percent),
             wind_speed_mph = mean(wind_speed_mph),
             solar_radiation_W_m2 = mean(solar_radiation_W_m2)
@@ -126,7 +137,7 @@ temp_fig
 ```{r VPD over time}
 ggplot(data = weather_dat, 
        aes(x = date_time,
-                y = VPD_kPa)) + 
+                y = VPD_kPa_CN98)) + 
   # all data
   geom_line(alpha = 0.6,
             color = "gray") +
@@ -302,6 +313,102 @@ sorad_fig
 
 
 
+
+## Active Season 
+
+```{r}
+# mean tmt values
+tmts <- data.frame(tmt = c("Cool Humid", "Hot Humid", "Cool Dry", "Hot Dry"),
+                   VPD_kPa = c(0.6, 1.1, 2.5, 3.8),
+                   temp_C = c(23.8, 34.9, 24.4, 35.5),
+                   RH_percent = c(78.3, 80.9, 17.9, 34.1))
+tmts$tmt <- factor(tmts$tmt,
+                   levels = c("Cool Humid", "Hot Humid", "Cool Dry", "Hot Dry"))
+# colors, shapes, labels
+CH_color <- brewer.pal(4, "Spectral")[c(4)]
+HH_color <- brewer.pal(4, "Spectral")[c(2)]
+CD_color <- brewer.pal(4, "Spectral")[c(3)]
+HD_color <- brewer.pal(4, "Spectral")[c(1)]
+my_colors <- c(CH_color, HH_color, CD_color, HD_color)
+CH_shp <- 15
+HH_shp <- 19
+CD_shp <- 15
+HD_shp <- 19
+my_shapes <- c(CH_shp, HH_shp, CD_shp, HD_shp)
+my_labels <- c("Cool Humid\n0.6 kPa",
+                               "Hot Humid\n1.1 kPa",
+                               "Cool Dry\n2.5 kPa",
+                               "Hot Dry\n3.8 kPa")
+
+# plot
+ggplot() +
+  geom_tile(data = weather_dat_active_szn,
+            aes(x = temp_C, 
+                y = RH_percent,
+                fill = VPD_kPa_CN98),
+            alpha = 0.5,
+            height = 1,
+            width = 0.4) +
+  geom_point(data = tmts,
+             aes(x = temp_C,
+                 y = RH_percent, 
+                 color = tmt,
+                 shape = tmt), 
+              size = 4,
+              alpha = 1) +
+  scale_fill_distiller(palette = "PuRd", direction = 1, name = NULL) +
+  theme_classic() + 
+  scale_shape_manual(values = my_shapes, name = NULL,
+                     labels = my_labels) +
+  scale_color_manual(values = my_colors, name = NULL,
+                     labels = my_labels) +
+  xlab("Temperature (°C)") + 
+  ylab("Relative Humidity (%)") + 
+  guides(shape = guide_legend(nrow = 4, byrow = TRUE),
+         #fill = guide_legend(title.position = "left") # makes color ramp weird
+         ) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        #axis.text.x = element_blank(),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.text.align = 0,
+        legend.position = "bottom",
+        legend.title.align = 0.5,
+        legend.direction = "vertical",
+        legend.margin = unit(10, "mm")
+        #plot.margin = unit(c(0, #top
+         #                     0, #right
+          #                    0, #bottom
+           #                   0), "mm")
+        ) -> tmt_weather_fig
+tmt_weather_fig
+
+# use ggarrange so legend is centered
+tmt_weather_fig_formatted <- ggarrange(tmt_weather_fig,
+                                        ncol = 1, nrow = 1,
+                                        common.legend = TRUE,
+                                        legend = "bottom")
+# save
+ggsave(filename = "exp_vs_weather_fig.pdf",
+       plot = tmt_weather_fig,
+       path = "./results_figures",
+       device = "pdf",
+       dpi = 600,
+       units = "mm",
+       width = 80, height = 100)
+```
+
+
+
+
+
+
 # Stats
 
 
@@ -320,8 +427,8 @@ variation <- weather_dat %>%
   group_by(study) %>%
   summarise(temp_CV = (sd(temp_C)/mean(temp_C)) *100,
             temp_range = max(temp_C) - min(temp_C),
-            VPD_CV = (sd(VPD_kPa)/mean(VPD_kPa)) *100,
-            VPD_range = max(VPD_kPa) - min(VPD_kPa),
+            VPD_CV = (sd(VPD_kPa_CN98)/mean(VPD_kPa_CN98)) *100,
+            VPD_range = max(VPD_kPa_CN98) - min(VPD_kPa_CN98),
             wind_CV = (sd(wind_speed_mph)/mean(wind_speed_mph)) *100,
             wind_range = max(wind_speed_mph) - min(wind_speed_mph),
             sorad_CV = (sd(solar_radiation_W_m2)/mean(solar_radiation_W_m2)) *100,
@@ -371,11 +478,11 @@ mean_humid_VPD <- weather_dat %>%
                   as.numeric(substr(date_time, 12, 13)) > 6) %>%
   # get by date first
   group_by(date) %>%
-  summarise(VPD_kPa = mean(VPD_kPa),
+  summarise(VPD_kPa_CN98 = mean(VPD_kPa_CN98),
             RH_percent = mean(RH_percent)) %>%
   # mean across dates
-  summarise(mean_VPD = mean(VPD_kPa),
-            sd_VPD = sd(VPD_kPa),
+  summarise(mean_VPD = mean(VPD_kPa_CN98),
+            sd_VPD = sd(VPD_kPa_CN98),
             mean_RH = mean(RH_percent),
             sd_RH = sd(RH_percent))
 mean_humid_VPD

@@ -351,37 +351,55 @@ ggplot() +
             width = 0.4) +
   geom_point(data = tmts,
              aes(x = temp_C,
-                 y = RH_percent, 
-                 color = tmt,
-                 shape = tmt), 
+                 y = RH_percent), 
+                 color = my_colors,
+                 shape = my_shapes, 
               size = 4,
               alpha = 1) +
-  scale_fill_distiller(palette = "PuRd", direction = 1, name = NULL) +
+  geom_point(data = tmts,
+             aes(x = temp_C,
+                 y = RH_percent), 
+             shape = c(22,21,22,21), # same as my_shapes, but with no fill
+             color = "black",
+              size = 4,
+              alpha = 1) +
+  scale_fill_distiller(palette = "PuRd", direction = 1, name = "VPD (kPa)") +
   theme_classic() + 
-  scale_shape_manual(values = my_shapes, name = NULL,
-                     labels = my_labels) +
-  scale_color_manual(values = my_colors, name = NULL,
-                     labels = my_labels) +
+  #scale_shape_manual(values = my_shapes, name = NULL,
+   #                  labels = my_labels) +
+  #scale_color_manual(values = my_colors, name = NULL,
+   #                  labels = my_labels) +
   xlab("Temperature (°C)") + 
   ylab("Relative Humidity (%)") + 
-  guides(shape = guide_legend(nrow = 4, byrow = TRUE),
-         #fill = guide_legend(title.position = "left") # makes color ramp weird
-         ) +
+  xlim(0,40) + ylim(0,100) +
+  #guides(shape = guide_legend(nrow = 4, byrow = TRUE),
+   #      #fill = guide_legend(title.position = "left") # makes color ramp weird
+    #     ) +
+  annotate("text", label = "Cool Humid\n0.6 kPa",
+            x = 26, y = 87, size = 2.6, color = "black") +
+  annotate("text", label = "Hot Humid\n1.1 kPa",
+            x = 37, y = 90, size = 2.6, color = "black") +
+  annotate("text", label = "Cool Dry\n2.5 kPa",
+            x = 21, y = 9, size = 2.6, color = "black") +
+  annotate("text", label = "Hot Dry\n3.8 kPa",
+            x = 38, y = 43, size = 2.6, color = "black") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 12),
         axis.text = element_text(color = "black", 
                                  family = "sans", 
                                  size = 8),
-        #axis.text.x = element_blank(),
         legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.title = element_text(color = "black", 
                                  family = "sans", 
                                  size = 8),
         legend.text.align = 0,
         legend.position = "bottom",
         legend.title.align = 0.5,
-        legend.direction = "vertical",
-        legend.margin = unit(10, "mm")
+        legend.direction = "horizontal",
+        legend.margin = margin(t = 5, unit = "mm")
         #plot.margin = unit(c(0, #top
          #                     0, #right
           #                    0, #bottom
@@ -396,7 +414,7 @@ tmt_weather_fig_formatted <- ggarrange(tmt_weather_fig,
                                         legend = "bottom")
 # save
 ggsave(filename = "exp_vs_weather_fig.pdf",
-       plot = tmt_weather_fig,
+       plot = tmt_weather_fig_formatted,
        path = "./results_figures",
        device = "pdf",
        dpi = 600,
@@ -452,7 +470,7 @@ Range differences are pretty negligible.
 Try a simple linear model of weather ~ date:
 
 ```{r}
-summary(lm(data = weather_dat_daily, temp_C ~ date))
+anova(lm(data = weather_dat_daily, temp_C ~ date))
 summary(lm(data = weather_dat_daily, VPD_kPa ~ date))
 summary(lm(data = weather_dat_daily, wind_speed_mph ~ date))
 summary(lm(data = weather_dat_daily, solar_radiation_W_m2 ~ date))

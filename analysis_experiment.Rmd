@@ -590,7 +590,7 @@ ggplot(dat_no_rehab) +
 Test an lm of raw CEWL ~ body temp for day 8 measurements only.
 
 ```{r}
-body_temp_test_dat <- dat_no_rehab %>%
+body_temp_test_dat <- dat_no_rehab_deltaCEWL %>%
   dplyr::filter(complete.cases(CEWL_g_m2h_mean)) %>%
   dplyr::filter(day_n == 8)
 
@@ -601,10 +601,80 @@ summary(CEWL_body_temp_mod)
 
 No relationship! So, continue on without.
 
+Also check body temp ~ measurement temp... and CEWL ~ msmt temp
+
+```{r}
+temp_body_temp_mod <- lm(data = body_temp_test_dat, 
+                         cloacal_temp_C ~ msmt_temp_C)
+summary(temp_body_temp_mod)
+
+ggplot(body_temp_test_dat) + 
+  geom_point(aes(x = msmt_temp_C,
+                 y = cloacal_temp_C)) +
+  xlim(23, 28) + ylim(23,28)
+ggplot(body_temp_test_dat) + 
+  geom_point(aes(x = msmt_temp_C,
+                 y = CEWL_g_m2h_mean,
+                 color = tmt))
+
+CEWL_msmt_temp_mod <- lm(data = body_temp_test_dat, 
+                         CEWL_g_m2h_mean ~ msmt_temp_C)
+summary(CEWL_msmt_temp_mod)
+
+HH_temp <- body_temp_test_dat %>%
+  dplyr::filter(substr(tmt, 1, 6) == "Hot Hu")
+CEWL_msmt_temp_HH <- lm(data = HH_temp, 
+                         CEWL_g_m2h_mean ~ msmt_temp_C)
+summary(CEWL_msmt_temp_HH) # p = 0.12
+
+HD_temp <- body_temp_test_dat %>%
+  dplyr::filter(substr(tmt, 1, 6) == "Hot Dr")
+CEWL_msmt_temp_HD <- lm(data = HD_temp, 
+                         CEWL_g_m2h_mean ~ msmt_temp_C)
+summary(CEWL_msmt_temp_HD) # p = 0.02***
+
+CH_temp <- body_temp_test_dat %>%
+  dplyr::filter(substr(tmt, 1, 6) == "Cool H")
+CEWL_msmt_temp_CH <- lm(data = CH_temp, 
+                         CEWL_g_m2h_mean ~ msmt_temp_C)
+summary(CEWL_msmt_temp_CH) # p = 0.32
+
+CD_temp <- body_temp_test_dat %>%
+  dplyr::filter(substr(tmt, 1, 6) == "Cool D")
+CEWL_msmt_temp_CD <- lm(data = CD_temp, 
+                         CEWL_g_m2h_mean ~ msmt_temp_C)
+summary(CEWL_msmt_temp_CD) # p = 0.09
+
+```
+
+
 
 
 
 ## CEWL
+
+
+
+### t-tests
+
+```{r}
+CEWL_ttest_HH <- t.test(HH_temp$delta_CEWL, 
+                        mu = 0, alternative = "two.sided")
+CEWL_ttest_HH
+
+CEWL_ttest_HD <- t.test(HD_temp$delta_CEWL, 
+                        mu = 0, alternative = "two.sided")
+CEWL_ttest_HD
+
+CEWL_ttest_CH <- t.test(CH_temp$delta_CEWL, 
+                        mu = 0, alternative = "two.sided")
+CEWL_ttest_CH
+
+CEWL_ttest_CD <- t.test(CD_temp$delta_CEWL, 
+                        mu = 0, alternative = "two.sided")
+CEWL_ttest_CD
+```
+
 
 
 
@@ -2042,9 +2112,21 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
       #        method = "lm",
        #       color = "red") +
   theme_classic() + 
-  scale_shape_manual(values = my_shapes, name = "") +
-  scale_fill_manual(values = my_colors, name = "") +
-  scale_color_manual(values = my_colors, name = "") +
+  scale_shape_manual(values = my_shapes_box, name = "",
+                     labels = c("Cool Humid (CH)",
+                               "Hot Humid (HH)",
+                               "Cool Dry (CD)",
+                               "Hot Dry (HD)")) +
+  scale_fill_manual(values = my_colors, name = "",
+                     labels = c("Cool Humid (CH)",
+                               "Hot Humid (HH)",
+                               "Cool Dry (CD)",
+                               "Hot Dry (HD)")) +
+  scale_color_manual(values = my_colors, name = "",
+                     labels = c("Cool Humid (CH)",
+                               "Hot Humid (HH)",
+                               "Cool Dry (CD)",
+                               "Hot Dry (HD)")) +
   scale_y_continuous(limits = c(-13,40),
                      breaks = c(seq(-10,40, by = 10)),
                      labels = c(seq(-10,40, by = 10))
@@ -2057,6 +2139,7 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
                                 "3.8\nHD")) +
   xlab("Vapor Pressure Deficit (kPa)") + 
   ylab(expression(Delta ~ 'CEWL')) + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 12),
@@ -2066,9 +2149,10 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
         #axis.text.x = element_blank(),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
-                                 size = 12),
+                                 size = 8),
         legend.text.align = 0,
-        legend.position = "none",
+        legend.position = "bottom",
+        legend.spacing.y = unit(0, "mm")
         #plot.margin = unit(c(0, #top
          #                     0, #right
           #                    0, #bottom
@@ -2076,14 +2160,19 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
         ) -> CEWL_VPD_fig
 CEWL_VPD_fig
 
+# use ggarrange so legend is centered
+CEWL_VPD_fig_formatted <- ggarrange(CEWL_VPD_fig,
+                                ncol = 1, nrow = 1,
+                                common.legend = TRUE,
+                                legend = "bottom")
 # save
 ggsave(filename = "exp_CEWL_delta_VPD.pdf",
-       plot = CEWL_VPD_fig,
+       plot = CEWL_VPD_fig_formatted,
        path = "./results_figures",
        device = "pdf",
        dpi = 600,
        units = "mm",
-       width = 80, height = 60)
+       width = 80, height = 90)
 ```
 
 

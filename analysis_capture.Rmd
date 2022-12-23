@@ -290,6 +290,15 @@ hct_mod7p <- lm(data = dat_reduced,
                           SMI +
                           # weather at the time of capture
                           wind_mph_interpol)
+hct_mod6p <- lm(data = dat_reduced,
+                          # response variable
+                          hematocrit_percent ~ 
+                          # body size
+                          SMI +
+                          # weather at the time of capture
+                          wind_mph_interpol + solar_rad_W_sqm_interpol)
+anova(hct_mod7p)
+anova(hct_mod6p)
 #write.csv(hct_AICc, "./results_statistics/capture_hct_mod_rankings.csv")
 #write.csv(broom.mixed::tidy(hct_mod6), 
  #         "./results_statistics/capture_hct_best_mod1.csv")
@@ -530,7 +539,7 @@ osml_mod7p <- lmerTest::lmer(data = dat_reduced,
                           # weather at the time of capture
                           temp_C_interpol + 
                           (1|capture_date))
-summary(osml_mod7p)
+anova(osml_mod7p)
 
 osml_mod8p <- lmerTest::lmer(data = dat_reduced,
                           # response variable
@@ -974,7 +983,7 @@ CEWL_mod9p <- lmerTest::lmer(data = dat_reduced,
                           # time between capture and measurements
                           hold_time_hr +
                           (1|capture_date))
-summary(CEWL_mod9p)
+anova(CEWL_mod9p)
 
 CEWL_mod12p <- lmerTest::lmer(data = dat_reduced,
                           # response variable
@@ -1443,10 +1452,13 @@ cap_CEWL_clotemp_fig
 ```{r CEWL osml fig}
 ggplot(dat) + 
   aes(x = osmolality_mmol_kg_mean,
-                 y = (CEWL_g_m2h_mean/msmt_VPD_kPa),
+                 y = (CEWL_g_m2h_mean),
       #color = as.factor(capture_date)
       ) +
   geom_point(size = 1, 
+             shape = 21,
+             fill = "black",
+             color = "black",
              alpha = 0.4) + 
   stat_smooth(formula = y ~ x, 
               method = "lm", 
@@ -1458,7 +1470,7 @@ ggplot(dat) +
   xlab(bquote('Osmolality (mmol '*kg^-1*')')) + 
   ylab(bquote('CEWL (g '*m^-2*' '*h^-1*')')) + 
   xlim(300, 400) +
-  #ylim(0, 40) +
+  ylim(0, 40) +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 12),
@@ -1476,7 +1488,7 @@ ggsave(filename = "cap_CEWL_osml_fig.pdf",
        device = "pdf",
        dpi = 600,
        units = "mm",
-       width = 80, height = 60)
+       width = 80, height = 70)
 ```
 
 

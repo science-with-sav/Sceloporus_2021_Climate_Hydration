@@ -905,7 +905,7 @@ all_emtrends <- CEWL_emtrends %>%
 #write.csv(all_emtrends, "./results_statistics/exp_emtrends_per_day_change.csv")
 ```
 
-
+Given the daily trends for plasma osmolality, in total for acclimation ∆ osml had 1.04 (0.13x8) to 13 (1.587x8) mmol/kg of change.
 
 
 
@@ -953,7 +953,7 @@ summary(CD_CEWL_osml)
 anova(CD_CEWL_osml, type = "1", ddf = "Kenward-Roger")
 ```
 
-Even though only data for one treatment group was significant, all have a positive relationship!
+Even though only data for one treatment group was significant, all have a positive relationship
 
 
 # CEWL ~ VPD

@@ -611,19 +611,6 @@ ggplot(body_temp_test_dat) +
   geom_point(aes(x = msmt_temp_C,
                  y = CEWL_g_m2h_mean,
                  color = tmt))
-
-HH_temp <- body_temp_test_dat %>%
-  dplyr::filter(substr(tmt, 1, 6) == "Hot Hu")
-
-HD_temp <- body_temp_test_dat %>%
-  dplyr::filter(substr(tmt, 1, 6) == "Hot Dr")
-
-CH_temp <- body_temp_test_dat %>%
-  dplyr::filter(substr(tmt, 1, 6) == "Cool H")
-
-CD_temp <- body_temp_test_dat %>%
-  dplyr::filter(substr(tmt, 1, 6) == "Cool D")
-
 ```
 
 
@@ -924,11 +911,49 @@ all_emtrends <- CEWL_emtrends %>%
 
 # CEWL ~ osmolality
 
-```{r}
+First, get a separate df for each tmt group:
 
+```{r}
+HH8 <- body_temp_test_dat %>%
+  dplyr::filter(substr(tmt, 1, 6) == "Hot Hu")
+HD8 <- body_temp_test_dat %>%
+  dplyr::filter(substr(tmt, 1, 6) == "Hot Dr")
+CH8 <- body_temp_test_dat %>%
+  dplyr::filter(substr(tmt, 1, 6) == "Cool H")
+CD8 <- body_temp_test_dat %>%
+  dplyr::filter(substr(tmt, 1, 6) == "Cool D")
 ```
 
 
+Then, run models for CEWL ~ osmolality:
+
+```{r}
+HH_CEWL_osml <- lmerTest::lmer(data = HH8, 
+                               CEWL_g_m2h_mean ~ osmolality_mmol_kg_mean +
+                               (1|trial_number))
+summary(HH_CEWL_osml)
+anova(HH_CEWL_osml, type = "1", ddf = "Kenward-Roger")
+
+HD_CEWL_osml <- lmerTest::lmer(data = HD8, 
+                               CEWL_g_m2h_mean ~ osmolality_mmol_kg_mean +
+                               (1|trial_number))
+summary(HD_CEWL_osml)
+anova(HD_CEWL_osml, type = "1", ddf = "Kenward-Roger")
+
+CH_CEWL_osml <- lmerTest::lmer(data = CH8, 
+                               CEWL_g_m2h_mean ~ osmolality_mmol_kg_mean +
+                               (1|trial_number))
+summary(CH_CEWL_osml)
+anova(CH_CEWL_osml, type = "1", ddf = "Kenward-Roger")
+
+CD_CEWL_osml <- lmerTest::lmer(data = CD8, 
+                               CEWL_g_m2h_mean ~ osmolality_mmol_kg_mean +
+                               (1|trial_number))
+summary(CD_CEWL_osml)
+anova(CD_CEWL_osml, type = "1", ddf = "Kenward-Roger")
+```
+
+Even though only data for one treatment group was significant, all have a positive relationship!
 
 
 # CEWL ~ VPD

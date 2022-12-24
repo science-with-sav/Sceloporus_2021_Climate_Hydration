@@ -578,7 +578,7 @@ osml_within <- osml_VPD_p %>%
 
 ## Body Temp
 
-I need to double check whether CEWL has a relationship with body temperature at the point of measurement, to make sure I do not need to account for it.
+I need to double check whether CEWL has a relationship with body temperature at the point of measurement.
 
 ```{r}
 ggplot(dat_no_rehab) + 
@@ -594,20 +594,15 @@ body_temp_test_dat <- dat_no_rehab_deltaCEWL %>%
   dplyr::filter(complete.cases(CEWL_g_m2h_mean)) %>%
   dplyr::filter(day_n == 8)
 
-CEWL_body_temp_mod <- lm(data = body_temp_test_dat, 
-                         CEWL_g_m2h_mean ~ cloacal_temp_C)
+CEWL_body_temp_mod <- lmerTest::lmer(data = body_temp_test_dat, 
+                         CEWL_g_m2h_mean ~ cloacal_temp_C * tmt +
+                           (1|trial_number))
 summary(CEWL_body_temp_mod)
+anova(CEWL_body_temp_mod, type = "1", ddf = "Kenward-Roger")
 ```
 
-No relationship! So, continue on without.
-
-Also check body temp ~ measurement temp... and CEWL ~ msmt temp
 
 ```{r}
-temp_body_temp_mod <- lm(data = body_temp_test_dat, 
-                         cloacal_temp_C ~ msmt_temp_C)
-summary(temp_body_temp_mod)
-
 ggplot(body_temp_test_dat) + 
   geom_point(aes(x = msmt_temp_C,
                  y = cloacal_temp_C)) +
@@ -617,33 +612,17 @@ ggplot(body_temp_test_dat) +
                  y = CEWL_g_m2h_mean,
                  color = tmt))
 
-CEWL_msmt_temp_mod <- lm(data = body_temp_test_dat, 
-                         CEWL_g_m2h_mean ~ msmt_temp_C)
-summary(CEWL_msmt_temp_mod)
-
 HH_temp <- body_temp_test_dat %>%
   dplyr::filter(substr(tmt, 1, 6) == "Hot Hu")
-CEWL_msmt_temp_HH <- lm(data = HH_temp, 
-                         CEWL_g_m2h_mean ~ msmt_temp_C)
-summary(CEWL_msmt_temp_HH) # p = 0.12
 
 HD_temp <- body_temp_test_dat %>%
   dplyr::filter(substr(tmt, 1, 6) == "Hot Dr")
-CEWL_msmt_temp_HD <- lm(data = HD_temp, 
-                         CEWL_g_m2h_mean ~ msmt_temp_C)
-summary(CEWL_msmt_temp_HD) # p = 0.02***
 
 CH_temp <- body_temp_test_dat %>%
   dplyr::filter(substr(tmt, 1, 6) == "Cool H")
-CEWL_msmt_temp_CH <- lm(data = CH_temp, 
-                         CEWL_g_m2h_mean ~ msmt_temp_C)
-summary(CEWL_msmt_temp_CH) # p = 0.32
 
 CD_temp <- body_temp_test_dat %>%
   dplyr::filter(substr(tmt, 1, 6) == "Cool D")
-CEWL_msmt_temp_CD <- lm(data = CD_temp, 
-                         CEWL_g_m2h_mean ~ msmt_temp_C)
-summary(CEWL_msmt_temp_CD) # p = 0.09
 
 ```
 
@@ -942,6 +921,12 @@ all_emtrends <- CEWL_emtrends %>%
 
 
 
+
+# CEWL ~ osmolality
+
+```{r}
+
+```
 
 
 

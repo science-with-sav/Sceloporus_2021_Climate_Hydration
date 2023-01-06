@@ -26,6 +26,113 @@ Our analyses of baseline variation in CEWL and plasma osmolality yielded VERY di
 
 # Load Data
 
+first, get the sunrise and sunset times March - September:
+(source: https://gml.noaa.gov/grad/solcalc/table.php?lat=35.304442&lon=-120.65925&year=2021)
+
+sunrise times:
+
+```{r}
+sunrises <- read.csv("./data/sunrise_SLO_2021.csv")
+rise_March <- sunrises %>%
+  dplyr::select(Day, time = Mar) %>%
+  mutate(date = paste("2021", "03", Day, sep = "-"),
+         sunrise = as.POSIXct(paste(date, time, sep = " ")))
+rise_April <- sunrises %>%
+  dplyr::select(Day, time = Apr) %>%
+  dplyr::filter(time != "") %>%
+  mutate(date = paste("2021", "04", Day, sep = "-"),
+         sunrise = as.POSIXct(paste(date, time, sep = " ")))
+rise_May <- sunrises %>%
+  dplyr::select(Day, time = May) %>%
+  dplyr::filter(time != "") %>%
+  mutate(date = paste("2021", "05", Day, sep = "-"),
+         sunrise = as.POSIXct(paste(date, time, sep = " ")))
+rise_June <- sunrises %>%
+  dplyr::select(Day, time = Jun) %>%
+  dplyr::filter(time != "") %>%
+  mutate(date = paste("2021", "06", Day, sep = "-"),
+         sunrise = as.POSIXct(paste(date, time, sep = " ")))
+rise_July <- sunrises %>%
+  dplyr::select(Day, time = Jul) %>%
+  dplyr::filter(time != "") %>%
+  mutate(date = paste("2021", "07", Day, sep = "-"),
+         sunrise = as.POSIXct(paste(date, time, sep = " ")))
+rise_August <- sunrises %>%
+  dplyr::select(Day, time = Aug) %>%
+  dplyr::filter(time != "") %>%
+  mutate(date = paste("2021", "08", Day, sep = "-"),
+         sunrise = as.POSIXct(paste(date, time, sep = " ")))
+rise_September <- sunrises %>%
+  dplyr::select(Day, time = Sep) %>%
+  dplyr::filter(time != "") %>%
+  mutate(date = paste("2021", "09", Day, sep = "-"),
+         sunrise = as.POSIXct(paste(date, time, sep = " ")))
+
+sunrises_formatted <- rise_March %>%
+  rbind(rise_April) %>%
+  rbind(rise_May) %>%
+  rbind(rise_June) %>%
+  rbind(rise_July) %>%
+  rbind(rise_August) %>%
+  rbind(rise_September) %>%
+  dplyr::select(date, sunrise) %>%
+  mutate(date = as.Date(date))
+```
+
+
+sunset times:
+
+```{r}
+sunsets <- read.csv("./data/sunset_SLO_2021.csv")
+set_March <- sunsets %>%
+  dplyr::select(Day, time = Mar) %>%
+  mutate(date = paste("2021", "03", Day, sep = "-"),
+         sunset = as.POSIXct(paste(date, time, sep = " ")))
+set_April <- sunsets %>%
+  dplyr::select(Day, time = Apr) %>%
+  dplyr::filter(time != "") %>%
+  mutate(date = paste("2021", "04", Day, sep = "-"),
+         sunset = as.POSIXct(paste(date, time, sep = " ")))
+set_May <- sunsets %>%
+  dplyr::select(Day, time = May) %>%
+  dplyr::filter(time != "") %>%
+  mutate(date = paste("2021", "05", Day, sep = "-"),
+         sunset = as.POSIXct(paste(date, time, sep = " ")))
+set_June <- sunsets %>%
+  dplyr::select(Day, time = Jun) %>%
+  dplyr::filter(time != "") %>%
+  mutate(date = paste("2021", "06", Day, sep = "-"),
+         sunset = as.POSIXct(paste(date, time, sep = " ")))
+set_July <- sunsets %>%
+  dplyr::select(Day, time = Jul) %>%
+  dplyr::filter(time != "") %>%
+  mutate(date = paste("2021", "07", Day, sep = "-"),
+         sunset = as.POSIXct(paste(date, time, sep = " ")))
+set_August <- sunsets %>%
+  dplyr::select(Day, time = Aug) %>%
+  dplyr::filter(time != "") %>%
+  mutate(date = paste("2021", "08", Day, sep = "-"),
+         sunset = as.POSIXct(paste(date, time, sep = " ")))
+set_September <- sunsets %>%
+  dplyr::select(Day, time = Sep) %>%
+  dplyr::filter(time != "") %>%
+  mutate(date = paste("2021", "09", Day, sep = "-"),
+         sunset = as.POSIXct(paste(date, time, sep = " ")))
+
+sunsets_formatted <- set_March %>%
+  rbind(set_April) %>%
+  rbind(set_May) %>%
+  rbind(set_June) %>%
+  rbind(set_July) %>%
+  rbind(set_August) %>%
+  rbind(set_September) %>%
+  dplyr::select(date, sunset) %>%
+  mutate(date = as.Date(date))
+```
+
+
+load in weather data from ITRC:
+
 ```{r load and format data}
 weather_dat_XL <- read.csv("./data/weather_long_term.csv", sep = ';') %>%
   mutate(temperature_F = as.numeric(temperature_F),
@@ -51,8 +158,17 @@ weather_dat <- weather_dat_XL %>%
                   date_time <= "2021-09-01 00:00:00")
 weather_dat_active_szn <- weather_dat_XL %>%
   dplyr::filter(date_time >= "2021-03-01 00:00:00" & 
-                  date_time <= "2021-10-01 00:00:00")
- summary(weather_dat)
+                  date_time <= "2021-10-01 00:00:00") %>%
+  # add sunrise and sunset times
+  left_join(sunrises_formatted, by = 'date') %>%
+  left_join(sunsets_formatted, by = 'date') %>%
+  group_by(date) %>%
+  mutate(daytime = case_when(date_time >= sunrise & date_time <= sunset ~ "day",
+                             date_time < sunrise ~ "night",
+                             date_time > sunset ~ "night"),
+         daytime = as.factor(daytime)) %>%
+  dplyr::filter(daytime == "day")
+summary(weather_dat_active_szn)
 ```
 
 

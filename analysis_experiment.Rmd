@@ -620,23 +620,36 @@ ggplot(body_temp_test_dat) +
 ## CEWL
 
 
+First, get a separate df for each tmt group:
+
+```{r}
+HH8 <- body_temp_test_dat %>%
+  dplyr::filter(substr(tmt, 1, 6) == "Hot Hu")
+HD8 <- body_temp_test_dat %>%
+  dplyr::filter(substr(tmt, 1, 6) == "Hot Dr")
+CH8 <- body_temp_test_dat %>%
+  dplyr::filter(substr(tmt, 1, 6) == "Cool H")
+CD8 <- body_temp_test_dat %>%
+  dplyr::filter(substr(tmt, 1, 6) == "Cool D")
+```
+
 
 ### t-tests
 
 ```{r}
-CEWL_ttest_HH <- t.test(HH_temp$delta_CEWL, 
+CEWL_ttest_HH <- t.test(HH8$delta_CEWL, 
                         mu = 0, alternative = "two.sided")
 CEWL_ttest_HH
 
-CEWL_ttest_HD <- t.test(HD_temp$delta_CEWL, 
+CEWL_ttest_HD <- t.test(HD8$delta_CEWL, 
                         mu = 0, alternative = "two.sided")
 CEWL_ttest_HD
 
-CEWL_ttest_CH <- t.test(CH_temp$delta_CEWL, 
+CEWL_ttest_CH <- t.test(CH8$delta_CEWL, 
                         mu = 0, alternative = "two.sided")
 CEWL_ttest_CH
 
-CEWL_ttest_CD <- t.test(CD_temp$delta_CEWL, 
+CEWL_ttest_CD <- t.test(CD8$delta_CEWL, 
                         mu = 0, alternative = "two.sided")
 CEWL_ttest_CD
 ```
@@ -905,24 +918,13 @@ all_emtrends <- CEWL_emtrends %>%
 #write.csv(all_emtrends, "./results_statistics/exp_emtrends_per_day_change.csv")
 ```
 
-Given the daily trends for plasma osmolality, in total for acclimation ∆ osml had 1.04 (0.13x8) to 13 (1.587x8) mmol/kg of change.
+Given the daily trends for plasma osmolality, in total for acclimation change in osml had 1.04 (0.13x8) to 13 (1.587x8) mmol/kg of change.
 
 
 
 # CEWL ~ osmolality
 
-First, get a separate df for each tmt group:
-
-```{r}
-HH8 <- body_temp_test_dat %>%
-  dplyr::filter(substr(tmt, 1, 6) == "Hot Hu")
-HD8 <- body_temp_test_dat %>%
-  dplyr::filter(substr(tmt, 1, 6) == "Hot Dr")
-CH8 <- body_temp_test_dat %>%
-  dplyr::filter(substr(tmt, 1, 6) == "Cool H")
-CD8 <- body_temp_test_dat %>%
-  dplyr::filter(substr(tmt, 1, 6) == "Cool D")
-```
+*Use separate df for each tmt group created for body temp relationship tests.*
 
 
 Then, run models for CEWL ~ osmolality:
@@ -1357,20 +1359,20 @@ ggplot() +
   
   annotate(geom = "text", x = 4, y = 12.7, label = "B", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 12.2, label = "9.4", #HD
-           size = 3) +
+  #annotate(geom = "text", x = 4, y = 12.2, label = "9.4", #HD
+   #        size = 3) +
   annotate(geom = "text", x = 2, y = 14.2, label = "B", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 13.7, label = "9.6", #HH
-           size = 3) +
+  #annotate(geom = "text", x = 2, y = 13.7, label = "9.6", #HH
+   #        size = 3) +
   annotate(geom = "text", x = 3, y = 14.8, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 14.3, label = "10.7", #CD
-           size = 3) +
+  #annotate(geom = "text", x = 3, y = 14.3, label = "10.7", #CD
+   #        size = 3) +
   annotate(geom = "text", x = 1, y = 14.6, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 1, y = 14.1, label = "10.8", #CH
-           size = 3) +
+  #annotate(geom = "text", x = 1, y = 14.1, label = "10.8", #CH
+   #        size = 3) +
   
   ylab("Body Condition (g')") + 
   theme(text = element_text(color = "black", 
@@ -1576,20 +1578,20 @@ ggplot() +
   
   annotate(geom = "text", x = 4, y = 47.6, label = "AB", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 45, label = "28", #HD
-           size = 3) +
+  #annotate(geom = "text", x = 4, y = 45, label = "28", #HD
+   #        size = 3) +
   annotate(geom = "text", x = 2, y = 44.6, label = "B", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 42, label = "26", #HH
-           size = 3) +
+  #annotate(geom = "text", x = 2, y = 42, label = "26", #HH
+   #        size = 3) +
   annotate(geom = "text", x = 3, y = 54.6, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 52, label = "30", #CD
-           size = 3) +
+  #annotate(geom = "text", x = 3, y = 52, label = "30", #CD
+   #        size = 3) +
   annotate(geom = "text", x = 1, y = 54.6, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 1, y = 52, label = "30", #CH
-           size = 3) +
+  #annotate(geom = "text", x = 1, y = 52, label = "30", #CH
+   #        size = 3) +
   
   ylab("Hematocrit (%)") + 
   theme(text = element_text(color = "black", 
@@ -1876,20 +1878,20 @@ ggplot() +
   
   annotate(geom = "text", x = 4, y = 427, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 417, label = "362", #HD
-           size = 3) +
+  #annotate(geom = "text", x = 4, y = 417, label = "362", #HD
+   #        size = 3) +
   annotate(geom = "text", x = 2, y = 452, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 442, label = "354", #HH
-           size = 3) +
+  #annotate(geom = "text", x = 2, y = 442, label = "354", #HH
+   #        size = 3) +
   annotate(geom = "text", x = 3, y = 437, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 427, label = "349", #CD
-           size = 3) +
+  #annotate(geom = "text", x = 3, y = 427, label = "349", #CD
+   #        size = 3) +
   annotate(geom = "text", x = 1, y = 470, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 1, y = 460, label = "350", #CH
-           size = 3) +
+  #annotate(geom = "text", x = 1, y = 460, label = "350", #CH
+   #        size = 3) +
   
   ylab(bquote('Osmolality (mmol '*kg^-1*')')) + 
   theme(text = element_text(color = "black", 
@@ -2235,20 +2237,20 @@ ggplot() +
   
   annotate(geom = "text", x = 4, y = 50, label = "C", 
            size = 3) +
-  annotate(geom = "text", x = 4, y = 47, label = "25", #HD
-           size = 3) +
+  #annotate(geom = "text", x = 4, y = 47, label = "25", #HD
+   #        size = 3) +
   annotate(geom = "text", x = 2, y = 63, label = "B", 
            size = 3) +
-  annotate(geom = "text", x = 2, y = 60, label = "37", #HH
-           size = 3) +
+  #annotate(geom = "text", x = 2, y = 60, label = "37", #HH
+  #         size = 3) +
   annotate(geom = "text", x = 3, y = 41, label = "C", 
            size = 3) +
-  annotate(geom = "text", x = 3, y = 38, label = "24", #CD
-           size = 3) +
+  #annotate(geom = "text", x = 3, y = 38, label = "24", #CD
+   #        size = 3) +
   annotate(geom = "text", x = 1, y = 52, label = "A", 
            size = 3) +
-  annotate(geom = "text", x = 1, y = 49, label = "30", #CH
-           size = 3) +
+  #annotate(geom = "text", x = 1, y = 49, label = "30", #CH
+   #        size = 3) +
   
   theme(text = element_text(color = "black", 
                             family = "sans", 

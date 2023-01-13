@@ -1,13 +1,16 @@
 ---
-title: "Climate Water Loss Experiment - Treatment Hydration Analysis"
+title: "Climate Water Loss Experiment - Treatment Analysis"
 author: "Savannah Weaver"
-date: "2021"
-output: pdf_document
-toc: TRUE
+date: "2022"
+output: 
+  rmdformats::html_clean:
+    highlight: tango
+    thumbnails: FALSE
+    toc: TRUE
+    toc_depth: 3
 ---
 
 # Packages
-
 
 ```{r setup, include = TRUE, message = FALSE}
 `%nin%` = Negate(`%in%`)
@@ -33,12 +36,14 @@ if (!require("MuMIn")) install.packages("MuMIn")
 library("MuMIn") # model selection
 if (!require("RColorBrewer")) install.packages("RColorBrewer")
 library("RColorBrewer") # color
+if (!require("rmdformats")) install.packages("rmdformats")
+library("rmdformats") # clean html R markdown format
 ```
 
 
 # Background and Goals
 
-This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus then acclimated to 4 different climate treatments. **This R file analyzes the effect of experimental climate treatments on lizard body condition, osmotic balance, and osmoregulation.** Please refer to the published scientific journal article for full details.
+This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus then acclimated to 4 different climate treatments. This R file analyzes the effect of experimental climate treatments on lizard body condition, osmotic balance (plasma osmolality and hematocrit), and cutaneous evaporative water loss (CEWL).
 
 
 # Data
@@ -85,7 +90,6 @@ recovery_v_post_exp <- dat %>%
   mutate(delta_osml_10_8 = end_osml - osmolality_mmol_kg_mean,
          delta_hct_10_8 = end_hct - hematocrit_percent,
          delta_SMI_10_8 = end_SMI - SMI)
-summary(recovery_v_post_exp)
 
 recovery_v_pre_exp <- dat %>%
   dplyr::filter(day_n == 0) %>%
@@ -93,7 +97,6 @@ recovery_v_pre_exp <- dat %>%
   mutate(delta_osml_10_0 = end_osml - osmolality_mmol_kg_mean,
          delta_hct_10_0 = end_hct - hematocrit_percent,
          delta_SMI_10_0 = end_SMI - SMI)
-summary(recovery_v_pre_exp)
 ```
 
 
@@ -175,6 +178,7 @@ means <- dat %>% # use whole dat because want for both exp and rehyd
          se_SMI = (sd_SMI/sqrt(n_lizards)))
 
 # get rid of non-defined points
+# these are from when not all variables were measured for a given date
 means$mean_CEWL[is.nan(means$mean_CEWL)] <- NA
 means$mean_osml[is.nan(means$mean_osml)] <- NA
 means$mean_hct[is.nan(means$mean_hct)] <- NA
@@ -184,13 +188,13 @@ means
 # get only means for the very end
 end_means <- means %>%
   dplyr::filter(day_n == 8)
-#write.csv(end_means, "./results_statistics/exp_end_means.csv")
+write.csv(end_means, "./results_statistics/exp_end_means.csv")
 ```
 
 
 ## End Values Only
 
-Select for only day=8 values.
+Select all raw measurements for only day=8 values.
 
 ```{r}
 end_vals <- dat %>%
@@ -200,7 +204,7 @@ end_vals <- dat %>%
 
 ## delta CEWL
 
-Get a df that only has complete observations that include CEWL values (only obs from before and after the experiment). Then, calculate the CHANGE (delta) in CEWL from before to after the experiment. Because we only measured CEWL at those two time points, it makes more sense to assess the **amount of change** in CEWL for each lizard, rather than measuring the change over time.
+Get a df that only has complete observations that include CEWL values (only obs from before and after the experiment). Then, calculate the *change* (delta) in CEWL from before to after the experiment. Because we only measured CEWL at those two time points, it makes more sense to assess the amount of change in CEWL for each lizard, rather than measuring the change over time.
 
 ```{r}
 start_CEWL <- dat_no_rehab %>%
@@ -279,10 +283,11 @@ Normality is violated, but linearity, equal error variance, and independence are
 Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values of the variables for each model.
 
 We... 
-calculate RMSE manually, 
-use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects, 
-use the aictab function in the AICmodavg package to get AIC and deltaAIC values, and
-get the sum of squares, F, and p-values for each variable from the anova table for each model.
+
+- calculate RMSE manually
+- use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects
+- use the aictab function in the AICmodavg package to get AIC and deltaAIC values
+- get the sum of squares, F, and p-values for each variable from the anova table for each model
 
 ```{r SMI mod compare}
 # calculate RMSE & R^2
@@ -399,12 +404,6 @@ All assumptions, normality, linearity, equal error variance, and independence ar
 
 Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values of the variables for each model.
 
-We... 
-calculate RMSE manually, 
-use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects, 
-use the aictab function in the AICmodavg package to get AIC and deltaAIC values, and
-get the sum of squares, F, and p-values for each variable from the anova table for each model.
-
 ```{r hct mod compare}
 # calculate RMSE & R^2
 hct_RMSE_Rsq <- data.frame(model = 
@@ -515,11 +514,6 @@ Normality is violated, but linearity, equal error variance, and independence are
 
 Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values of the variables for each model.
 
-We... 
-calculate RMSE manually, 
-use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects, 
-use the aictab function in the AICmodavg package to get AIC and deltaAIC values, and
-get the sum of squares, F, and p-values for each variable from the anova table for each model.
 
 ```{r osml mod compare}
 # calculate RMSE & R^2
@@ -619,8 +613,7 @@ ggplot(body_temp_test_dat) +
 
 ## CEWL
 
-
-First, get a separate df for each tmt group:
+First, get a separate df of delta CEWL for each tmt group:
 
 ```{r}
 HH8 <- body_temp_test_dat %>%
@@ -635,6 +628,8 @@ CD8 <- body_temp_test_dat %>%
 
 
 ### t-tests
+
+I use t-tests to assess whether the change in CEWL from the experiment is significantly different from zero for each treatment group.
 
 ```{r}
 CEWL_ttest_HH <- t.test(HH8$delta_CEWL, 
@@ -659,7 +654,7 @@ CEWL_ttest_CD
 
 ### Building
 
-Build each treatment effect model.
+Build each treatment effect model. These are equivalent to the models built for body condition, hematocrit, and plasma osmolality, but the effect of time is not included because we assess CEWL as **delta CEWL**. 
 
 ```{r CEWL exp models}
 CEWL_mod_VPD <- lmerTest::lmer(data = dat_no_rehab_deltaCEWL,
@@ -707,11 +702,6 @@ All assumptions are fine.
 
 Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values of the variables for each model.
 
-We... 
-calculate RMSE manually, 
-use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects, 
-use the aictab function in the AICmodavg package to get AIC and deltaAIC values, and
-get the sum of squares, F, and p-values for each variable from the anova table for each model.
 
 ```{r CEWL mod compare}
 # calculate RMSE & R^2
@@ -786,6 +776,7 @@ CEWL_within <- CEWL_VPD_p %>%
 Put all the model statistics into one df/csv - one for among-model comparisons, and one for within-model stats.
 
 ```{r export exp stats}
+# comparisons of all models for each variable
 experiment_model_compare <- CEWL_across %>%
   rbind(osml_across) %>%
   rbind(hct_across) %>%
@@ -799,6 +790,7 @@ experiment_model_compare <- CEWL_across %>%
 write.csv(experiment_model_compare, 
           "./results_statistics/exp_model_comparisons.csv")
 
+# all of the actual model results
 experiment_model_values <- CEWL_within %>%
   rbind(osml_within) %>%
   rbind(hct_within) %>%
@@ -859,9 +851,6 @@ CEWL_emmeans <- data.frame(emmeans(CEWL_mod_end, "tmt")) %>%
   mutate(response = "CEWL (g/m2h)")
 CEWL_pairwise <- data.frame(pairs(emmeans(CEWL_mod_end, "tmt"))) %>%
   mutate(response = "CEWL (g/m2h)")
-
-# put together?
-# use indiv for boxplots
 ```
 
 
@@ -915,7 +904,7 @@ all_emtrends <- CEWL_emtrends %>%
                 per_day_change = day_n.trend,
                 confint95,
                 SE, df)
-#write.csv(all_emtrends, "./results_statistics/exp_emtrends_per_day_change.csv")
+write.csv(all_emtrends, "./results_statistics/exp_emtrends_per_day_change.csv")
 ```
 
 Given the daily trends for plasma osmolality, in total for acclimation change in osml had 1.04 (0.13x8) to 13 (1.587x8) mmol/kg of change.
@@ -924,12 +913,15 @@ Given the daily trends for plasma osmolality, in total for acclimation change in
 
 # CEWL ~ osmolality
 
-*Use separate df for each tmt group created for body temp relationship tests.*
-
-
-Then, run models for CEWL ~ osmolality:
+Let's compare the relationship of CEWL ~ osmolality post-experiment to what we found pre-experiment in the "analysis_capture" file. The treatment-specific sub-dataframes were created in the "Body Temp" model subsection above.
 
 ```{r}
+CEWL_osml <- lmerTest::lmer(data = end_vals, 
+                               CEWL_g_m2h_mean ~ osmolality_mmol_kg_mean +
+                               (1|trial_number))
+summary(CEWL_osml)
+anova(CEWL_osml, type = "1", ddf = "Kenward-Roger")
+
 HH_CEWL_osml <- lmerTest::lmer(data = HH8, 
                                CEWL_g_m2h_mean ~ osmolality_mmol_kg_mean +
                                (1|trial_number))
@@ -959,6 +951,8 @@ Even though only data for one treatment group was significant, all have a positi
 
 
 # CEWL ~ VPD
+
+We also want to assess whether the vapor pressure deficit lizards experienced during acclimation has an effect on the change in CEWL.
 
 ```{r}
 CEWL_VPD_lm <- lm(data = dat_no_rehab_deltaCEWL,
@@ -1021,17 +1015,7 @@ anova(CEWL_VPD_lm)
 
 # Recovery Models
 
-I want to know how the 2-day recovery period affects physiology relative to post- and pre- experiment. To do this, I'll use a two-sided t-test comparing delta to the hypothesis of mu=0.
-
-First, calculate the mean delta and SEM?
-
-```{r}
-recovery_v_post_exp_summary <- recovery_v_post_exp %>%
-  group_by(type) %>%
-  summarise(mean_delta_osml = mean(delta_osml_10_8, na.rm = T),
-            mean_delta_hct = mean(delta_hct_10_8, na.rm = T),
-            mean_delta_SMI = mean(delta_SMI_10_8, na.rm = T))
-```
+I want to know how the 2-day recovery period affects physiology relative to post- and pre- experiment. To do this, I'll use two-sided t-tests comparing recovery delta values to the hypothesis of mu=0.
 
 
 
@@ -1084,6 +1068,7 @@ osml_rmod_pre_exp
 
 ## Group Export
 
+Now, I put all the recovery t-test statistics into one dataframe, and export it.
 
 ```{r best rehydration models all vars}
 recovery_stats <- broom.mixed::tidy(osml_rmod_pre_exp) %>%
@@ -1115,6 +1100,8 @@ write.csv(recovery_stats,
 # Figures
 
 ## Colors & Shapes
+
+Create custom colors, shapes, and labels to make it easy to apply changes across all figures.
 
 ```{r}
 CH_color <- brewer.pal(4, "Spectral")[c(4)]
@@ -1193,15 +1180,9 @@ ggplot() +
                              0.41 #left
                              ), "cm")) -> SMI_fig
 SMI_fig
-#ggsave(filename = "SMI_fig1.jpeg",
- #      plot = SMI_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 6, height = 6)
 ```
 
-### Means Only *MS*
+### Means Only *F5*
 
 ```{r SMI actual-min fig}
 ggplot() + 
@@ -1222,16 +1203,7 @@ ggplot() +
                 ymin = mean_SMI-se_SMI, 
                 ymax = mean_SMI+se_SMI),
                 width = .1,
-                #position=position_dodge(.01),
                 alpha = 0.7) +
-  #geom_line(data = means,
-   #         aes(x = day_n,
-    #            y = mean_SMI, 
-     #           color = tmt,
-      #          #linetype = tmt,
-       #         group = tmt),
-        #    alpha = 1, 
-         #   size = 0.5) +
   geom_point(data = means,
             aes(x = day_n,
                 y = mean_SMI, 
@@ -1291,7 +1263,6 @@ ggplot() +
               size = 1.2, 
               alpha = 0.2) + 
   theme_classic() + 
-  #scale_shape_manual(values = c(15:18), name = "") +
   scale_x_continuous(limits = c(0,8),
                      breaks = c(0, 2, 4, 6, 8)) +
   scale_color_brewer(palette = "Set2", name = "") +
@@ -1314,7 +1285,7 @@ SMI_lm_fig
 ```
 
 
-### Ending Values *MS*
+### Ending Values *F6*
 
 ```{r SMI ending vals}
 ggplot() +
@@ -1359,20 +1330,12 @@ ggplot() +
   
   annotate(geom = "text", x = 4, y = 12.7, label = "B", 
            size = 3) +
-  #annotate(geom = "text", x = 4, y = 12.2, label = "9.4", #HD
-   #        size = 3) +
   annotate(geom = "text", x = 2, y = 14.2, label = "B", 
            size = 3) +
-  #annotate(geom = "text", x = 2, y = 13.7, label = "9.6", #HH
-   #        size = 3) +
   annotate(geom = "text", x = 3, y = 14.8, label = "A", 
            size = 3) +
-  #annotate(geom = "text", x = 3, y = 14.3, label = "10.7", #CD
-   #        size = 3) +
   annotate(geom = "text", x = 1, y = 14.6, label = "A", 
            size = 3) +
-  #annotate(geom = "text", x = 1, y = 14.1, label = "10.8", #CH
-   #        size = 3) +
   
   ylab("Body Condition (g')") + 
   theme(text = element_text(color = "black", 
@@ -1381,7 +1344,6 @@ ggplot() +
         axis.text = element_text(color = "black", 
                                  family = "sans", 
                                  size = 8),
-        #axis.text.x = element_blank(),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
                                  size = 8),
@@ -1459,7 +1421,7 @@ hct_fig
 
 
 
-### Means Only *MS*
+### Means Only *F5*
 
 ```{r hct actual-minimal fig}
 ggplot() +
@@ -1479,16 +1441,7 @@ ggplot() +
                 ymin = mean_hct-se_hct, 
                 ymax = mean_hct+se_hct),
                 width = .1,
-                #position=position_dodge(.1),
                 alpha = 0.7) +
-  #geom_line(data = means[complete.cases(means$mean_hct),],
-   #         aes(x = day_n,
-    #            y = mean_hct, 
-     #           color = tmt,
-      #          #linetype = tmt,
-       #         group = tmt),
-        #    alpha = 1, 
-         #   size = 0.5) +
   geom_point(data = means[complete.cases(means$mean_hct),],
             aes(x = day_n,
                 y = mean_hct, 
@@ -1532,7 +1485,7 @@ hct_fig_min
 
 
 
-### Ending Values *MS*
+### Ending Values *F6*
 
 
 ```{r hct ending vals}
@@ -1578,20 +1531,12 @@ ggplot() +
   
   annotate(geom = "text", x = 4, y = 47.6, label = "AB", 
            size = 3) +
-  #annotate(geom = "text", x = 4, y = 45, label = "28", #HD
-   #        size = 3) +
   annotate(geom = "text", x = 2, y = 44.6, label = "B", 
            size = 3) +
-  #annotate(geom = "text", x = 2, y = 42, label = "26", #HH
-   #        size = 3) +
   annotate(geom = "text", x = 3, y = 54.6, label = "A", 
            size = 3) +
-  #annotate(geom = "text", x = 3, y = 52, label = "30", #CD
-   #        size = 3) +
   annotate(geom = "text", x = 1, y = 54.6, label = "A", 
            size = 3) +
-  #annotate(geom = "text", x = 1, y = 52, label = "30", #CH
-   #        size = 3) +
   
   ylab("Hematocrit (%)") + 
   theme(text = element_text(color = "black", 
@@ -1677,7 +1622,7 @@ osml_fig
 ```
 
 
-### Means Only *MS*
+### Means Only *F5*
 
 
 ```{r osmolality actual-minimal fig}
@@ -1698,16 +1643,7 @@ ggplot() +
                 ymin = mean_osml-se_osml, 
                 ymax = mean_osml+se_osml),
                 width = .1,
-                #position=position_dodge(.1),
                 alpha = 0.7) +
-  #geom_line(data = means[complete.cases(means$mean_osml),],
-   #         aes(x = day_n,
-    #            y = mean_osml, 
-     #           color = tmt,
-      #          #linetype = tmt,
-       #         group = tmt),
-        #    alpha = 1, 
-         #   size = 0.5) +
   geom_point(data = means,
             aes(x = day_n,
                 y = mean_osml, 
@@ -1784,10 +1720,12 @@ osml_pairwise_df <- as.data.frame(pair_HD[[1]]) %>%
          CI_95 = paste(round(lwr, digits = 2), round(upr, digits = 2), sep = ", "),
          diff = round(diff, digits = 2)) %>%
   dplyr::select(tmt, day_diff, diff, CI_95, p_adj = "p adj")
+
+# save
 write.csv(osml_pairwise_df, "./results_statistics/osmolality_pairwise_diffs.csv")
 ```
 
-nope, none of the differences between days within tmt groups are significantly different 
+Nope, none of the differences between days within tmt groups are significantly different.
 
 
 ### LM + SE
@@ -1807,13 +1745,11 @@ ggplot() +
               size = 2, 
               alpha = 0.1) + 
   theme_classic() + 
-  #scale_shape_manual(values = c(15:18), name = "") +
   scale_x_continuous(limits = c(0,8), 
                      breaks = c(0, 2, 4, 6, 8)) +
   scale_color_brewer(palette = "Set2", name = "") +
   scale_fill_brewer(palette = "Set2", name = "") +
   xlab("Acclimation Day") + 
-  #ylim(340,370) + #CANNOT put ylimits in bc gets rid of pts that are used to make lines
   ylab("Plasma Osmolality\n(mmol/kg)") + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
   theme(text = element_text(color = "black", 
@@ -1833,7 +1769,7 @@ osml_lm_fig
 
 
 
-### Ending Values *MS*
+### Ending Values *F6*
 
 ```{r osml ending vals}
 ggplot() +
@@ -1878,20 +1814,12 @@ ggplot() +
   
   annotate(geom = "text", x = 4, y = 427, label = "A", 
            size = 3) +
-  #annotate(geom = "text", x = 4, y = 417, label = "362", #HD
-   #        size = 3) +
   annotate(geom = "text", x = 2, y = 452, label = "A", 
            size = 3) +
-  #annotate(geom = "text", x = 2, y = 442, label = "354", #HH
-   #        size = 3) +
   annotate(geom = "text", x = 3, y = 437, label = "A", 
            size = 3) +
-  #annotate(geom = "text", x = 3, y = 427, label = "349", #CD
-   #        size = 3) +
   annotate(geom = "text", x = 1, y = 470, label = "A", 
            size = 3) +
-  #annotate(geom = "text", x = 1, y = 460, label = "350", #CH
-   #        size = 3) +
   
   ylab(bquote('Osmolality (mmol '*kg^-1*')')) + 
   theme(text = element_text(color = "black", 
@@ -1900,7 +1828,6 @@ ggplot() +
         axis.text = element_text(color = "black", 
                                  family = "sans", 
                                  size = 8),
-        #axis.text.x = element_blank(),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
                                  size = 8),
@@ -1965,20 +1892,14 @@ ggplot() +
                                  size = 22),
         legend.text.align = 0,
         legend.position = "bottom"
-        #legend.position = c(0.25,0.85)
         ) -> CEWL_fig
 CEWL_fig
-#ggsave(filename = "CEWL_fig1.jpeg",
- #      plot = CEWL_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 6, height = 6)
+
 ```
 
 
 
-### Means Only *MS*
+### Means Only *F3*
 
 ```{r CEWL actual fig minimal}
 ggplot() + 
@@ -2089,7 +2010,6 @@ ggplot() +
                                  size = 22),
         legend.text.align = 0,
         legend.position = "none"
-        #legend.position = c(0.25,0.85)
         ) -> CEWL_lm_fig
 CEWL_lm_fig
 ```
@@ -2099,7 +2019,7 @@ CEWL_lm_fig
 
 
 
-### delta CEWL ~ VPD
+### delta CEWL ~ VPD *F4*
 
 ```{r}
 ggplot(data = dat_no_rehab_deltaCEWL) +
@@ -2158,7 +2078,6 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
         axis.text = element_text(color = "black", 
                                  family = "sans", 
                                  size = 8),
-        #axis.text.x = element_blank(),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
                                  size = 8),
@@ -2191,7 +2110,7 @@ ggsave(filename = "exp_CEWL_delta_VPD.pdf",
 
 
 
-### Ending Values *MS*
+### Ending Values *F6*
 
 ```{r}
 ggplot() +
@@ -2237,20 +2156,12 @@ ggplot() +
   
   annotate(geom = "text", x = 4, y = 50, label = "C", 
            size = 3) +
-  #annotate(geom = "text", x = 4, y = 47, label = "25", #HD
-   #        size = 3) +
   annotate(geom = "text", x = 2, y = 63, label = "B", 
            size = 3) +
-  #annotate(geom = "text", x = 2, y = 60, label = "37", #HH
-  #         size = 3) +
   annotate(geom = "text", x = 3, y = 41, label = "C", 
            size = 3) +
-  #annotate(geom = "text", x = 3, y = 38, label = "24", #CD
-   #        size = 3) +
   annotate(geom = "text", x = 1, y = 52, label = "A", 
            size = 3) +
-  #annotate(geom = "text", x = 1, y = 49, label = "30", #CH
-   #        size = 3) +
   
   theme(text = element_text(color = "black", 
                             family = "sans", 
@@ -2258,7 +2169,6 @@ ggplot() +
         axis.text = element_text(color = "black", 
                                  family = "sans", 
                                  size = 8),
-        #axis.text.x = element_blank(),
         legend.text = element_text(color = "black", 
                                  family = "sans", 
                                  size = 8),
@@ -2299,8 +2209,6 @@ ggplot(end_vals_CEWL_osml) +
   theme_classic() + 
   xlab(bquote('Osmolality (mmol '*kg^-1*')')) + 
   ylab(bquote('CEWL (g '*m^-2*' '*h^-1*')')) + 
-  #xlim(300, 400) +
-  #ylim(0, 40) +
   scale_shape_manual(values = c(21,19, 22,15), name = "") +
   scale_fill_brewer(palette = "Spectral", name = "") +
   scale_color_brewer(palette = "Spectral", name = "") +
@@ -2315,12 +2223,9 @@ ggplot(end_vals_CEWL_osml) +
                                  family = "sans", 
                                  size = 8),
         legend.position = "bottom"
-        #axis.text.y = element_blank(),
-        #plot.margin = unit(c(0.1,0,0.1,0.45), "cm")
         ) -> exp_end_CEWL_osml_fig
 exp_end_CEWL_osml_fig
 
-# will need to save using figure arrange to make legend centered if I use that fig
 ggsave(filename = "exp_CEWL_osml_fig.pdf",
        plot = exp_end_CEWL_osml_fig,
        path = "./results_figures",
@@ -2346,6 +2251,7 @@ ggarrange(osml_fig_min,
           legend = "bottom"
           ) -> experiment_multi_fig
 #experiment_multi_fig
+
 # export figure
 ggsave(filename = "experiment_multi_fig.pdf",
        plot = experiment_multi_fig,

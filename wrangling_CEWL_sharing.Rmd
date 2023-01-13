@@ -6,6 +6,9 @@ output: pdf_document
 toc: TRUE
 ---
 
+to add:
+- check that measurements are in one rep set (check time range)
+- make code more robust against typos (comments column!)
 
 # Packages
 

@@ -2,8 +2,12 @@
 title: "Climate Water Loss Experiment - General Data Wrangling"
 author: "Savannah Weaver"
 date: "2021"
-output: pdf_document
-toc: TRUE
+output: 
+  rmdformats::html_clean:
+    highlight: tango
+    thumbnails: FALSE
+    toc: TRUE
+    toc_depth: 3
 ---
 
 
@@ -16,12 +20,14 @@ if (!require("zoo")) install.packages("zoo")
 library("zoo") # interpolation using na.approx (weather data)
 if (!require("weathermetrics")) install.packages("weathermetrics")
 library("weathermetrics") # F to C conversion (weather data)
+if (!require("rmdformats")) install.packages("rmdformats")
+library("rmdformats") # clean html R markdown format
 ```
 
 
 # Background and Goals
 
-This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus and in Poly Canyon. This R file compiles and formats the measurements taken. Please refer to the published scientific journal article for full details.
+This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus and in Poly Canyon. This R file compiles and formats all the measurements taken, including the weather data used. 
 
 
 # Load Data

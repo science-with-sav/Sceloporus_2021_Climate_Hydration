@@ -1,9 +1,13 @@
 ---
-title: "HOBO Data Logger Climate Treatment Summary"
+title: "Climate Water Loss Experiment - HOBO Data Logger Climate Summary"
 author: "Savannah Weaver"
-date: "2021"
-output: pdf_document
-toc: TRUE
+date: "2022"
+output: 
+  rmdformats::html_clean:
+    highlight: tango
+    thumbnails: FALSE
+    toc: TRUE
+    toc_depth: 3
 ---
 
 # Packages
@@ -11,29 +15,35 @@ toc: TRUE
 ```{r setup, include = TRUE, message = FALSE}
 if (!require("tidyverse")) install.packages("tidyverse") 
 library("tidyverse")
+if (!require("rmdformats")) install.packages("rmdformats")
+library("rmdformats") # clean html R markdown format
 ```
 
-**remember to do rehab data separately**
+
+# Background
+
+This data was collected using Onset HOBO temperature and humidity dataloggers to assess the climates that lizards actually experienced during the course of our acclimation experiment. 
+
 
 # Load in Data
 
-This data was collected using Onset HOBO temperature and humidity dataloggers during the course of our experiment. See publication for full details. 
-
-The data is in a separate file for each download for each logger, so I need to compile each of those into one dataset. 
-
-To do this, first I compile a list of the filenames I need to read-in.
 
 ## File Names
+
+The data is in a separate file for each download for each logger, so I need to compile each of those into one dataset. To do this, first I compile a list of the filenames I need to read-in.
+
 
 ```{r, filenames}
 # make a list of file names of all data to load in
 filenames <- list.files(path = "data/HOBOs")
 ```
 
-Next, I make a function that will read in the data from each csv, name and organize the data correctly. 
+
 
 
 ## Function
+
+Next, I make a function that will read in the data from each csv, name and organize the data correctly. 
 
 ```{r, create read_HOBO_files function to get each csv data}
 # make a function to read in data from each csv file and add correct identifiers
@@ -102,7 +112,7 @@ head(all_HOBO_data)
 
 ## Dates
 
-I need to subset the data based on the date range for actual experiment days.
+The loggers were left on sometimes even though the experiment was not ongoing. I need to subset the data based on the date range for actual experiment days.
 
 Trail 1: June 16-24
 Trail 2: June 26 - July 4
@@ -135,6 +145,8 @@ subset_HOBO_data <- all_HOBO_data %>%
 
 
 ## Trial & Tmt
+
+Add our notes about what bins/treatments the loggers were put in.
 
 ```{r}
 # load HOBO assignment data
@@ -171,7 +183,6 @@ format_HOBO_data %>%
   group_by(trial) %>%
   summarise(min_date = (min(date_time_PST)),
             max_date = (max(date_time_PST)))
-as.Date("2021-06-16 20:00:00")
 ```
 
 
@@ -188,8 +199,6 @@ format_HOBO_data %>%
   arrange(tmt)
 ```
 
-
-I noted that the treatment assignment for logger 20785311 during trial 1 might have been mistakenly recorded as hot dry instead of cool dry, but the values definitely match hot treatment.
 
 
 ```{r}
@@ -214,7 +223,7 @@ format_HOBO_data %>%
   arrange(temp_C)
 ```
 
-There are only 10 points <30C for the hot treatment, which is very few compared to the total number of measurements. I think these observations are from when the lizards (thus loggers) were out of the incubators for daily checkups. But, this is still technically characteristic of the environment the lizards experienced, and it's very few points, so I'll leave them.
+There are only 10 points <30C for the hot treatment, which is very few compared to the total number of measurements. I think these observations are from when the lizards (thus loggers) were out of the incubators for daily checkups. But, this is still technically characteristic of the environment the lizards experienced, and it's very few points that are unlikely to affect the summary statistics, so I'll leave them.
 
 There are many more points <20C for the cool treatment. The lowest is still ~17C, and most of them are very close to 20. The bottom of the cool incubator tended to get extra cold, so I'm not worried about the validity of these points.
 
@@ -255,6 +264,8 @@ format_HOBO_data %>%
 
 ## Treatment Differences
 
+Get mean and sd of temperature and humidity for each tmt group, and calculate vapor pressure deficit based on those mean values using the formula in the book "Environmental Biophysics" by Campbell & Norman, 1998.
+
 ```{r}
 tmt_only_means <- format_HOBO_data %>%
   group_by(tmt) %>%
@@ -268,13 +279,11 @@ tmt_only_means <- format_HOBO_data %>%
 tmt_only_means
 ```
 
-2.57 -> 2.50
-0.65 -> 0.64
-3.99 -> 3.82
-1.11 -> 1.07
 
 
 ## Trial Differences
+
+Were there also differences across the trials (experiment iterations)?
 
 ```{r}
 tmt_trial_means <- format_HOBO_data %>%
@@ -291,7 +300,7 @@ tmt_trial_means
 ```
 
 
-reformat and save:
+reformat and the mean values:
 
 ```{r}
 tmt_trial_means$tmt <- factor(tmt_trial_means$tmt,
@@ -324,7 +333,7 @@ a_temp_mod <- aov(temp_mod)
 ph_temp_mod <- TukeyHSD(a_temp_mod)
 summary(temp_mod)
 temp_mod_df <- data.frame(broom::tidy(ph_temp_mod)) %>%
-  arrange(desc(term, adj.p.value))
+  arrange(desc(adj.p.value))
 write.csv(temp_mod_df, "./results_statistics/HOBO_temp_pairwise_diffs.csv")
 
 # humidity
@@ -334,7 +343,7 @@ a_humid_mod <- aov(humidity_mod)
 ph_humid_mod <- TukeyHSD(a_humid_mod)
 summary(humidity_mod)
 humid_mod_df <- data.frame(broom::tidy(ph_humid_mod)) %>%
-  arrange(desc(term, adj.p.value))
+  arrange(desc(adj.p.value))
 write.csv(humid_mod_df,
           "./results_statistics/HOBO_humidity_pairwise_diffs.csv")
 ```

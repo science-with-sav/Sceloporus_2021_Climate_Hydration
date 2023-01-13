@@ -2,8 +2,12 @@
 title: "Climate Water Loss Experiment - Plasma Osmolality Data Wrangling"
 author: "Savannah Weaver"
 date: "2021"
-output: pdf_document
-toc: TRUE
+output: 
+  rmdformats::html_clean:
+    highlight: tango
+    thumbnails: FALSE
+    toc: TRUE
+    toc_depth: 3
 ---
 
 
@@ -13,12 +17,14 @@ toc: TRUE
 `%nin%` = Negate(`%in%`)
 if (!require("tidyverse")) install.packages("tidyverse")
 library("tidyverse") # workflow and plots
+if (!require("rmdformats")) install.packages("rmdformats")
+library("rmdformats") # clean html R markdown format
 ```
 
 
 # Background and Goals
 
-Blood was drawn from the postorbital sinus of adult male *Sceloporus occidentalis* between June - August 2021. After centrifuging and separating, plasma was run on a VAPRO vapor pressure osmometer in 1-4 replicates, when plasma volume allowed. In this R script, I check the distribution of replicates, omit outliers, and average remaining replicates. The final values will be more precise and accurate estimates of the true plasma osmolality for each lizard, and those values will be used in the capture_analysis and experiment_analysis R script files. Please refer to the published scientific journal article for full details.
+Blood was drawn from the postorbital sinus of adult male *Sceloporus occidentalis* between June - August 2021. After centrifuging and separating, plasma was run on a VAPRO vapor pressure osmometer in 1-4 replicates, when plasma volume allowed. In this R script, I check the distribution of replicates, omit outliers, and average remaining replicates. The final values will be more precise and accurate estimates of the true plasma osmolality for each lizard, and those values will be used in the capture_analysis and experiment_analysis R script files.
 
 
 # Load Data
@@ -113,7 +119,7 @@ Wahoo, every lizard has blood draws from 4 different dates.
 
 # Replicates
 
-Now, I will try to identify outliers within the replicates for a given individual on a given date. There must be at least 3 replicates to do this, so the first thing I need to do is figure out which individuals/dates have enough replicates, then subset my data to be only those individuals.
+Now, I will try to identify outliers within the replicate set for a given individual on a given date. There must be at least 3 replicates to do this, so the first thing I need to do is figure out which individuals/dates have enough replicates, then subset my data to be only those individuals.
 
 
 ## Individuals w 3+ Replicates
@@ -165,51 +171,8 @@ Ideally, CV would be <10-15%. If it's larger, and one of the replicates is very 
 The CV is >10 for only one lizard on one date, so our replicates are already likely to accurately represent the true value. We don't want to lose accuracy by searching for precision, so we will only remove the one point driving the enormous CV value.
 
 
-## Find Outliers Visually
+## Find & Remove Outlier
 
-```{r create find outlier function}
-# write function to find outliers for each individual on each date
-find_outliers <- function(df) {
-  
-  # initiate a for loop to go through every who in df
-  for(indiv_ch in unique(df$individual_ID)) {
-    
-    # select data for only the individual of interest
-    df_sub <- df %>%
-      dplyr::filter(individual_ID == as.numeric(indiv_ch))
-    
-    # make a boxplot
-    ggplot(df_sub) +
-      geom_boxplot(aes(x = as.factor(date_blood_drawn),
-                       y = osmolality_mmol_kg,
-                       fill = as.factor(date_blood_drawn))) +
-      ggtitle(paste("Individual", indiv_ch)) +
-      theme_classic() -> plot
-    
-    # print/save
-    print(plot)
-  
-  }
-
-}
-```
-
-
-Now apply the function to the data:
-
-```{r find outlier using boxplots, fig.show="hold", out.width="50%"}
-par(mfrow = c(71, 2))
-find_outliers(enuf_reps)
-par(mfrow = c(1, 1))
-```
-
-Based on boxplots, there are no outliers.
-
-
-
-## Remove Outlier
-
-EVen though there are no outliers based on boxplot IQRs, we still want to find and omit the point severely increasing CV for one individual on one date, so find that one.
 
 ```{r find high CV rep group}
 CVs %>% dplyr::filter(CV > 10)

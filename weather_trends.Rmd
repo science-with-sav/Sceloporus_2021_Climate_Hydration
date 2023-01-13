@@ -2,8 +2,12 @@
 title: "Climate Water Loss Experiment - Weather Over Time"
 author: "Savannah Weaver"
 date: "2021"
-output: pdf_document
-toc: TRUE
+output: 
+  rmdformats::html_clean:
+    highlight: tango
+    thumbnails: FALSE
+    toc: TRUE
+    toc_depth: 3
 ---
 
 # Packages
@@ -17,11 +21,17 @@ if (!require("RColorBrewer")) install.packages("RColorBrewer")
 library("RColorBrewer") # color
 if (!require("ggpubr")) install.packages("ggpubr")
 library("ggpubr") # for multi-ggplot figs
+if (!require("rmdformats")) install.packages("rmdformats")
+library("rmdformats") # clean html R markdown format
 ```
 
 # Background
 
-Our analyses of baseline variation in CEWL and plasma osmolality yielded VERY different models for this current project/dataset compared to our last iteration of data collection. In this Rmd, I investigate the weather trends across both studies to assess whether variation, or lack of, in weather may have affected the very different results we got.
+Our analyses of baseline variation in CEWL and plasma osmolality yielded VERY different models for this current project/dataset compared to our last iteration of data collection (DOI:10.1655/Herpetologica-D-21-00030.1). In this Rmd, I investigate the weather trends across both studies to assess whether variation, or lack of, in weather may have led to the very different results we got.
+
+I also want to know how close our treatment climates were to what the lizards experience in the wild, and I quantify that in this file.
+
+The weather at capture that is used in the models of baseline variation are read-in in the "wrangling_general" file and analysed in the "analysis_capture" file.
 
 
 # Load Data
@@ -134,6 +144,7 @@ sunsets_formatted <- set_March %>%
 load in weather data from ITRC:
 
 ```{r load and format data}
+# ALL DATA
 weather_dat_XL <- read.csv("./data/weather_long_term.csv", sep = ';') %>%
   mutate(temperature_F = as.numeric(temperature_F),
          wind_speed_mph = as.numeric(wind_speed_mph),
@@ -153,9 +164,13 @@ weather_dat_XL <- read.csv("./data/weather_long_term.csv", sep = ';') %>%
          VPD_kPa_CN98 = e_s_kPa_CN98*(1 - (RH_percent/100))
          ) %>%
   dplyr::filter(complete.cases(temp_C, VPD_kPa_CN98)) 
+
+# data for across both studies
 weather_dat <- weather_dat_XL %>%
   dplyr::filter(date_time >= "2021-04-01 00:00:00" & 
                   date_time <= "2021-09-01 00:00:00")
+
+# data for the entire, conservative active season of these lizards
 weather_dat_active_szn <- weather_dat_XL %>%
   dplyr::filter(date_time >= "2021-03-01 00:00:00" & 
                   date_time <= "2021-10-01 00:00:00") %>%
@@ -187,7 +202,9 @@ weather_dat_daily <- weather_dat %>%
 
 
 
-# Visualize
+# Visualize Trends Over Time
+
+The vertical lines added indicate the days we captured lizards for both studies conducted in 2021.
 
 ## Temperature
 
@@ -432,6 +449,8 @@ sorad_fig
 
 ## Active Season 
 
+Create a figure to compare our experimental conditions to daytime conditions throughout the entire active season.
+
 ```{r}
 # mean tmt values
 tmts <- data.frame(tmt = c("Cool Humid", "Hot Humid", "Cool Dry", "Hot Dry"),
@@ -603,6 +622,8 @@ Of the 4 weather variables, mean daily values correlated with date for only temp
 
 ## Daily Humidity
 
+What level of relative humidity do these lizards typically experience?
+
 ```{r}
 mean_humid_VPD <- weather_dat %>%
   # filter to be only for study 2
@@ -622,8 +643,7 @@ mean_humid_VPD <- weather_dat %>%
 mean_humid_VPD
 ```
 
-
-Mean daily relative humidity during the CWL 2021 study was 73±9%!
+Mean daily relative humidity during the CWL 2021 study was 73±9%, shockingly high!
 
 
 

@@ -1,9 +1,13 @@
 ---
-title: "Climate Water Loss Experiment - Capture Hydration Analysis"
+title: "Climate Water Loss Experiment - Capture Analysis"
 author: "Savannah Weaver"
-date: "2021"
-output: pdf_document
-toc: TRUE
+date: "2022"
+output: 
+  rmdformats::html_clean:
+    highlight: tango
+    thumbnails: FALSE
+    toc: TRUE
+    toc_depth: 3
 ---
 
 
@@ -26,16 +30,16 @@ if (!require("AICcmodavg")) install.packages("AICcmodavg")
 library("AICcmodavg") # model selection
 if (!require("car")) install.packages("car")
 library("car") # VIFs
-if (!require("AICcmodavg")) install.packages("AICcmodavg")
-library("AICcmodavg") # model selection
 if (!require("RColorBrewer")) install.packages("RColorBrewer")
 library("RColorBrewer") # color
+if (!require("rmdformats")) install.packages("rmdformats")
+library("rmdformats") # clean html R markdown format
 ```
 
 
 # Background and Goals
 
-This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus then acclimated to 4 different climate treatments. **This R file analyzes the state and variation of osmotic balance and regulation at the time of capture.** Please refer to the published scientific journal article for full details.
+This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus then acclimated to 4 different climate treatments. This R file analyzes the state and variation of hydric physiology at the time of capture.
 
 
 # Load Data
@@ -299,11 +303,6 @@ hct_mod6p <- lm(data = dat_reduced,
                           wind_mph_interpol + solar_rad_W_sqm_interpol)
 anova(hct_mod7p)
 anova(hct_mod6p)
-#write.csv(hct_AICc, "./results_statistics/capture_hct_mod_rankings.csv")
-#write.csv(broom.mixed::tidy(hct_mod6), 
- #         "./results_statistics/capture_hct_best_mod1.csv")
-#write.csv(broom.mixed::tidy(hct_mod5), 
- #         "./results_statistics/capture_hct_best_mod2.csv")
 ```
 
 
@@ -314,9 +313,7 @@ anova(hct_mod6p)
 
 Since there are large differences in osmolality by date, but we are interested in what's different within dates, rather than the capture date itself, we will include that as a random effect in the model.
 
-We would also include whether or not a blood sample is hemolyzed as a random effect, but only 11 of the almost 150 samples were hemolyzed, so we will assume that any potential effects will be undetectable and/or overshadowed. We do not have concern about using those points.
-
-First, start with a full model with every probable predictor in it, then check for multicollinearity.
+First, start with a full model with each predictor in it, then check for multicollinearity.
 
 ```{r osmolality model 1}
 osml_mod1 <- lme4::lmer(data = dat_reduced,
@@ -503,7 +500,7 @@ osml_AICc <- data.frame(aictab(cand.set = osml_models,
 osml_AICc
 ```
 
-
+Temperature, mass, and SVL are the variables in the top 2 models.
 
 
 ### LM Conditions
@@ -526,9 +523,7 @@ There is no clear pattern in the residuals ~ fitted plot, so linearity seems sat
 
 ### Export
 
-
-First, re-run for p-values:
-
+re-run for p-values:
 
 ```{r osmolality best models}
 osml_mod7p <- lmerTest::lmer(data = dat_reduced,
@@ -539,8 +534,7 @@ osml_mod7p <- lmerTest::lmer(data = dat_reduced,
                           # weather at the time of capture
                           temp_C_interpol + 
                           (1|capture_date))
-anova(osml_mod7p)
-
+summary(osml_mod7p)
 osml_mod8p <- lmerTest::lmer(data = dat_reduced,
                           # response variable
                           osmolality_mmol_kg_mean ~ 
@@ -550,24 +544,7 @@ osml_mod8p <- lmerTest::lmer(data = dat_reduced,
                           temp_C_interpol + 
                           (1|capture_date))
 summary(osml_mod8p)
-
 ```
-
-
-Save the model output.
-
-```{r best osml model}
-#write.csv(broom.mixed::tidy(osml_mod6p),
- #         "./results_statistics/capture_osml_best_model1.csv")
-#write.csv(broom.mixed::tidy(osml_mod7p),
- #         "./results_statistics/capture_osml_best_model2.csv")
-#write.csv(osml_AICc, "./results_statistics/capture_osml_mod_rankings.csv")
-```
-
-
-To report in paper:
-
-The best models to predict the variation in baseline plasma osmolality included SVL, SMI, VPD, and solar radiation at the time of capture as fixed effects. Date was included as a random effect. The final model had acceptable LM conditions. The full model included mass, SVL, SMI, percent hematocrit, and temperature, VPD, wind speed, and solar radiation at the time of capture, with date as a random effect.
 
 
 
@@ -578,9 +555,9 @@ There are differences in CEWL across dates, and based on cloacal temp, capture t
 
 ### Models
 
-Start with the full model of all potential predictor variables. We will again include date as a random effect. Individual ID is not included as a random effect bc each lizard only has one set of capture observations.
+Start with the full model of all potential predictor variables. We will again include date as a random effect.
 
-When we have this many variables, it's extremely important to start with checking for multicollinearity.
+Again, start with checking for multicollinearity.
 
 ```{r CEWL model 1}
 CEWL_mod1 <- lme4::lmer(data = dat_reduced,
@@ -954,7 +931,7 @@ There is some slight fanning in the residuals ~ fitted plot, suggesting equal er
 
 ### Export
 
-First, re-run the best model using lmerTest for p-values.
+Re-run the best model using lmerTest for p-values.
 
 ```{r CEWL best model p vals}
 CEWL_mod10p <- lmerTest::lmer(data = dat_reduced,
@@ -1002,22 +979,6 @@ anova(CEWL_mod9p, type = "1", ddf = "Kenward-Roger")
 anova(CEWL_mod12p, type = "1", ddf = "Kenward-Roger")
 ```
 
-Save the best CEWL model output.
-
-```{r best CEWL model}
-#write.csv(broom.mixed::tidy(CEWL_mod9p),
- #         "./results_statistics/capture_CEWL_best_model1.csv")
-#write.csv(broom.mixed::tidy(CEWL_mod10p),
- #         "./results_statistics/capture_CEWL_best_model2.csv")
-#write.csv(CEWL_AICc, 
- #         "./results_statistics/capture_CEWL_mod_rankings.csv")
-```
-
-
-To report in paper:
-
-The best model to predict CEWL included plasma osmolality, temperature and VPD at the time of measurement, and VPD and wind at the time of capture. The final model met all linear regression conditions for linearity, normality, and equal error variance, and there was no multicollinearity.
-
 
 
 ## Group Model Export
@@ -1038,6 +999,7 @@ all_mod_ranks <- CEWL_AICc %>%
          LL = round(LL, digits = 2),
          Cum.Wt = round(Cum.Wt, digits = 2))
 
+# save
 write.csv(all_mod_ranks, "./results_statistics/capture_ALL_mod_rankings.csv")
 
 # calculate F & p-values
@@ -1061,7 +1023,7 @@ anova_tables <- data.frame(anova(CEWL_mod12p,
                 p_value = Pr..F.) %>%
   dplyr::filter(term != "Residuals")
 
-# models
+# rest of model results
 all_top_mods <- broom.mixed::tidy(CEWL_mod12p) %>% # chose the least-variable one
   rbind(broom.mixed::tidy(osml_mod8p)) %>% # chose the least-variable one
   rbind((broom.mixed::tidy(hct_mod7p) %>%
@@ -1076,6 +1038,7 @@ all_top_mods <- broom.mixed::tidy(CEWL_mod12p) %>% # chose the least-variable on
   dplyr::select(var, effect, group, term, estimate, std.error) %>%
   left_join(anova_tables, by = 'term')
 
+# save
 write.csv(all_top_mods, "./results_statistics/capture_ALL_best_mods.csv")
 ```
 
@@ -1083,18 +1046,6 @@ write.csv(all_top_mods, "./results_statistics/capture_ALL_best_mods.csv")
 
 
 # Figures
-
-## Custom Colors
-
-```{r}
-lizard_color = "turquoise"
-VPD_color = "blue"
-temp_color = "gray"
-solar_color = "orange"
-wind_color = "orange"
-date_color = "gray"
-osml_color  <- c(brewer.pal(11, "Spectral")[c(10)])
-```
 
 
 
@@ -1110,7 +1061,7 @@ ggplot(dat) +
               method = "lm", 
               se = F, 
               size = 1.6, 
-              color = lizard_color,
+              color = "blue",
               alpha = 1) + 
   theme_classic() + 
   xlab("Body Condition (g)") + 
@@ -1144,7 +1095,6 @@ ggplot(dat) +
   stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
-              #color = VPD_color,
               size = 1.6, 
               alpha = 1 ) + 
   theme_classic() + 
@@ -1179,7 +1129,6 @@ ggplot(dat) +
   stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
-              #color = wind_color,
               size = 1.6, 
               alpha = 1 ) + 
   theme_classic() + 
@@ -1215,7 +1164,6 @@ ggplot(dat) +
   stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
-              #color = solar_color,
               size = 1.6, 
               alpha = 1 ) + 
   theme_classic() + 
@@ -1248,7 +1196,6 @@ ggplot(dat) +
               method = "lm", 
               se = F, 
               size = 1.6, 
-              color = lizard_color,
               alpha = 1) + 
   theme_classic() + 
   xlab("Snout-Vent Length (mm)") + 
@@ -1281,7 +1228,6 @@ ggplot(dat) +
               method = "lm", 
               se = F, 
               size = 1.6, 
-              color = lizard_color,
               alpha = 1) + 
   theme_classic() + 
   xlab("Body Condition (g)") + 
@@ -1315,7 +1261,6 @@ ggplot(dat_reduced) +
   stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
-              #color = VPD_color,
               size = 1.6, 
               alpha = 1 ) + 
   theme_classic() + 
@@ -1349,7 +1294,6 @@ ggplot(dat) +
   stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
-              #color = solar_color,
               size = 1.6, 
               alpha = 1 ) + 
   theme_classic() + 
@@ -1425,7 +1369,6 @@ ggplot(dat) +
   stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
-              color = temp_color,
               size = 1.6, 
               alpha = 1) + 
   theme_classic() + 
@@ -1516,7 +1459,6 @@ ggplot(dat) +
   stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
-              #color = temp_color,
               size = 1.6, 
               alpha = 1) + 
   theme_classic() + 
@@ -1550,7 +1492,6 @@ ggplot(dat) +
   stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
-              #color = VPD_color,
               size = 1.6, 
               alpha = 1 ) + 
   theme_classic() + 
@@ -1585,7 +1526,6 @@ ggplot(dat) +
   stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
-              color = VPD_color,
               size = 1.6, 
               alpha = 1 ) + 
   theme_classic() + 
@@ -1618,7 +1558,6 @@ ggplot(dat) +
   stat_smooth(formula = y ~ x, 
               method = "lm", 
               se = F, 
-              color = wind_color,
               size = 1.6, 
               alpha = 1 ) + 
   theme_classic() + 
@@ -1675,83 +1614,6 @@ ggplot(dat) +
         ) -> cap_CEWL_date_fig
 cap_CEWL_date_fig
 ```
-
-
-
-
-## Figure Arrangements
-
-```{r FIG ARRANGE}
-# hematocrit
-ggarrange(cap_hct_sorad_fig, cap_hct_VPD_fig,
-          cap_hct_SMI_fig, cap_hct_wind_fig,
-          ncol = 2, nrow = 2,
-          legend = "none"
-          ) -> cap_hct_multi_fig
-#cap_hct_multi_fig
-# export figure
-#ggsave(filename = "cap_hct_multi_fig.jpeg",
- #      plot = cap_hct_multi_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 12, height = 8)
-
-
-# osmolality
-ggarrange(cap_osml_sorad_fig, cap_osml_VPD_fig,
-          cap_osml_SMI_fig, cap_osml_SVL_fig,
-          ncol = 2, nrow = 2,
-          legend = "none"
-          ) -> cap_osml_multi_fig
-#cap_osml_multi_fig
-# export figure
-#ggsave(filename = "cap_osml_multi_fig.jpeg",
- #      plot = cap_osml_multi_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 12, height = 8)
-
-
-
-# CEWL
-ggarrange(cap_CEWL_VPDm_fig, cap_CEWL_VPDc_fig,
-          cap_CEWL_temp_fig, cap_CEWL_wind_fig,
-          cap_CEWL_osml_fig, cap_CEWL_clotemp_fig,
-          ncol = 2, nrow = 3,
-          legend = "none"
-          ) -> cap_CEWL_multi_fig
-#cap_CEWL_multi_fig
-# export figure
-#ggsave(filename = "cap_CEWL_multi_fig",
- #      plot = cap_CEWL_multi_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 12, height = 16)
-
-
-
-# date differences
-ggarrange(cap_osml_date_fig, cap_CEWL_date_fig,
-          ncol = 1, nrow = 2,
-          legend = "none"
-          ) -> cap_date_diffs_multi_fig
-##cap_date_diffs_multi_fig
-# export figure
-#ggsave(filename = "cap_date_diffs_multi_fig.jpeg",
- #      plot = cap_date_diffs_multi_fig,
-  #     path = "./results_figures",
-   #    device = "jpeg",
-    #   dpi = 1200,
-     #  width = 6, height = 8)
-```
-
-
-
-
-
 
 
 

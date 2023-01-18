@@ -46,7 +46,6 @@ library("rmdformats") # clean html R markdown format
 This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus then acclimated to 4 different climate treatments. This R file analyzes the effect of experimental climate treatments on lizard body condition, osmotic balance (plasma osmolality and hematocrit), and cutaneous evaporative water loss (CEWL).
 
 
-TEST CHANGE
 # Data
 
 ## Load

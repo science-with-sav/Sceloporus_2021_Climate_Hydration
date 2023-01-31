@@ -1203,7 +1203,7 @@ ggplot() +
                 ymin = mean_SMI-se_SMI, 
                 ymax = mean_SMI+se_SMI),
                 width = .1,
-                alpha = 0.7) +
+                alpha = 0.8) +
   geom_point(data = means,
             aes(x = day_n,
                 y = mean_SMI, 
@@ -1306,7 +1306,7 @@ ggplot() +
                     ymin = lower.CL, 
                     ymax = upper.CL),
                 width = .1,
-                alpha = 0.9) +
+                alpha = 1) +
   geom_point(data = SMI_emmeans, 
              aes(x = tmt,
                    y = emmean, 
@@ -1441,7 +1441,7 @@ ggplot() +
                 ymin = mean_hct-se_hct, 
                 ymax = mean_hct+se_hct),
                 width = .1,
-                alpha = 0.7) +
+                alpha = 0.8) +
   geom_point(data = means[complete.cases(means$mean_hct),],
             aes(x = day_n,
                 y = mean_hct, 
@@ -1507,7 +1507,7 @@ ggplot() +
                     ymin = lower.CL, 
                     ymax = upper.CL),
                 width = .1,
-                alpha = 0.9) +
+                alpha = 1) +
   geom_point(data = hct_emmeans, 
              aes(x = tmt,
                    y = emmean, 
@@ -1643,7 +1643,7 @@ ggplot() +
                 ymin = mean_osml-se_osml, 
                 ymax = mean_osml+se_osml),
                 width = .1,
-                alpha = 0.7) +
+                alpha = 0.8) +
   geom_point(data = means,
             aes(x = day_n,
                 y = mean_osml, 
@@ -1790,7 +1790,7 @@ ggplot() +
                     ymin = lower.CL, 
                     ymax = upper.CL),
                 width = .1,
-                alpha = 0.9) +
+                alpha = 1) +
   geom_point(data = osml_emmeans, 
              aes(x = tmt,
                    y = emmean, 
@@ -1912,14 +1912,14 @@ ggplot() +
                 ymax = mean_CEWL+se_CEWL),
                 width = .1,
                 #position=position_dodge(.1),
-                alpha = 0.7) +
+                alpha = 0.8) +
   geom_line(data = means[complete.cases(means$mean_CEWL),],
             aes(x = day_n,
                 y = mean_CEWL, 
                 color = tmt,
                 #linetype = tmt,
                 group = tmt),
-            alpha = 1, 
+            alpha = 0.7, 
             size = .5) +
   geom_point(data = means[complete.cases(means$mean_CEWL),],
             aes(x = day_n,
@@ -2131,7 +2131,7 @@ ggplot() +
                     ymin = lower.CL, 
                     ymax = upper.CL),
                 width = .1,
-                alpha = 0.9) +
+                alpha = 1) +
   geom_point(data = CEWL_emmeans, 
              aes(x = tmt,
                    y = emmean, 

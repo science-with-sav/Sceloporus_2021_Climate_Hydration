@@ -584,9 +584,8 @@ ggplot(dat_no_rehab) +
 Test an lm of raw CEWL ~ body temp for day 8 measurements only.
 
 ```{r}
-body_temp_test_dat <- dat_no_rehab_deltaCEWL %>%
-  dplyr::filter(complete.cases(CEWL_g_m2h_mean)) %>%
-  dplyr::filter(day_n == 8)
+body_temp_test_dat <- end_vals %>%
+  dplyr::filter(complete.cases(CEWL_g_m2h_mean))
 
 CEWL_body_temp_mod <- lmerTest::lmer(data = body_temp_test_dat, 
                          CEWL_g_m2h_mean ~ cloacal_temp_C * tmt +
@@ -606,6 +605,27 @@ ggplot(body_temp_test_dat) +
                  y = CEWL_g_m2h_mean,
                  color = tmt))
 ```
+
+
+Do the same exact stats for ambient temp and VPD at the time of measurement:
+
+```{r}
+CEWL_msmt_temp_mod <- lmerTest::lmer(data = body_temp_test_dat, 
+                                     CEWL_g_m2h_mean ~ msmt_temp_C * tmt +
+                                       (1|trial_number))
+CEWL_msmt_VPD_mod <- lmerTest::lmer(data = body_temp_test_dat, 
+                                     CEWL_g_m2h_mean ~ msmt_VPD_kPa * tmt +
+                                       (1|trial_number))
+
+summary(CEWL_msmt_temp_mod)
+summary(CEWL_msmt_VPD_mod)
+anova(CEWL_msmt_temp_mod, type = "1", ddf = "Kenward-Roger")
+anova(CEWL_msmt_VPD_mod, type = "1", ddf = "Kenward-Roger")
+```
+
+
+
+
 
 
 

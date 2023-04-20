@@ -20,12 +20,21 @@
 "day_n21","Hematocrit (%)","Day * Temp","day_n",7119,"1, 264",477.01,4.55030080989605e-61
 "temp_tmt2","Hematocrit (%)","Day * Temp","temp_tmt",126,"1, 128",8.42,0.00436396797252915
 "day_n:temp_tmt1","Hematocrit (%)","Day * Temp","day_n:temp_tmt",93,"1, 263",6.24,0.013088801795507
-"day_n4","Body Condition (g')","Day * VPD","day_n",226,"1, 668",3209.7,2.64093608532347e-257
-"VPD_kPa3","Body Condition (g')","Day * VPD","VPD_kPa",0,"1, 128",3.16,0.0776047512514472
-"day_n:VPD_kPa2","Body Condition (g')","Day * VPD","day_n:VPD_kPa",13,"1, 668",177.21,4.95063057796248e-36
-"day_n12","Body Condition (g')","Day * Humidity","day_n",226,"1, 668",2704.67,4.66994452101459e-237
-"humidity_tmt3","Body Condition (g')","Day * Humidity","humidity_tmt",0,"1, 128",0.02,0.875835805974575
-"day_n:humidity_tmt2","Body Condition (g')","Day * Humidity","day_n:humidity_tmt",4,"1, 668",44.22,6.09758466730173e-11
-"day_n22","Body Condition (g')","Day * Temp","day_n",226,"1, 668",4130.9,3.13162725806711e-288
-"temp_tmt3","Body Condition (g')","Day * Temp","temp_tmt",1,"1, 128",25.93,1.23462007394746e-06
-"day_n:temp_tmt2","Body Condition (g')","Day * Temp","day_n:temp_tmt",23,"1, 668",419.8,9.19859252913732e-73
+"day_n4","Body Mass (g)","Day * VPD","day_n",230,"1, 668",2899.99,3.16239032540609e-245
+"VPD_kPa3","Body Mass (g)","Day * VPD","VPD_kPa",0,"1, 130",0.57,0.449762994130668
+"day_n:VPD_kPa2","Body Mass (g)","Day * VPD","day_n:VPD_kPa",14,"1, 668",171.79,4.30420850661409e-35
+"day_n12","Body Mass (g)","Day * Humidity","day_n",230,"1, 668",2454.58,7.07127993480799e-226
+"humidity_tmt3","Body Mass (g)","Day * Humidity","humidity_tmt",0,"1, 130",0.01,0.925939468327187
+"day_n:humidity_tmt2","Body Mass (g)","Day * Humidity","day_n:humidity_tmt",4,"1, 668",42.8,1.20440283281869e-10
+"day_n22","Body Mass (g)","Day * Temp","day_n",230,"1, 668",3671.82,1.21689707902081e-273
+"temp_tmt3","Body Mass (g)","Day * Temp","temp_tmt",0,"1, 128",6.16,0.0143334764258136
+"day_n:temp_tmt2","Body Mass (g)","Day * Temp","day_n:temp_tmt",25,"1, 668",395.3,1.88562827289396e-69
+"day_n5","Body Condition (g')","Day * VPD","day_n",226,"1, 668",3209.7,2.64093608532347e-257
+"VPD_kPa4","Body Condition (g')","Day * VPD","VPD_kPa",0,"1, 128",3.16,0.0776047512514472
+"day_n:VPD_kPa3","Body Condition (g')","Day * VPD","day_n:VPD_kPa",13,"1, 668",177.21,4.95063057796248e-36
+"day_n13","Body Condition (g')","Day * Humidity","day_n",226,"1, 668",2704.67,4.66994452101459e-237
+"humidity_tmt4","Body Condition (g')","Day * Humidity","humidity_tmt",0,"1, 128",0.02,0.875835805974575
+"day_n:humidity_tmt3","Body Condition (g')","Day * Humidity","day_n:humidity_tmt",4,"1, 668",44.22,6.09758466730173e-11
+"day_n23","Body Condition (g')","Day * Temp","day_n",226,"1, 668",4130.9,3.13162725806711e-288
+"temp_tmt4","Body Condition (g')","Day * Temp","temp_tmt",1,"1, 128",25.93,1.23462007394746e-06
+"day_n:temp_tmt3","Body Condition (g')","Day * Temp","day_n:temp_tmt",23,"1, 668",419.8,9.19859252913732e-73

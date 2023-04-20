@@ -161,7 +161,7 @@ dat_no_rehab %>%
 Calculate mean values per day per tmt group.
 
 ```{r means}
-means <- dat %>% # use whole dat because want for both exp and rehyd
+means <- dat_no_rehab %>%
   group_by(day_n, tmt) %>%
   summarise(n_lizards = n(),
             mean_CEWL = mean(CEWL_g_m2h_mean, na.rm = T),
@@ -170,11 +170,14 @@ means <- dat %>% # use whole dat because want for both exp and rehyd
             sd_osml = sd(osmolality_mmol_kg_mean, na.rm = T),
             mean_hct = mean(hematocrit_percent, na.rm = T),
             sd_hct = sd(hematocrit_percent, na.rm = T),
+            mean_mass = mean(mass_g, na.rm = T),
+            sd_mass = sd(mass_g, na.rm = T),
             mean_SMI = mean(SMI, na.rm = T),
             sd_SMI = sd(SMI, na.rm = T)) %>%
   mutate(se_CEWL = (sd_CEWL/sqrt(n_lizards)),
          se_osml = (sd_osml/sqrt(n_lizards)),
          se_hct = (sd_hct/sqrt(n_lizards)),
+         se_mass = (sd_mass/sqrt(n_lizards)),
          se_SMI = (sd_SMI/sqrt(n_lizards)))
 
 # get rid of non-defined points
@@ -182,6 +185,7 @@ means <- dat %>% # use whole dat because want for both exp and rehyd
 means$mean_CEWL[is.nan(means$mean_CEWL)] <- NA
 means$mean_osml[is.nan(means$mean_osml)] <- NA
 means$mean_hct[is.nan(means$mean_hct)] <- NA
+means$mean_mass[is.nan(means$mean_mass)] <- NA
 means$mean_SMI[is.nan(means$mean_SMI)] <- NA
 means
 
@@ -228,6 +232,131 @@ response ~ day*temperature
 response ~ day*VPD
 
 Then, we will use AIC, RMSE, and R-sq to assess which treatment effect is most important to that response variable.
+
+
+## Body Mass
+
+### Building
+
+Build each treatment effect model.
+
+```{r mass exp models}
+mass_mod_VPD <- lmerTest::lmer(data = dat_no_rehab,
+                              mass_g ~ day_n * VPD_kPa +
+                              (1|trial_number/individual_ID))
+mass_mod_hum <- lmerTest::lmer(data = dat_no_rehab,
+                              mass_g ~ day_n * humidity_tmt +
+                              (1|trial_number/individual_ID))
+mass_mod_temp <- lmerTest::lmer(data = dat_no_rehab,
+                              mass_g ~ day_n * temp_tmt +
+                              (1|trial_number/individual_ID))
+```
+
+
+
+### Assumptions
+
+Check linear regression assumptions/conditions.
+
+```{r mass exp model assumptions}
+# distribution of SMI
+hist(dat_no_rehab$mass_g)
+
+# VPD model
+plot(mass_mod_VPD)
+simple.eda(residuals(mass_mod_VPD))
+shapiro.test(residuals(mass_mod_VPD))
+
+# humidity model
+plot(mass_mod_hum)
+simple.eda(residuals(mass_mod_hum))
+shapiro.test(residuals(mass_mod_hum))
+
+# temperature model
+plot(mass_mod_temp)
+simple.eda(residuals(mass_mod_temp))
+shapiro.test(residuals(mass_mod_temp))
+```
+
+
+Normality is violated, but linearity, equal error variance, and independence are all good.
+
+
+### Comparison
+
+Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values of the variables for each model.
+
+We... 
+
+- calculate RMSE manually
+- use the r.squaredGLMM function in the MuMIn package to get the marginal R^2, which is how much of the total variance is explained by fixed effects
+- use the aictab function in the AICmodavg package to get AIC and deltaAIC values
+- get the sum of squares, F, and p-values for each variable from the anova table for each model
+
+```{r mass mod compare}
+# calculate RMSE & R^2
+mass_RMSE_Rsq <- data.frame(model = 
+                               c('Day * VPD',
+                                 'Day * Humidity',
+                                 'Day * Temp'
+                                 ),
+                           RMSE = c(sqrt(mean((residuals(mass_mod_VPD))^2)),
+                                    sqrt(mean((residuals(mass_mod_hum))^2)),
+                                    sqrt(mean((residuals(mass_mod_temp))^2))),
+                           # marginal Rsq for the amount of variance
+                           # explained by fixed effects only
+                           Rsq = c(MuMIn::r.squaredGLMM(mass_mod_VPD)[,"R2m"],
+                                   MuMIn::r.squaredGLMM(mass_mod_hum)[,"R2m"],
+                                   MuMIn::r.squaredGLMM(mass_mod_temp)[,"R2m"]))
+
+# calculate AIC
+mass_models <- list(mass_mod_VPD, mass_mod_hum, mass_mod_temp)
+EXP_mod_names <- data.frame(model = 
+                               c('Day * VPD',
+                                 'Day * Humidity',
+                                 'Day * Temp'
+                                 ))
+mass_AICc <- data.frame(aictab(cand.set = mass_models, 
+                                 modnames = EXP_mod_names))
+
+# compare across models
+mass_across <- mass_RMSE_Rsq %>%
+  left_join(mass_AICc, by = 'model') %>%
+  mutate(response = "Body Mass (g)") %>%
+  arrange(Delta_AICc)
+
+# calculate F & p-values
+mass_VPD_p <- data.frame(anova(mass_mod_VPD, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Day * VPD',
+         predictor = rownames(.))
+mass_hum_p <- data.frame(anova(mass_mod_hum, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Day * Humidity',
+         predictor = rownames(.))
+mass_temp_p <- data.frame(anova(mass_mod_temp, 
+                              type = "1", 
+                              ddf = "Kenward-Roger")) %>%
+  mutate(model = 'Day * Temp',
+         predictor = rownames(.))
+
+# save within model values
+mass_within <- mass_VPD_p %>%
+  rbind(mass_hum_p) %>%
+  rbind(mass_temp_p) %>%
+  mutate(df = paste((NumDF), round(DenDF, 0), sep = ", "),
+         response = "Body Mass (g)")
+```
+
+
+
+
+
+
+
+
 
 
 ## Body Condition
@@ -633,16 +762,18 @@ anova(CEWL_msmt_VPD_mod, type = "1", ddf = "Kenward-Roger")
 
 ## CEWL
 
-First, get a separate df of delta CEWL for each tmt group:
+First, get a separate df of end-experiment delta CEWL for each tmt group:
 
 ```{r}
-HH8 <- body_temp_test_dat %>%
+dat_no_rehab_deltaCEWL_post <- dat_no_rehab_deltaCEWL %>%
+  dplyr::filter(day_n == 8)
+HH8 <- dat_no_rehab_deltaCEWL_post %>%
   dplyr::filter(substr(tmt, 1, 6) == "Hot Hu")
-HD8 <- body_temp_test_dat %>%
+HD8 <- dat_no_rehab_deltaCEWL_post %>%
   dplyr::filter(substr(tmt, 1, 6) == "Hot Dr")
-CH8 <- body_temp_test_dat %>%
+CH8 <- dat_no_rehab_deltaCEWL_post %>%
   dplyr::filter(substr(tmt, 1, 6) == "Cool H")
-CD8 <- body_temp_test_dat %>%
+CD8 <- dat_no_rehab_deltaCEWL_post %>%
   dplyr::filter(substr(tmt, 1, 6) == "Cool D")
 ```
 
@@ -800,6 +931,7 @@ Put all the model statistics into one df/csv - one for among-model comparisons, 
 experiment_model_compare <- CEWL_across %>%
   rbind(osml_across) %>%
   rbind(hct_across) %>%
+  rbind(mass_across) %>%
   rbind(SMI_across) %>%
   dplyr::select(response, model, 
                 RMSE, Rsq, AICc, Delta_AICc) %>%
@@ -814,6 +946,7 @@ write.csv(experiment_model_compare,
 experiment_model_values <- CEWL_within %>%
   rbind(osml_within) %>%
   rbind(hct_within) %>%
+  rbind(mass_within) %>%
   rbind(SMI_within) %>%
   dplyr::select(response, model, predictor, 
                 seq_sum_of_squares = Sum.Sq, 
@@ -836,6 +969,15 @@ write.csv(experiment_model_values, "./results_statistics/exp_model_values.csv")
 Now, we can use the emmeans function from the emmeans package to estimate marginal means and confidence intervals for the values among treatment groups at the end of the experiment. But, to get for each treatment group, we need to run a new model with day 8 data only and tmt as a single, 4-category variable.
 
 ```{r emmeans}
+# Body Mass
+mass_mod_end <- lmerTest::lmer(data = end_vals,
+                              mass_g ~ tmt + 
+                              (1|trial_number))
+mass_emmeans <- data.frame(emmeans(mass_mod_end, "tmt")) %>%
+  mutate(response = "Body Mass (g)")
+mass_pairwise <- data.frame(pairs(emmeans(mass_mod_end, "tmt"))) %>%
+  mutate(response = "Body Mass (g)")
+
 # Body Condition
 SMI_mod_end <- lmerTest::lmer(data = end_vals,
                               SMI ~ tmt + 
@@ -984,6 +1126,44 @@ summary(CEWL_VPD_lm)
 ```
 
 Even though the data is slightly nonlinear, a linear model does a fine job explaining the data.
+
+To be extra sure, also check for high leverage and influential points using H-values and Cook's distance:
+
+```{r}
+# compute values for observations 
+high_leverage <- data.frame(H = hatvalues(CEWL_VPD_lm)) %>% 
+  mutate(row = row_number())
+
+# compute cutoff value 
+h_bar <- (3*sum(high_leverage$H))/nrow(high_leverage)
+
+# add to original dataframe 
+# see which observations have extremely high leverage (if any)
+high_leverage_dat <- dat_no_rehab_deltaCEWL %>%
+  mutate(row = row_number()) %>%
+  left_join(., high_leverage, by = "row") %>%
+  dplyr::filter(H > h_bar) 
+high_leverage_dat
+
+
+# get Cook's distance 
+cooks <- data.frame(c = cooks.distance(CEWL_VPD_lm)) %>% 
+  mutate(row = row_number())
+
+# add to original dataframe 
+influential <- dat_no_rehab_deltaCEWL %>%
+  mutate(row = row_number()) %>% 
+  left_join(., cooks, by = "row")
+
+# see moderately influential points 
+cook_mod_inf <- influential %>% 
+  dplyr::filter(c>0.5) 
+cook_mod_inf
+```
+
+NO high leverage or influential points! :)
+
+
 
 We will double check a comparison of a polynomial model, just to be sure:
 
@@ -1147,6 +1327,160 @@ my_labels <- c("Cool Humid\n0.6 kPa",
 
 
 
+
+
+
+## Body Mass 
+
+
+
+### Means Only *F5*
+
+```{r mass actual-min fig}
+ggplot() + 
+  #plot these first so they end up on the "bottom"
+  geom_smooth(data = dat_no_rehab,
+                  aes(x = day_n,
+                y = mass_g, 
+                color = tmt,
+                group = tmt),
+              method = "lm",
+              se = F,
+              size = 0.7) +
+  geom_errorbar(data = means,
+                  aes(x = day_n,
+                y = mean_mass, 
+                color = tmt,
+                group = tmt,
+                ymin = mean_mass-se_mass, 
+                ymax = mean_mass+se_mass),
+                width = .1,
+                alpha = 0.8) +
+  geom_point(data = means,
+            aes(x = day_n,
+                y = mean_mass, 
+                color = tmt,
+                #fill = tmt,
+                shape = tmt),
+            fill = "white",
+            alpha = 1, 
+            size = 3) +
+  
+  theme_classic() + 
+  scale_shape_manual(values = my_shapes, name = "",
+                     labels = my_labels) +
+  scale_fill_manual(values = my_colors, name = "",
+                     labels = my_labels) +
+  scale_color_manual(values = my_colors, name = "",
+                     labels = my_labels) +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
+  scale_y_continuous(breaks = c(seq(9,12)),
+                     labels = c(seq(9,12))) +
+  xlab("Day") + 
+  ylab("Body Mass (g)") + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  #geom_vline(xintercept = 9,
+   #          linetype = "dashed",
+    #         color = "darkgrey") +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = margin(t = 6, r = 6, b = 6, l = 10.8, unit = "pt")
+) -> mass_fig_min
+mass_fig_min
+```
+
+
+
+
+
+### Ending Values *F6*
+
+```{r mass ending vals}
+ggplot() +
+  geom_jitter(data = end_vals,
+              aes(x = tmt,
+                   y = mass_g, 
+                   color = tmt,
+                 fill = tmt,
+                 shape = tmt), 
+               size = 1,
+              alpha = 0.4,
+              position = position_jitter(height = 0, width = 0.2)) +
+  geom_errorbar(data = mass_emmeans,
+                aes(x = tmt,
+                    y = emmean, 
+                    color = tmt,
+                    group = tmt,
+                    ymin = lower.CL, 
+                    ymax = upper.CL),
+                width = .1,
+                alpha = 1) +
+  geom_point(data = mass_emmeans, 
+             aes(x = tmt,
+                   y = emmean, 
+                   #color = tmt,
+                 shape = tmt,
+                 fill = tmt), 
+             color = "black",
+               size = 4) +
+  theme_classic() + 
+  scale_shape_manual(values = my_shapes_box, name = "") +
+  scale_fill_manual(values = my_colors, name = "") +
+  scale_color_manual(values = my_colors, name = "") +
+  scale_y_continuous(limits = c(7,15),
+                     breaks = c(seq(7,15, by = 2)),
+                     labels = c(seq(7,15, by = 2))) +
+  scale_x_discrete(labels = c("Cool Humid\n0.6 kPa",
+                               "Hot Humid\n1.1 kPa",
+                               "Cool Dry\n2.5 kPa",
+                               "Hot Dry\n3.8 kPa")) + 
+  xlab("") + 
+  
+  annotate(geom = "text", x = 4, y = 14.4, label = "B", 
+           size = 3) +
+  annotate(geom = "text", x = 2, y = 15, label = "BC", 
+           size = 3) +
+  annotate(geom = "text", x = 3, y = 14.6, label = "AC", 
+           size = 3) +
+  annotate(geom = "text", x = 1, y = 14.8, label = "A", 
+           size = 3) +
+  
+  ylab("Body Mass (g)") + 
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.text.align = 0,
+        legend.position = "none",
+        plot.margin = unit(c(0, #top
+                              0, #right
+                              0, #bottom
+                              3.4), "mm")
+        ) -> mass_end_boxplot
+mass_end_boxplot
+mass_emmeans
+mass_pairwise
+```
+
+
+
+
+
+
 ## SMI 
 
 ### Ind + Means
@@ -1241,15 +1575,15 @@ ggplot() +
                      labels = my_labels) +
   scale_color_manual(values = my_colors, name = "",
                      labels = my_labels) +
-  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
   scale_y_continuous(breaks = c(seq(8,12)),
                      labels = c(seq(8,12))) +
   xlab("Day") + 
   ylab("Body Condition (g')") + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
-  geom_vline(xintercept = 9,
-             linetype = "dashed",
-             color = "darkgrey") +
+  #geom_vline(xintercept = 9,
+   #          linetype = "dashed",
+    #         color = "darkgrey") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 12),
@@ -1478,15 +1812,15 @@ ggplot() +
                      labels = my_labels) +
   scale_color_manual(values = my_colors, name = "",
                      labels = my_labels) +
-  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
   scale_y_continuous(breaks = c(25, 30, 35, 40),
                      labels = c(25, 30, 35, 40),) +
   xlab("") + 
   ylab("Hematocrit (%)") + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
-  geom_vline(xintercept = 9,
-             linetype = "dashed",
-             color = "darkgrey") +
+  #geom_vline(xintercept = 9,
+   #          linetype = "dashed",
+    #         color = "darkgrey") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 12),
@@ -1680,15 +2014,15 @@ ggplot() +
                      labels = my_labels) +
   scale_color_manual(values = my_colors, name = "",
                      labels = my_labels) +
-  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
-  scale_y_continuous(breaks = c(seq(320,400, by = 10)),
-                     labels = c(seq(320,400, by = 10))) +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
+  scale_y_continuous(breaks = c(seq(340,380, by = 10)),
+                     labels = c(seq(340,380, by = 10))) +
   xlab("") + 
   ylab(bquote('Osmolality (mmol '*kg^-1*')')) + 
   guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
-  geom_vline(xintercept = 9,
-             linetype = "dashed",
-             color = "darkgrey") +
+  #geom_vline(xintercept = 9,
+   #          linetype = "dashed",
+    #         color = "darkgrey") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 12),
@@ -2264,7 +2598,7 @@ over time:
 ```{r arrange figs}
 ggarrange(osml_fig_min, 
           hct_fig_min, 
-          SMI_fig_min,
+          mass_fig_min,
           ncol = 1, nrow = 3,
           labels = c("A", "B", "C"),
           common.legend = TRUE,
@@ -2289,7 +2623,7 @@ end values:
 ggarrange(CEWL_end_boxplot, 
           osml_end_boxplot, 
           hct_end_boxplot,
-          SMI_end_boxplot, 
+          mass_end_boxplot, 
           ncol = 2, nrow = 2,
           labels = c("A", "B", "C", "D"),
           widths = c(2, 2.045), heights = c(2, 2),

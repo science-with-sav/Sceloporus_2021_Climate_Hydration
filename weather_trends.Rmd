@@ -36,8 +36,8 @@ The weather at capture that is used in the models of baseline variation are read
 
 # Load Data
 
-first, get the sunrise and sunset times March - September:
-(source: https://gml.noaa.gov/grad/solcalc/table.php?lat=35.304442&lon=-120.65925&year=2021)
+First, get the sunrise and sunset times March - September.
+source: [ESRL](https://gml.noaa.gov/grad/solcalc/table.php?lat=35.304442&lon=-120.65925&year=2021)
 
 sunrise times:
 
@@ -199,6 +199,21 @@ weather_dat_daily <- weather_dat %>%
             solar_radiation_W_m2 = mean(solar_radiation_W_m2)
             )
 ```
+
+
+
+
+# At Capture
+
+This is weather data specifically at the time of capture of each lizard in the study.
+
+```{r}
+cap_weather <- read_rds("./data/analysis_data_capture.RDS") %>%
+  dplyr::filter(complete.cases(VPD_kPa_int))
+```
+
+
+
 
 
 
@@ -456,7 +471,10 @@ Create a figure to compare our experimental conditions to daytime conditions thr
 tmts <- data.frame(tmt = c("Cool Humid", "Hot Humid", "Cool Dry", "Hot Dry"),
                    VPD_kPa = c(0.6, 1.1, 2.5, 3.8),
                    temp_C = c(23.8, 34.9, 24.4, 35.5),
-                   RH_percent = c(78.3, 80.9, 17.9, 34.1))
+                   RH_percent = c(78.3, 80.9, 17.9, 34.1)) %>%
+  mutate(tmt = factor(tmt,
+         levels = c("Cool Humid", "Hot Humid", "Cool Dry", "Hot Dry")))
+  
 tmts$tmt <- factor(tmts$tmt,
                    levels = c("Cool Humid", "Hot Humid", "Cool Dry", "Hot Dry"))
 # colors, shapes, labels
@@ -475,49 +493,65 @@ my_labels <- c("Cool Humid\n0.6 kPa",
                                "Cool Dry\n2.5 kPa",
                                "Hot Dry\n3.8 kPa")
 
+
 # plot
 ggplot() +
   geom_tile(data = weather_dat_active_szn,
             aes(x = temp_C, 
-                y = RH_percent,
-                fill = VPD_kPa_CN98),
+                #y = RH_percent,
+                y = VPD_kPa_CN98,
+                fill = RH_percent
+                #fill = VPD_kPa_CN98
+                ),
             alpha = 0.5,
-            height = 1,
-            width = 0.4) +
+            height = 0.09,
+            width = 0.6) +
+  geom_point(data = cap_weather,
+             aes(x = temp_C_interpol,
+                 y = VPD_kPa_int),
+             color = "black",
+             size = 0.5
+             ) +
   geom_point(data = tmts,
              aes(x = temp_C,
-                 y = RH_percent), 
+                 y = VPD_kPa), 
                  color = my_colors,
                  shape = my_shapes, 
               size = 4,
               alpha = 1) +
   geom_point(data = tmts,
              aes(x = temp_C,
-                 y = RH_percent), 
+                 y = VPD_kPa), 
              shape = c(22,21,22,21), # same as my_shapes, but with no fill
              color = "black",
               size = 4,
               alpha = 1) +
-  scale_fill_distiller(palette = "PuRd", direction = 1, name = "VPD (kPa)") +
+  scale_fill_distiller(palette = "PuRd", direction = -1, name = NULL
+                       #name = "Relative Humidity (%)"
+                       ) +
   theme_classic() + 
   #scale_shape_manual(values = my_shapes, name = NULL,
    #                  labels = my_labels) +
   #scale_color_manual(values = my_colors, name = NULL,
    #                  labels = my_labels) +
   xlab("Temperature (°C)") + 
-  ylab("Relative Humidity (%)") + 
-  xlim(0,40) + ylim(0,100) +
+  #ylab("Relative Humidity (%)") + 
+  ylab("Vapor Pressure Deficit (kPa)") + 
+  xlim(0,40) + ylim(-0.1,6) +
   #guides(shape = guide_legend(nrow = 4, byrow = TRUE),
    #      #fill = guide_legend(title.position = "left") # makes color ramp weird
     #     ) +
-  annotate("text", label = "Cool Humid\n0.6 kPa",
-            x = 26, y = 87, size = 2.6, color = "black") +
-  annotate("text", label = "Hot Humid\n1.1 kPa",
-            x = 37, y = 90, size = 2.6, color = "black") +
-  annotate("text", label = "Cool Dry\n2.5 kPa",
-            x = 21, y = 9, size = 2.6, color = "black") +
-  annotate("text", label = "Hot Dry\n3.8 kPa",
-            x = 38, y = 43, size = 2.6, color = "black") +
+  annotate("text", label = "Cool Humid",#\n0.6 kPa",
+            x = 26.8, y = 0.2, size = 2.6, color = "black") +
+  annotate("text", label = "Hot Humid",#\n1.1 kPa",
+            x = 37.4, y = 1.5, size = 2.6, color = "black") +
+  annotate("text", label = "Cool Dry",#\n2.5 kPa",
+            x = 22.2, y = 2.9, size = 2.6, color = "black") +
+  annotate("text", label = "Hot Dry",#\n3.8 kPa",
+            x = 37.3, y = 3.4, size = 2.6, color = "black") +
+  # add custom legend title so I can put where I want
+  annotate("text", label = "Relative Humidity (%)",
+            x = 12, y = 6, size = 3, color = "black") +
   theme(text = element_text(color = "black", 
                             family = "sans", 
                             size = 12),
@@ -530,11 +564,11 @@ ggplot() +
         legend.title = element_text(color = "black", 
                                  family = "sans", 
                                  size = 8),
-        legend.text.align = 0,
-        legend.position = "bottom",
-        legend.title.align = 0.5,
+        legend.text.align = 0.5,
+        legend.position = c(0.3, 0.84),
+        legend.title.align = 0,
         legend.direction = "horizontal",
-        legend.margin = margin(t = 5, unit = "mm")
+        legend.margin = margin(t = 0, unit = "mm")
         #plot.margin = unit(c(0, #top
          #                     0, #right
           #                    0, #bottom
@@ -543,18 +577,20 @@ ggplot() +
 tmt_weather_fig
 
 # use ggarrange so legend is centered
-tmt_weather_fig_formatted <- ggarrange(tmt_weather_fig,
-                                        ncol = 1, nrow = 1,
-                                        common.legend = TRUE,
-                                        legend = "bottom")
+# only need if legend outside plot
+#tmt_weather_fig_formatted <- ggarrange(tmt_weather_fig,
+ #                                       ncol = 1, nrow = 1,
+  #                                      common.legend = TRUE,
+   #                                     legend = "bottom"
+    #                                   )
 # save
-ggsave(filename = "exp_vs_weather_fig.pdf",
-       plot = tmt_weather_fig_formatted,
+ggsave(filename = "exp_vs_weather_fig_VPD.pdf",
+       plot = tmt_weather_fig,
        path = "./results_figures",
        device = "pdf",
        dpi = 600,
        units = "mm",
-       width = 80, height = 100)
+       width = 80, height = 80)
 ```
 
 

@@ -1020,6 +1020,15 @@ CEWL_pairwise <- data.frame(pairs(emmeans(CEWL_mod_end, "tmt"))) %>%
 ## Rate of Change
 
 ```{r emtrends}
+# Body MASS
+mass_mod_day <- lmerTest::lmer(data = dat_no_rehab,
+                              mass_g ~ day_n * tmt + 
+                              (1|trial_number/individual_ID))
+mass_emtrends <- data.frame(emtrends(mass_mod_day, "tmt", var = "day_n")) %>%
+  mutate(response = "Body Mass (g)")
+mass_pairtrend <- data.frame(pairs(emtrends(mass_mod_day, "tmt", var = "day_n"))) %>%
+  mutate(response = "Body Mass (g)")
+
 # Body Condition
 SMI_mod_day <- lmerTest::lmer(data = dat_no_rehab,
                               SMI ~ day_n * tmt + 
@@ -1060,6 +1069,7 @@ CEWL_pairtrend <- data.frame(pairs(emtrends(CEWL_mod_day, "tmt", var = "day_n"))
 all_emtrends <- CEWL_emtrends %>%
   rbind(osml_emtrends) %>%
   rbind(hct_emtrends) %>%
+  rbind(mass_emtrends) %>%
   rbind(SMI_emtrends) %>%
   mutate(confint95 = paste(round(lower.CL, 2), round(upper.CL, 2), sep = ", ")) %>%
   dplyr::select(response, tmt, 

@@ -327,17 +327,17 @@ mass_across <- mass_RMSE_Rsq %>%
 
 # calculate F & p-values
 mass_VPD_p <- data.frame(anova(mass_mod_VPD, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Day * VPD',
          predictor = rownames(.))
 mass_hum_p <- data.frame(anova(mass_mod_hum, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Day * Humidity',
          predictor = rownames(.))
 mass_temp_p <- data.frame(anova(mass_mod_temp, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Day * Temp',
          predictor = rownames(.))
@@ -452,17 +452,17 @@ SMI_across <- SMI_RMSE_Rsq %>%
 
 # calculate F & p-values
 SMI_VPD_p <- data.frame(anova(SMI_mod_VPD, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Day * VPD',
          predictor = rownames(.))
 SMI_hum_p <- data.frame(anova(SMI_mod_hum, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Day * Humidity',
          predictor = rownames(.))
 SMI_temp_p <- data.frame(anova(SMI_mod_temp, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Day * Temp',
          predictor = rownames(.))
@@ -562,17 +562,17 @@ hct_across <- hct_RMSE_Rsq %>%
 
 # calculate F & p-values
 hct_VPD_p <- data.frame(anova(hct_mod_VPD, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Day * VPD',
          predictor = rownames(.))
 hct_hum_p <- data.frame(anova(hct_mod_hum, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Day * Humidity',
          predictor = rownames(.))
 hct_temp_p <- data.frame(anova(hct_mod_temp, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Day * Temp',
          predictor = rownames(.))
@@ -673,17 +673,17 @@ osml_across <- osml_RMSE_Rsq %>%
 
 # calculate F & p-values
 osml_VPD_p <- data.frame(anova(osml_mod_VPD, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Day * VPD',
          predictor = rownames(.))
 osml_hum_p <- data.frame(anova(osml_mod_hum, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Day * Humidity',
          predictor = rownames(.))
 osml_temp_p <- data.frame(anova(osml_mod_temp, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Day * Temp',
          predictor = rownames(.))
@@ -720,7 +720,7 @@ CEWL_body_temp_mod <- lmerTest::lmer(data = body_temp_test_dat,
                          CEWL_g_m2h_mean ~ cloacal_temp_C * tmt +
                            (1|trial_number))
 summary(CEWL_body_temp_mod)
-anova(CEWL_body_temp_mod, type = "1", ddf = "Kenward-Roger")
+anova(CEWL_body_temp_mod, type = "3", ddf = "Kenward-Roger")
 ```
 
 
@@ -748,8 +748,8 @@ CEWL_msmt_VPD_mod <- lmerTest::lmer(data = body_temp_test_dat,
 
 summary(CEWL_msmt_temp_mod)
 summary(CEWL_msmt_VPD_mod)
-anova(CEWL_msmt_temp_mod, type = "1", ddf = "Kenward-Roger")
-anova(CEWL_msmt_VPD_mod, type = "1", ddf = "Kenward-Roger")
+anova(CEWL_msmt_temp_mod, type = "3", ddf = "Kenward-Roger")
+anova(CEWL_msmt_VPD_mod, type = "3", ddf = "Kenward-Roger")
 ```
 
 
@@ -888,17 +888,17 @@ CEWL_across <- CEWL_RMSE_Rsq %>%
 
 # calculate F & p-values
 CEWL_VPD_p <- data.frame(anova(CEWL_mod_VPD, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'VPD',
          predictor = rownames(.))
 CEWL_hum_p <- data.frame(anova(CEWL_mod_hum, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Humidity',
          predictor = rownames(.))
 CEWL_temp_p <- data.frame(anova(CEWL_mod_temp, 
-                              type = "1", 
+                              type = "3", 
                               ddf = "Kenward-Roger")) %>%
   mutate(model = 'Temp',
          predictor = rownames(.))
@@ -1092,31 +1092,31 @@ CEWL_osml <- lmerTest::lmer(data = end_vals,
                                CEWL_g_m2h_mean ~ osmolality_mmol_kg_mean +
                                (1|trial_number))
 summary(CEWL_osml)
-anova(CEWL_osml, type = "1", ddf = "Kenward-Roger")
+anova(CEWL_osml, type = "3", ddf = "Kenward-Roger")
 
 HH_CEWL_osml <- lmerTest::lmer(data = HH8, 
                                CEWL_g_m2h_mean ~ osmolality_mmol_kg_mean +
                                (1|trial_number))
 summary(HH_CEWL_osml)
-anova(HH_CEWL_osml, type = "1", ddf = "Kenward-Roger")
+anova(HH_CEWL_osml, type = "3", ddf = "Kenward-Roger")
 
 HD_CEWL_osml <- lmerTest::lmer(data = HD8, 
                                CEWL_g_m2h_mean ~ osmolality_mmol_kg_mean +
                                (1|trial_number))
 summary(HD_CEWL_osml)
-anova(HD_CEWL_osml, type = "1", ddf = "Kenward-Roger")
+anova(HD_CEWL_osml, type = "3", ddf = "Kenward-Roger")
 
 CH_CEWL_osml <- lmerTest::lmer(data = CH8, 
                                CEWL_g_m2h_mean ~ osmolality_mmol_kg_mean +
                                (1|trial_number))
 summary(CH_CEWL_osml)
-anova(CH_CEWL_osml, type = "1", ddf = "Kenward-Roger")
+anova(CH_CEWL_osml, type = "3", ddf = "Kenward-Roger")
 
 CD_CEWL_osml <- lmerTest::lmer(data = CD8, 
                                CEWL_g_m2h_mean ~ osmolality_mmol_kg_mean +
                                (1|trial_number))
 summary(CD_CEWL_osml)
-anova(CD_CEWL_osml, type = "1", ddf = "Kenward-Roger")
+anova(CD_CEWL_osml, type = "3", ddf = "Kenward-Roger")
 ```
 
 Even though only data for one treatment group was significant, all have a positive relationship
@@ -1128,7 +1128,7 @@ We also want to assess whether the vapor pressure deficit lizards experienced du
 
 ```{r}
 CEWL_VPD_lm <- lm(data = dat_no_rehab_deltaCEWL,
-                               delta_CEWL ~ VPD_kPa_tmttrial)
+                               delta_CEWL ~ VPD_mean_tmttrial)
 plot(CEWL_VPD_lm)
 simple.eda(residuals(CEWL_VPD_lm))
 shapiro.test(residuals(CEWL_VPD_lm))
@@ -1179,7 +1179,7 @@ We will double check a comparison of a polynomial model, just to be sure:
 
 ```{r}
 CEWL_VPD_poly <- lm(data = dat_no_rehab_deltaCEWL,
-                               delta_CEWL ~ poly(VPD_kPa_tmttrial, 2))
+                               delta_CEWL ~ poly(VPD_mean_tmttrial, 2))
 plot(CEWL_VPD_poly)
 simple.eda(residuals(CEWL_VPD_poly))
 shapiro.test(residuals(CEWL_VPD_poly))
@@ -1214,7 +1214,7 @@ I'll use the lm as the best model/
 
 ```{r}
 summary(CEWL_VPD_lm)
-anova(CEWL_VPD_lm)
+anova(CEWL_VPD_lm) # single factor slr = can't specify ddf and type SS the same way (& don't need to I think)
 ```
 
 (estimate = -2.96, SE = 0.6, df = (1, 131), F = 24.82, p < 0.0001, Rsq = 0.16)

@@ -268,9 +268,11 @@ Get mean and sd of temperature and humidity for each tmt group, and calculate va
 
 ```{r}
 format_HOBO_data_w_VPD <- format_HOBO_data %>%
-  mutate(e_s_kPa = 0.611 * exp((17.502*temp_C)/(temp_C + 240.97)), # saturation VP, Campbell & Normal 1998
-         # VPD, Campbell & Normal 1998
-         VPD_kPa = e_s_kPa*(1 - (relative_humidity/100))) 
+  # vapor pressure calculations based on Campbell & Normal 1998
+  mutate(e_s_kPa = 0.611 * exp((17.502*temp_C)/(temp_C + 240.97)), 
+         e_a_kPa = e_s_kPa*(relative_humidity/100),
+         VPD_kPa = e_s_kPa - e_a_kPa
+         ) 
 
 tmt_only_means <- format_HOBO_data_w_VPD %>%
   group_by(tmt) %>%
@@ -283,6 +285,11 @@ tmt_only_means <- format_HOBO_data_w_VPD %>%
             humidity_SD = sd(relative_humidity),
             humidity_min = min(relative_humidity),
             humidity_max = max(relative_humidity),
+            
+            e_a_mean = mean(e_a_kPa),
+            e_a_SD = sd(e_a_kPa),
+            e_a_min = min(e_a_kPa),
+            e_a_max = max(e_a_kPa),
             
             VPD_mean = mean(VPD_kPa),
             VPD_SD = sd(VPD_kPa),
@@ -303,7 +310,9 @@ Were there also differences across the trials (experiment iterations)?
 ```{r}
 tmt_trial_means <- format_HOBO_data_w_VPD %>%
   group_by(tmt, trial) %>%
-  summarise(VPD_mean_tmttrial = mean(VPD_kPa),
+  summarise(e_a_mean_tmttrial = mean(e_a_kPa),
+            e_a_SD_tmttrial = sd(e_a_kPa),
+            VPD_mean_tmttrial = mean(VPD_kPa),
             VPD_SD_tmttrial = sd(VPD_kPa),
             temp_mean_tmttrial = mean(temp_C),
             temp_SD_tmttrial = sd(temp_C),

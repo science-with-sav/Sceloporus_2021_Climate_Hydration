@@ -432,10 +432,10 @@ full_dat3$tmt <- factor(full_dat3$tmt,
                                       "hot humid", 
                                       "cool dry", 
                                       "hot dry"),
-                           labels = c("Cool Humid (0.6 kPa)", 
-                                      "Hot Humid (1.1 kPa)", 
-                                      "Cool Dry (2.5 kPa)", 
-                                      "Hot Dry (3.8 kPa)"))
+                           labels = c("Cool Humid", 
+                                      "Hot Humid", 
+                                      "Cool Dry", 
+                                      "Hot Dry"))
 
 summary(full_dat3)
 ```

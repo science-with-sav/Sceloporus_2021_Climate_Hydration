@@ -173,6 +173,26 @@ summary(format_HOBO_data)
 ```
 
 
+## Pretty Tmt Factor
+
+reformat tmt factor:
+
+```{r}
+format_HOBO_data$tmt <- factor(format_HOBO_data$tmt,
+                           levels = c("cool-humid",
+                                      "hot-humid", 
+                                      "cool-dry", 
+                                      "hot-dry"),
+                           labels = c("Cool Humid", 
+                                      "Hot Humid", 
+                                      "Cool Dry", 
+                                      "Hot Dry"))
+summary(format_HOBO_data)
+```
+
+
+
+
 
 # Check Data
 
@@ -259,7 +279,14 @@ format_HOBO_data %>%
 
 
 
+
+
+
+
 # Statistics
+
+
+
 
 
 ## Treatment Differences
@@ -303,6 +330,33 @@ tmt_only_means
 
 
 
+### Make Pretty Version
+
+```{r}
+tmt_only_means_pretty <- tmt_only_means %>% 
+  mutate(trial = "Average",
+         temperature_C = paste(round(temp_mean, 1), "±", 
+                                          round(temp_SD, 1), sep = " "),
+         relative_humidity_percent = paste(round(humidity_mean, 0), "±", 
+                                          round(humidity_SD, 0), sep = " "),
+         water_vapor_pressure_kPa = paste(round(e_a_mean, 1), "±", 
+                                          round(e_a_SD, 1), sep = " "),
+         vapor_pressure_deficit_kPa = paste(round(VPD_mean, 1), "±", 
+                                          round(VPD_SD, 1), sep = " ")) %>% 
+  dplyr::select(tmt, trial, 
+                temperature_C, relative_humidity_percent,
+                water_vapor_pressure_kPa, vapor_pressure_deficit_kPa) %>% 
+  arrange(tmt)
+
+tmt_only_means_pretty
+
+write.csv(tmt_only_means_pretty, "./results_statistics/HOBO_mean_diffs_tmt_only.csv")
+```
+
+
+
+
+
 ## Trial Differences
 
 Were there also differences across the trials (experiment iterations)?
@@ -324,23 +378,39 @@ tmt_trial_means
 ```
 
 
-reformat and the mean values:
+### Export for other Rmds
 
 ```{r}
-tmt_trial_means$tmt <- factor(tmt_trial_means$tmt,
-                           levels = c("cool-humid",
-                                      "hot-humid", 
-                                      "cool-dry", 
-                                      "hot-dry"),
-                           labels = c("Cool Humid (0.6 kPa)", 
-                                      "Hot Humid (1.1 kPa)", 
-                                      "Cool Dry (2.5 kPa)", 
-                                      "Hot Dry (3.8 kPa)"))
-
-summary(tmt_trial_means)
 write_rds(tmt_trial_means, "./data/HOBO_tmt_trial_diffs.RDS")
-write.csv(tmt_trial_means, "./results_statistics/HOBO_mean_diffs.csv")
 ```
+
+
+
+
+### Export Pretty Version
+
+```{r}
+tmt_trial_means_pretty <- tmt_trial_means %>% 
+  mutate(temperature_C = paste(round(temp_mean_tmttrial, 1), "±", 
+                                          round(temp_SD_tmttrial, 1), sep = " "),
+         relative_humidity_percent = paste(round(humidity_mean_tmttrial, 0), "±", 
+                                          round(humidity_SD_tmttrial, 0), sep = " "),
+         water_vapor_pressure_kPa = paste(round(e_a_mean_tmttrial, 1), "±", 
+                                          round(e_a_SD_tmttrial, 1), sep = " "),
+         vapor_pressure_deficit_kPa = paste(round(VPD_mean_tmttrial, 1), "±", 
+                                          round(VPD_SD_tmttrial, 1), sep = " ")) %>% 
+  dplyr::select(tmt, trial, 
+                temperature_C, relative_humidity_percent,
+                water_vapor_pressure_kPa, vapor_pressure_deficit_kPa) %>% 
+  rbind(tmt_only_means_pretty) %>% 
+  arrange(tmt, trial)
+
+tmt_trial_means_pretty
+
+write.csv(tmt_trial_means_pretty, "./results_statistics/HOBO_mean_diffs.csv")
+```
+
+
 
 
 

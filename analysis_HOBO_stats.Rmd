@@ -380,8 +380,25 @@ tmt_trial_means
 
 ### Export for other Rmds
 
+First, add overall tmt means:
+
 ```{r}
-write_rds(tmt_trial_means, "./data/HOBO_tmt_trial_diffs.RDS")
+tmt_only_means_sub <- tmt_only_means %>% 
+  dplyr::select(tmt, 
+                e_a_kPa = e_a_mean, 
+                VPD_kPa = VPD_mean) %>% 
+  mutate(e_a_kPa = round(e_a_kPa, 1),
+         VPD_kPa = round(VPD_kPa, 1))
+tmt_only_means_sub
+
+tmt_trial_means_plus <- tmt_trial_means %>% 
+  left_join(tmt_only_means_sub, by = 'tmt')
+```
+
+
+
+```{r}
+write_rds(tmt_trial_means_plus, "./data/HOBO_tmt_trial_diffs.RDS")
 ```
 
 

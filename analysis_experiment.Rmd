@@ -13,11 +13,8 @@ output:
 # Packages
 
 ```{r setup, include = TRUE, message = FALSE}
-`%nin%` = Negate(`%in%`)
 if (!require("tidyverse")) install.packages("tidyverse")
 library("tidyverse") # workflow and plots
-if (!require("lme4")) install.packages("lme4")
-library("lme4") # for LMMs
 if (!require("lmerTest")) install.packages("lmerTest")
 library("lmerTest") # for p-values
 if (!require("ggpubr")) install.packages("ggpubr")
@@ -27,9 +24,7 @@ library("UsingR") # simple.eda model assumption checker
 if (!require("broom.mixed")) install.packages("broom.mixed")
 library("broom.mixed") # lmer model export
 if (!require("emmeans")) install.packages('emmeans')
-library('emmeans')
-if (!require("car")) install.packages("car")
-library("car") # VIFs
+library('emmeans') # marginal means
 if (!require("AICcmodavg")) install.packages("AICcmodavg")
 library("AICcmodavg") # model selection
 if (!require("MuMIn")) install.packages("MuMIn")
@@ -53,15 +48,7 @@ This data was collected June - August by Master's student Savannah Weaver, advis
 Read-in data that was compiled, formatted, and checked for completeness in 'wrangling_general'. See that file for information related to the variables.
 
 ```{r load data}
-dat <- read_rds("./data/analysis_data_experiment.RDS") %>%
-  # add VPD values by tmt and trial group
-  left_join(read_rds("./data/HOBO_tmt_trial_diffs.RDS"), 
-            by = c('tmt', 'trial_number'='trial')) %>%
-  # add the per tmt group calculation of VPD from analysis_HOBO
-  mutate(VPD_kPa = case_when(substr(tmt, 1, 6) == "Hot Dr" ~ 3.82,
-                             substr(tmt, 1, 6) == "Hot Hu" ~ 1.07,
-                             substr(tmt, 1, 6) == "Cool D" ~ 2.50,
-                             substr(tmt, 1, 6) == "Cool H" ~ 0.64))
+dat <- read_rds("./data/analysis_data_experiment.RDS")
 summary(dat)
 ```
 
@@ -72,6 +59,8 @@ summary(dat)
 ## Split
 
 Make sub-dataframes without recovery data / with only recovery-related data:
+
+*note: recovery analysis was not included in publication*
 
 ```{r sub-dfs}
 dat_no_rehab <- dat %>%
@@ -151,7 +140,7 @@ dat_no_rehab %>%
             mean(msmt_RH_percent, na.rm = T),
             sd(msmt_RH_percent, na.rm = T),
             mean(msmt_VPD_kPa, na.rm = T),
-            mean(msmt_VPD_kPa, na.rm = T))
+            sd(msmt_VPD_kPa, na.rm = T))
 ```
 
 
@@ -231,6 +220,8 @@ response ~ day*humidity
 response ~ day*temperature
 response ~ day*VPD
 
+**I added models with water vapor pressure based on comments received during review, but deemed it uninformative to add to the results presented in the paper**
+
 Then, we will use AIC, RMSE, and R-sq to assess which treatment effect is most important to that response variable.
 
 
@@ -241,6 +232,9 @@ Then, we will use AIC, RMSE, and R-sq to assess which treatment effect is most i
 Build each treatment effect model.
 
 ```{r mass exp models}
+mass_mod_WVP <- lmerTest::lmer(data = dat_no_rehab,
+                              mass_g ~ day_n * e_a_kPa +
+                              (1|trial_number/individual_ID))
 mass_mod_VPD <- lmerTest::lmer(data = dat_no_rehab,
                               mass_g ~ day_n * VPD_kPa +
                               (1|trial_number/individual_ID))
@@ -296,23 +290,27 @@ We...
 ```{r mass mod compare}
 # calculate RMSE & R^2
 mass_RMSE_Rsq <- data.frame(model = 
-                               c('Day * VPD',
+                               c('Day * WVP',
+                                 'Day * VPD',
                                  'Day * Humidity',
                                  'Day * Temp'
                                  ),
-                           RMSE = c(sqrt(mean((residuals(mass_mod_VPD))^2)),
+                           RMSE = c(sqrt(mean((residuals(mass_mod_WVP))^2)),
+                                    sqrt(mean((residuals(mass_mod_VPD))^2)),
                                     sqrt(mean((residuals(mass_mod_hum))^2)),
                                     sqrt(mean((residuals(mass_mod_temp))^2))),
                            # marginal Rsq for the amount of variance
                            # explained by fixed effects only
-                           Rsq = c(MuMIn::r.squaredGLMM(mass_mod_VPD)[,"R2m"],
+                           Rsq = c(MuMIn::r.squaredGLMM(mass_mod_WVP)[,"R2m"],
+                                   MuMIn::r.squaredGLMM(mass_mod_VPD)[,"R2m"],
                                    MuMIn::r.squaredGLMM(mass_mod_hum)[,"R2m"],
                                    MuMIn::r.squaredGLMM(mass_mod_temp)[,"R2m"]))
 
 # calculate AIC
-mass_models <- list(mass_mod_VPD, mass_mod_hum, mass_mod_temp)
+mass_models <- list(mass_mod_WVP, mass_mod_VPD, mass_mod_hum, mass_mod_temp)
 EXP_mod_names <- data.frame(model = 
-                               c('Day * VPD',
+                               c('Day * WVP',
+                                 'Day * VPD',
                                  'Day * Humidity',
                                  'Day * Temp'
                                  ))
@@ -360,6 +358,8 @@ mass_within <- mass_VPD_p %>%
 
 
 ## Body Condition
+
+*not in publication*
 
 ### Building
 
@@ -742,6 +742,9 @@ Do the same exact stats for ambient temp and VPD at the time of measurement:
 CEWL_msmt_temp_mod <- lmerTest::lmer(data = body_temp_test_dat, 
                                      CEWL_g_m2h_mean ~ msmt_temp_C * tmt +
                                        (1|trial_number))
+CEWL_msmt_WVP_mod <- lmerTest::lmer(data = body_temp_test_dat, 
+                                     CEWL_g_m2h_mean ~ e_a_kPa_m * tmt +
+                                       (1|trial_number))
 CEWL_msmt_VPD_mod <- lmerTest::lmer(data = body_temp_test_dat, 
                                      CEWL_g_m2h_mean ~ msmt_VPD_kPa * tmt +
                                        (1|trial_number))
@@ -749,6 +752,7 @@ CEWL_msmt_VPD_mod <- lmerTest::lmer(data = body_temp_test_dat,
 summary(CEWL_msmt_temp_mod)
 summary(CEWL_msmt_VPD_mod)
 anova(CEWL_msmt_temp_mod, type = "3", ddf = "Kenward-Roger")
+anova(CEWL_msmt_WVP_mod, type = "3", ddf = "Kenward-Roger")
 anova(CEWL_msmt_VPD_mod, type = "3", ddf = "Kenward-Roger")
 ```
 
@@ -811,12 +815,23 @@ Build each treatment effect model. These are equivalent to the models built for 
 CEWL_mod_VPD <- lmerTest::lmer(data = dat_no_rehab_deltaCEWL,
                                delta_CEWL ~ VPD_kPa +
                               (1|trial_number))
+CEWL_mod_WVP <- lmerTest::lmer(data = dat_no_rehab_deltaCEWL,
+                               delta_CEWL ~ e_a_kPa +
+                              (1|trial_number))
 CEWL_mod_hum <- lmerTest::lmer(data = dat_no_rehab_deltaCEWL,
                                delta_CEWL ~ humidity_tmt +
                               (1|trial_number))
 CEWL_mod_temp <- lmerTest::lmer(data = dat_no_rehab_deltaCEWL,
                                delta_CEWL ~ temp_tmt +
                               (1|trial_number))
+CEWL_mod_double <- lmerTest::lmer(data = dat_no_rehab_deltaCEWL,
+                               delta_CEWL ~ temp_tmt*humidity_tmt +
+                              (1|trial_number))
+
+# summary(CEWL_mod_VPD)
+# summary(CEWL_mod_hum)
+# summary(CEWL_mod_temp)
+# summary(CEWL_mod_double)
 ```
 
 
@@ -857,23 +872,27 @@ Now, compare the AIC, RMSE, and R^2 values across models, and the F and p values
 ```{r CEWL mod compare}
 # calculate RMSE & R^2
 CEWL_RMSE_Rsq <- data.frame(model = 
-                               c('VPD',
+                               c('WVP',
+                                 'VPD',
                                  'Humidity',
                                  'Temp'
                                  ),
-                           RMSE = c(sqrt(mean((residuals(CEWL_mod_VPD))^2)),
+                           RMSE = c(sqrt(mean((residuals(CEWL_mod_WVP))^2)),
+                                    sqrt(mean((residuals(CEWL_mod_VPD))^2)),
                                     sqrt(mean((residuals(CEWL_mod_hum))^2)),
                                     sqrt(mean((residuals(CEWL_mod_temp))^2))),
                            # marginal Rsq for the amount of variance
                            # explained by fixed effects only
-                           Rsq = c(MuMIn::r.squaredGLMM(CEWL_mod_VPD)[,"R2m"],
+                           Rsq = c(MuMIn::r.squaredGLMM(CEWL_mod_WVP)[,"R2m"],
+                                   MuMIn::r.squaredGLMM(CEWL_mod_VPD)[,"R2m"],
                                    MuMIn::r.squaredGLMM(CEWL_mod_hum)[,"R2m"],
                                    MuMIn::r.squaredGLMM(CEWL_mod_temp)[,"R2m"]))
 
 # calculate AIC
-CEWL_models <- list(CEWL_mod_VPD, CEWL_mod_hum, CEWL_mod_temp)
+CEWL_models <- list(CEWL_mod_WVP, CEWL_mod_VPD, CEWL_mod_hum, CEWL_mod_temp)
 CEWL_mod_names <- data.frame(model = 
-                               c('VPD',
+                               c('WVP',
+                                 'VPD',
                                  'Humidity',
                                  'Temp'
                                  ))
@@ -911,7 +930,7 @@ CEWL_within <- CEWL_VPD_p %>%
          response = "deltaCEWL")
 ```
 
-
+*But, water vapor pressure is pretty confounded with humidity tmt.*
 
 
 
@@ -1087,6 +1106,8 @@ Given the daily trends for plasma osmolality, in total for acclimation change in
 
 Let's compare the relationship of CEWL ~ osmolality post-experiment to what we found pre-experiment in the "analysis_capture" file. The treatment-specific sub-dataframes were created in the "Body Temp" model subsection above.
 
+**These are NOT the stats presents for Figure 6**
+
 ```{r}
 CEWL_osml <- lmerTest::lmer(data = end_vals, 
                                CEWL_g_m2h_mean ~ osmolality_mmol_kg_mean +
@@ -1120,6 +1141,33 @@ anova(CD_CEWL_osml, type = "3", ddf = "Kenward-Roger")
 ```
 
 Even though only data for one treatment group was significant, all have a positive relationship
+
+
+# CEWL ~ **W**VP
+
+The Rsq is better... 0.22 vs 0.15
+
+```{r}
+CEWL_WVP_lm <- lm(data = dat_no_rehab_deltaCEWL,
+                               delta_CEWL ~ e_a_mean_tmttrial)
+plot(CEWL_WVP_lm)
+simple.eda(residuals(CEWL_WVP_lm))
+shapiro.test(residuals(CEWL_WVP_lm))
+summary(CEWL_WVP_lm)
+
+CEWL_WVP_poly <- lm(data = dat_no_rehab_deltaCEWL,
+                               delta_CEWL ~ poly(e_a_mean_tmttrial, 2))
+plot(CEWL_WVP_poly)
+simple.eda(residuals(CEWL_WVP_poly))
+shapiro.test(residuals(CEWL_WVP_poly))
+summary(CEWL_WVP_poly)
+
+anova(CEWL_WVP_poly, CEWL_WVP_lm)
+```
+
+
+
+
 
 
 # CEWL ~ VPD
@@ -1190,40 +1238,58 @@ LINE assumptions are equally-well-met.
 
 The polynomial factor is not significant, but the R-sq is slightly higher for the poly model. 
 
+
+# Compare WVP / VPD / poly
+
 Compare RMSE and AIC:
 
 ```{r}
 sqrt(mean((residuals(CEWL_VPD_lm))^2))
 sqrt(mean((residuals(CEWL_VPD_poly))^2))
+sqrt(mean((residuals(CEWL_WVP_lm))^2))
+sqrt(mean((residuals(CEWL_WVP_poly))^2))
 
-CEWL_VPD_models <- list(CEWL_VPD_lm, CEWL_VPD_poly)
+CEWL_VPD_models <- list(CEWL_WVP_lm, CEWL_WVP_poly,
+                        CEWL_VPD_lm, CEWL_VPD_poly)
 CEWL_VPD_mod_names <- data.frame(model = 
-                               c('linear',
-                                 'polynomial'
+                               c('WVP linear',
+                                 'WVP polynomial',
+                                 'VPD linear',
+                                 'VPD polynomial'
                                  ))
 CEWL_VPD_AICc <- data.frame(aictab(cand.set = CEWL_VPD_models, 
                                  modnames = CEWL_VPD_mod_names))
 CEWL_VPD_AICc
 ```
 
-RMSE is slightly lower for the polynomial model. But, AIC is not meaningfully different between the two versions.
+RMSE is slightly lower for the polynomial model. But, AIC is not meaningfully different between the two versions for each variable.
 
 
 
-I'll use the lm as the best model/
+I'll use the lm for each as the best models.
 
 ```{r}
 summary(CEWL_VPD_lm)
 anova(CEWL_VPD_lm) # single factor slr = can't specify ddf and type SS the same way (& don't need to I think)
+
+summary(CEWL_WVP_lm)
+anova(CEWL_WVP_lm)
 ```
 
-(estimate = -2.96, SE = 0.6, df = (1, 131), F = 24.82, p < 0.0001, Rsq = 0.16)
+
+*stats for paper*
+
+VPD: (estimate = -2.95, SE = 0.59, **SS = 1879**, F(1,131) = 24.66, p < 0.0001, adj-Rsq = 0.15)
+
+WVP: (estimate = 3.10, SE = 0.50, SS = 2648, F(1,131) = 37.65, p < 0.0001, adj-Rsq = 0.22)
 
 
 
 
 
 # Recovery Models
+
+*not in publication*
 
 I want to know how the 2-day recovery period affects physiology relative to post- and pre- experiment. To do this, I'll use two-sided t-tests comparing recovery delta values to the hypothesis of mu=0.
 
@@ -1344,7 +1410,7 @@ my_labels <- c("Cool Humid\n0.6 kPa",
 
 
 
-### Means Only *F5*
+### Means Only *F4*
 
 ```{r mass actual-min fig}
 ggplot() + 
@@ -1412,7 +1478,7 @@ mass_fig_min
 
 
 
-### Ending Values *F6*
+### Ending Values *F5*
 
 ```{r mass ending vals}
 ggplot() +
@@ -1490,238 +1556,6 @@ mass_pairwise
 
 
 
-
-## SMI 
-
-### Ind + Means
-
-```{r SMI actual fig}
-ggplot() + 
-  geom_line(data = dat,
-            aes(x = day_n,
-                y = SMI, 
-                color = tmt,
-                group = individual_ID),
-            alpha = 0.2) +
-  geom_line(data = means,
-            aes(x = day_n,
-                y = mean_SMI, 
-                color = tmt,
-                group = tmt),
-            alpha = 1, 
-            size = 1) +
-  geom_point(data = means,
-            aes(x = day_n,
-                y = mean_SMI, 
-                color = tmt,
-                shape = tmt),
-            alpha = 1, 
-            size = 5) +
-  geom_vline(xintercept = 9,
-             linetype = "dashed",
-             color = "darkgrey") +
-  theme_classic() + 
-  scale_shape_manual(values = c(15:18), name = "") +
-  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
-  scale_color_brewer(palette = "Set2", name = "") +
-  xlab("Day") + 
-  ylab("Body Condition (g)") + 
-  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
-  theme(text = element_text(color = "black", 
-                            family = "sans", 
-                            size = 22),
-        axis.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 16),
-        legend.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 22),
-        legend.text.align = 0,
-        legend.position = "none",
-        plot.margin = unit(c(0.1, #top
-                             0.1, #right
-                             0.1, #bottom
-                             0.41 #left
-                             ), "cm")) -> SMI_fig
-SMI_fig
-```
-
-### Means Only *F5*
-
-```{r SMI actual-min fig}
-ggplot() + 
-  #plot these first so they end up on the "bottom"
-  geom_smooth(data = dat_no_rehab,
-                  aes(x = day_n,
-                y = SMI, 
-                color = tmt,
-                group = tmt),
-              method = "lm",
-              se = F,
-              size = 0.7) +
-  geom_errorbar(data = means,
-                  aes(x = day_n,
-                y = mean_SMI, 
-                color = tmt,
-                group = tmt,
-                ymin = mean_SMI-se_SMI, 
-                ymax = mean_SMI+se_SMI),
-                width = .1,
-                alpha = 0.8) +
-  geom_point(data = means,
-            aes(x = day_n,
-                y = mean_SMI, 
-                color = tmt,
-                #fill = tmt,
-                shape = tmt),
-            fill = "white",
-            alpha = 1, 
-            size = 3) +
-  
-  theme_classic() + 
-  scale_shape_manual(values = my_shapes, name = "",
-                     labels = my_labels) +
-  scale_fill_manual(values = my_colors, name = "",
-                     labels = my_labels) +
-  scale_color_manual(values = my_colors, name = "",
-                     labels = my_labels) +
-  scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
-  scale_y_continuous(breaks = c(seq(8,12)),
-                     labels = c(seq(8,12))) +
-  xlab("Day") + 
-  ylab("Body Condition (g')") + 
-  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
-  #geom_vline(xintercept = 9,
-   #          linetype = "dashed",
-    #         color = "darkgrey") +
-  theme(text = element_text(color = "black", 
-                            family = "sans", 
-                            size = 12),
-        axis.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 8),
-        legend.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 8),
-        legend.text.align = 0,
-        legend.position = "none",
-        plot.margin = margin(t = 6, r = 6, b = 6, l = 10.8, unit = "pt")
-) -> SMI_fig_min
-SMI_fig_min
-```
-
-
-
-### LM + SE
-
-```{r mass prez version}
-ggplot() + 
-  geom_smooth(data = dat_no_rehab,
-              aes(x = day_n,
-                  y = mass_g, 
-                  color = tmt,
-                  group = tmt),
-              formula = y ~ x, 
-              method = "lm", 
-              se = T, 
-              size = 1.2, 
-              alpha = 0.2) + 
-  theme_classic() + 
-  scale_x_continuous(limits = c(0,8),
-                     breaks = c(0, 2, 4, 6, 8)) +
-  scale_color_brewer(palette = "Set2", name = "") +
-  xlab("Acclimation Day") + 
-  ylab("Lizard Mass (g)") + 
-  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
-  theme(text = element_text(color = "black", 
-                            family = "sans", 
-                            size = 22),
-        axis.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 16),
-        legend.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 22),
-        legend.text.align = 0,
-        legend.position = "none"
-) -> SMI_lm_fig
-SMI_lm_fig
-```
-
-
-### Ending Values *F6*
-
-```{r SMI ending vals}
-ggplot() +
-  geom_jitter(data = end_vals,
-              aes(x = tmt,
-                   y = SMI, 
-                   color = tmt,
-                 fill = tmt,
-                 shape = tmt), 
-               size = 1,
-              alpha = 0.4,
-              position = position_jitter(height = 0, width = 0.2)) +
-  geom_errorbar(data = SMI_emmeans,
-                aes(x = tmt,
-                    y = emmean, 
-                    color = tmt,
-                    group = tmt,
-                    ymin = lower.CL, 
-                    ymax = upper.CL),
-                width = .1,
-                alpha = 1) +
-  geom_point(data = SMI_emmeans, 
-             aes(x = tmt,
-                   y = emmean, 
-                   #color = tmt,
-                 shape = tmt,
-                 fill = tmt), 
-             color = "black",
-               size = 4) +
-  theme_classic() + 
-  scale_shape_manual(values = my_shapes_box, name = "") +
-  scale_fill_manual(values = my_colors, name = "") +
-  scale_color_manual(values = my_colors, name = "") +
-  scale_y_continuous(limits = c(7,15),
-                     breaks = c(seq(7,15, by = 2)),
-                     labels = c(seq(7,15, by = 2))) +
-  scale_x_discrete(labels = c("Cool Humid\n0.6 kPa",
-                               "Hot Humid\n1.1 kPa",
-                               "Cool Dry\n2.5 kPa",
-                               "Hot Dry\n3.8 kPa")) + 
-  xlab("") + 
-  
-  annotate(geom = "text", x = 4, y = 12.7, label = "B", 
-           size = 3) +
-  annotate(geom = "text", x = 2, y = 14.2, label = "B", 
-           size = 3) +
-  annotate(geom = "text", x = 3, y = 14.8, label = "A", 
-           size = 3) +
-  annotate(geom = "text", x = 1, y = 14.6, label = "A", 
-           size = 3) +
-  
-  ylab("Body Condition (g')") + 
-  theme(text = element_text(color = "black", 
-                            family = "sans", 
-                            size = 12),
-        axis.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 8),
-        legend.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 8),
-        legend.text.align = 0,
-        legend.position = "none",
-        plot.margin = unit(c(0, #top
-                              0, #right
-                              0, #bottom
-                              3.4), "mm")
-        ) -> SMI_end_boxplot
-SMI_end_boxplot
-SMI_emmeans
-SMI_pairwise
-```
 
 
 
@@ -1849,7 +1683,7 @@ hct_fig_min
 
 
 
-### Ending Values *F6*
+### Ending Values *F5*
 
 
 ```{r hct ending vals}
@@ -1986,7 +1820,7 @@ osml_fig
 ```
 
 
-### Means Only *F5*
+### Means Only *F4*
 
 
 ```{r osmolality actual-minimal fig}
@@ -2092,48 +1926,10 @@ write.csv(osml_pairwise_df, "./results_statistics/osmolality_pairwise_diffs.csv"
 Nope, none of the differences between days within tmt groups are significantly different.
 
 
-### LM + SE
-
-
-```{r osmolality lm fig}
-ggplot() + 
-  stat_smooth(data = dat_no_rehab,
-              aes(x = day_n,
-                  y = osmolality_mmol_kg_mean, 
-                  color = tmt,
-                  fill = tmt,
-                  group = tmt),
-              formula = y ~ x, 
-              method = "lm", 
-              se = T, 
-              size = 2, 
-              alpha = 0.1) + 
-  theme_classic() + 
-  scale_x_continuous(limits = c(0,8), 
-                     breaks = c(0, 2, 4, 6, 8)) +
-  scale_color_brewer(palette = "Set2", name = "") +
-  scale_fill_brewer(palette = "Set2", name = "") +
-  xlab("Acclimation Day") + 
-  ylab("Plasma Osmolality\n(mmol/kg)") + 
-  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
-  theme(text = element_text(color = "black", 
-                            family = "sans", 
-                            size = 30),
-        axis.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 20),
-        legend.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 22),
-        legend.text.align = 0,
-        legend.position = "none"
-        ) -> osml_lm_fig
-osml_lm_fig
-```
 
 
 
-### Ending Values *F6*
+### Ending Values *F5*
 
 ```{r osml ending vals}
 ggplot() +
@@ -2263,7 +2059,7 @@ CEWL_fig
 
 
 
-### Means Only *F3*
+### Means Only *F2*
 
 ```{r CEWL actual fig minimal}
 ggplot() + 
@@ -2340,54 +2136,15 @@ ggsave(filename = "experiment_CEWL_fig.pdf",
 
 
 
-### LM + SE
-
-
-```{r CEWL lm fig}
-ggplot() + 
-  stat_smooth(data = dat,
-              aes(x = day_n,
-                  y = CEWL_g_m2h_mean, 
-                  color = tmt,
-                  fill = tmt,
-                  group = tmt),
-              formula = y ~ x, 
-              method = "lm", 
-              se = T, 
-              size = 2, 
-              alpha = 0.2) + 
-  theme_classic() + 
-  scale_x_continuous(breaks = c(0, 2, 4, 6, 8)) +
-  scale_color_brewer(palette = "Set2", name = "") +
-  scale_fill_brewer(palette = "Set2", name = "") +
-  xlab("Acclimation Day") + 
-  ylab(bquote('CEWL (g/'*m^2*'h)')) + 
-  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
-  theme(text = element_text(color = "black", 
-                            family = "sans", 
-                            size = 30),
-        axis.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 20),
-        legend.text = element_text(color = "black", 
-                                 family = "sans", 
-                                 size = 22),
-        legend.text.align = 0,
-        legend.position = "none"
-        ) -> CEWL_lm_fig
-CEWL_lm_fig
-```
 
 
 
 
-
-
-### delta CEWL ~ VPD *F4*
+### delta ~ VPD *F3*
 
 ```{r}
 ggplot(data = dat_no_rehab_deltaCEWL) +
-  geom_point(aes(x = VPD_kPa_tmttrial,
+  geom_point(aes(x = VPD_mean_tmttrial,
                    y = delta_CEWL, 
                    color = tmt,
                  fill = tmt,
@@ -2395,18 +2152,12 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
                size = 2,
               alpha = 0.4
              ) +
-  geom_smooth(aes(x = VPD_kPa_tmttrial,
+  geom_smooth(aes(x = VPD_mean_tmttrial,
                    y = delta_CEWL), 
               se = F,
               formula = y ~ x,
               method = "lm",
               color = "black") +
-  #geom_smooth(aes(x = VPD_kPa_tmttrial,
-   #                y = delta_CEWL), 
-    #          se = F,
-     #         formula = y ~ poly(x, 2),
-      #        method = "lm",
-       #       color = "red") +
   theme_classic() + 
   scale_shape_manual(values = my_shapes_box, name = "",
                      labels = c("Cool Humid (CH)",
@@ -2427,7 +2178,7 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
                      breaks = c(seq(-10,40, by = 10)),
                      labels = c(seq(-10,40, by = 10))
                      ) +
-  scale_x_continuous(limits = c(0,4),
+  scale_x_continuous(limits = c(0,5),
                      breaks = c(0.6, 1.1, 2.5, 3.8),
                      labels = c("0.6\nCH", 
                                 "1.1\nHH", 
@@ -2455,26 +2206,105 @@ ggplot(data = dat_no_rehab_deltaCEWL) +
         ) -> CEWL_VPD_fig
 CEWL_VPD_fig
 
-# use ggarrange so legend is centered
-CEWL_VPD_fig_formatted <- ggarrange(CEWL_VPD_fig,
-                                ncol = 1, nrow = 1,
-                                common.legend = TRUE,
-                                legend = "bottom")
-# save
-ggsave(filename = "exp_CEWL_delta_VPD.pdf",
-       plot = CEWL_VPD_fig_formatted,
-       path = "./results_figures",
-       device = "pdf",
-       dpi = 600,
-       units = "mm",
-       width = 80, height = 90)
+# code to export this figure alone
+# NA bc now grouped with the next figure
+# # use ggarrange so legend is centered
+# CEWL_VPD_fig_formatted <- ggarrange(CEWL_VPD_fig,
+#                                 ncol = 1, nrow = 1,
+#                                 common.legend = TRUE,
+#                                 legend = "bottom")
+# # save
+# ggsave(filename = "exp_CEWL_delta_VPD.pdf",
+#        plot = CEWL_VPD_fig_formatted,
+#        path = "./results_figures",
+#        device = "pdf",
+#        dpi = 600,
+#        units = "mm",
+#        width = 80, height = 90)
+```
+
+
+
+
+### delta ~ WVP *F3*
+
+```{r}
+ggplot(data = dat_no_rehab_deltaCEWL) +
+  geom_point(aes(x = e_a_mean_tmttrial,
+                   y = delta_CEWL, 
+                   color = tmt,
+                 fill = tmt,
+                 shape = tmt), 
+               size = 2,
+              alpha = 0.4
+             ) +
+  geom_smooth(aes(x = e_a_mean_tmttrial,
+                   y = delta_CEWL), 
+              se = F,
+              formula = y ~ x,
+              method = "lm",
+              color = "black") +
+  theme_classic() + 
+  scale_shape_manual(values = my_shapes_box, name = "",
+                     labels = c("Cool Humid (CH)",
+                               "Hot Humid (HH)",
+                               "Cool Dry (CD)",
+                               "Hot Dry (HD)")) +
+  scale_fill_manual(values = my_colors, name = "",
+                     labels = c("Cool Humid (CH)",
+                               "Hot Humid (HH)",
+                               "Cool Dry (CD)",
+                               "Hot Dry (HD)")) +
+  scale_color_manual(values = my_colors, name = "",
+                     labels = c("Cool Humid (CH)",
+                               "Hot Humid (HH)",
+                               "Cool Dry (CD)",
+                               "Hot Dry (HD)")) +
+  scale_y_continuous(limits = c(-13,40),
+                     breaks = c(seq(-10,40, by = 10)),
+                     labels = c(seq(-10,40, by = 10))
+                     ) +
+  scale_x_continuous(limits = c(0,5),
+                     breaks = c(0.5, 2.0, 2.3, 4.5),
+                     labels = c("0.5\nCD", 
+                                "2.0  \nHD  ", 
+                                "  2.3\n  CH", 
+                                "4.5\nHH")) +
+  xlab("Water Vapor Pressure (kPa)") + 
+  ylab(expression(Delta ~ 'CEWL')) + 
+  guides(shape = guide_legend(nrow = 2, byrow = TRUE)) +
+  theme(text = element_text(color = "black", 
+                            family = "sans", 
+                            size = 12),
+        axis.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.text = element_text(color = "black", 
+                                 family = "sans", 
+                                 size = 8),
+        legend.text.align = 0,
+        legend.position = "bottom",
+        legend.spacing.y = unit(0, "mm")
+        #plot.margin = unit(c(0, #top
+         #                     0, #right
+          #                    0, #bottom
+           #                   0), "mm")
+        ) -> CEWL_WVP_fig
+CEWL_WVP_fig
 ```
 
 
 
 
 
-### Ending Values *F6*
+
+
+
+
+
+
+
+### Ending Values *F5*
 
 ```{r}
 ggplot() +
@@ -2603,7 +2433,7 @@ ggsave(filename = "exp_CEWL_osml_fig.pdf",
 
 ## Multi-Figures
 
-over time:
+### hydration ~ time *F4*
 
 ```{r arrange figs}
 ggarrange(osml_fig_min, 
@@ -2627,7 +2457,7 @@ ggsave(filename = "experiment_multi_fig.pdf",
 ```
 
 
-end values:
+### end values *F5*
 
 ```{r}
 ggarrange(CEWL_end_boxplot, 
@@ -2654,7 +2484,25 @@ ggsave(filename = "exp_end_val_multi_fig.pdf",
 
 
 
+### VPD/WVP *F3*
 
+```{r}
+# use ggarrange so legend is centered
+CEWL_VPD_fig_formatted <- ggarrange(CEWL_VPD_fig,
+                                    CEWL_WVP_fig,
+                                ncol = 1, nrow = 2,
+                                common.legend = TRUE,
+                                legend = "bottom",
+                                labels = c("A", "B"))
+# save
+ggsave(filename = "exp_CEWL_delta_VPD_WVP.pdf",
+       plot = CEWL_VPD_fig_formatted,
+       path = "./results_figures",
+       device = "pdf",
+       dpi = 600,
+       units = "mm",
+       width = 80, height = 150)
+```
 
 
 

@@ -440,10 +440,29 @@ full_dat3$tmt <- factor(full_dat3$tmt,
 summary(full_dat3)
 ```
 
+
+
+
+## Add HOBO Data
+
+
+```{r}
+full_dat4 <- full_dat3 %>%
+  # add VPD values by tmt and tmt-trial groupings
+  left_join(read_rds("./data/HOBO_tmt_trial_diffs.RDS"), 
+             by = c('tmt', 'trial_number'='trial'))
+```
+
+
+
+
+
+
+
 ## Export
 
 ```{r export full dat}
-write_rds(full_dat3, "./data/analysis_data_experiment.RDS")
+write_rds(full_dat4, "./data/analysis_data_experiment.RDS")
 ```
 
 

@@ -291,7 +291,7 @@ format_HOBO_data %>%
 
 ## Treatment Differences
 
-Get mean and sd of temperature and humidity for each tmt group, and calculate vapor pressure deficit based on those mean values using the formula in the book "Environmental Biophysics" by Campbell & Norman, 1998.
+Calculate vapor pressure deficit based on temp/RH values using the formula in the book "Environmental Biophysics" by Campbell & Norman, 1998. Then, get mean + SD stats for each variable.
 
 ```{r}
 format_HOBO_data_w_VPD <- format_HOBO_data %>%
@@ -364,14 +364,14 @@ Were there also differences across the trials (experiment iterations)?
 ```{r}
 tmt_trial_means <- format_HOBO_data_w_VPD %>%
   group_by(tmt, trial) %>%
-  summarise(e_a_mean_tmttrial = mean(e_a_kPa),
-            e_a_SD_tmttrial = sd(e_a_kPa),
-            VPD_mean_tmttrial = mean(VPD_kPa),
-            VPD_SD_tmttrial = sd(VPD_kPa),
-            temp_mean_tmttrial = mean(temp_C),
+  summarise(temp_mean_tmttrial = mean(temp_C),
             temp_SD_tmttrial = sd(temp_C),
             humidity_mean_tmttrial = mean(relative_humidity),
-            humidity_SD_tmttrial = sd(relative_humidity)
+            humidity_SD_tmttrial = sd(relative_humidity),
+            e_a_mean_tmttrial = mean(e_a_kPa),
+            e_a_SD_tmttrial = sd(e_a_kPa),
+            VPD_mean_tmttrial = mean(VPD_kPa),
+            VPD_SD_tmttrial = sd(VPD_kPa)
             ) %>%
   arrange(trial)
 tmt_trial_means
@@ -385,9 +385,13 @@ First, add overall tmt means:
 ```{r}
 tmt_only_means_sub <- tmt_only_means %>% 
   dplyr::select(tmt, 
+                temp_C = temp_mean,
+                humidity_percent = humidity_mean,
                 e_a_kPa = e_a_mean, 
                 VPD_kPa = VPD_mean) %>% 
-  mutate(e_a_kPa = round(e_a_kPa, 1),
+  mutate(temp_C = round(temp_C, 1),
+         humidity_percent = round(humidity_percent, 1),
+         e_a_kPa = round(e_a_kPa, 1),
          VPD_kPa = round(VPD_kPa, 1))
 tmt_only_means_sub
 

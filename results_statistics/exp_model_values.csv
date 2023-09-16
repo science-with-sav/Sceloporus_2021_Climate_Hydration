@@ -1,37 +1,37 @@
 "","response","model","predictor","seq_sum_of_squares","df","F_statistic","p_value"
-"VPD_kPa","deltaCEWL","VPD","VPD_kPa",1905,"1, 127",32.78,7.05880599375959e-08
+"VPD_kPa","deltaCEWL","VPD","VPD_kPa",1858,"1, 127",31.77,1.06502968328396e-07
 "humidity_tmt","deltaCEWL","Humidity","humidity_tmt",2578,"1, 127",48.82,1.4010636188616e-10
 "temp_tmt","deltaCEWL","Temp","temp_tmt",297,"1, 127",4.2,0.0425862494043247
-"day_n","Plasma Osmolality (mmol/kg)","Day * VPD","day_n",545,"1, 262",1.01,0.315130236066051
-"VPD_kPa1","Plasma Osmolality (mmol/kg)","Day * VPD","VPD_kPa",247,"1, 370",0.46,0.498540432678909
-"day_n:VPD_kPa","Plasma Osmolality (mmol/kg)","Day * VPD","day_n:VPD_kPa",1879,"1, 263",3.49,0.0627297434767582
+"day_n","Plasma Osmolality (mmol/kg)","Day * VPD","day_n",556,"1, 262",1.03,0.310295951754624
+"VPD_kPa1","Plasma Osmolality (mmol/kg)","Day * VPD","VPD_kPa",257,"1, 370",0.48,0.490206984359395
+"day_n:VPD_kPa","Plasma Osmolality (mmol/kg)","Day * VPD","day_n:VPD_kPa",1908,"1, 263",3.55,0.0607609512876733
 "day_n1","Plasma Osmolality (mmol/kg)","Day * Humidity","day_n",640,"1, 262",1.18,0.277860393293688
 "humidity_tmt1","Plasma Osmolality (mmol/kg)","Day * Humidity","humidity_tmt",275,"1, 370",0.51,0.476461084618012
 "day_n:humidity_tmt","Plasma Osmolality (mmol/kg)","Day * Humidity","day_n:humidity_tmt",930,"1, 262",1.72,0.191117794094205
 "day_n2","Plasma Osmolality (mmol/kg)","Day * Temp","day_n",596,"1, 262",1.11,0.29286686296313
 "temp_tmt1","Plasma Osmolality (mmol/kg)","Day * Temp","temp_tmt",64,"1, 369",0.12,0.729235718317269
 "day_n:temp_tmt","Plasma Osmolality (mmol/kg)","Day * Temp","day_n:temp_tmt",1715,"1, 262",3.2,0.0749826403635883
-"day_n3","Hematocrit (%)","Day * VPD","day_n",2018,"1, 264",131.97,4.92888210786807e-25
-"VPD_kPa2","Hematocrit (%)","Day * VPD","VPD_kPa",2,"1, 235",0.13,0.721739994653021
-"day_n:VPD_kPa1","Hematocrit (%)","Day * VPD","day_n:VPD_kPa",0,"1, 263",0,0.966062923996488
+"day_n3","Hematocrit (%)","Day * VPD","day_n",2016,"1, 264",131.83,5.17389859918641e-25
+"VPD_kPa2","Hematocrit (%)","Day * VPD","VPD_kPa",2,"1, 235",0.14,0.707649808547344
+"day_n:VPD_kPa1","Hematocrit (%)","Day * VPD","day_n:VPD_kPa",0,"1, 263",0,0.996163400146434
 "day_n11","Hematocrit (%)","Day * Humidity","day_n",7136,"1, 263",468.06,2.33334488400198e-60
 "humidity_tmt2","Hematocrit (%)","Day * Humidity","humidity_tmt",0,"1, 235",0.01,0.936288076038284
 "day_n:humidity_tmt1","Hematocrit (%)","Day * Humidity","day_n:humidity_tmt",11,"1, 263",0.74,0.391306597509799
 "day_n21","Hematocrit (%)","Day * Temp","day_n",7169,"1, 263",480.37,2.55354141055207e-61
 "temp_tmt2","Hematocrit (%)","Day * Temp","temp_tmt",17,"1, 239",1.12,0.290650870000166
 "day_n:temp_tmt1","Hematocrit (%)","Day * Temp","day_n:temp_tmt",93,"1, 263",6.24,0.013088801795507
-"day_n4","Body Mass (g)","Day * VPD","day_n",24,"1, 668",304.93,1.57043605378046e-56
-"VPD_kPa3","Body Mass (g)","Day * VPD","VPD_kPa",0,"1, 135",1.35,0.246681715636579
-"day_n:VPD_kPa2","Body Mass (g)","Day * VPD","day_n:VPD_kPa",14,"1, 668",171.79,4.30420850661409e-35
+"day_n4","Body Mass (g)","Day * VPD","day_n",24,"1, 668",304.87,1.6031826446044e-56
+"VPD_kPa3","Body Mass (g)","Day * VPD","VPD_kPa",0,"1, 135",1.34,0.248879088097754
+"day_n:VPD_kPa2","Body Mass (g)","Day * VPD","day_n:VPD_kPa",14,"1, 668",176.16,7.52987814472229e-36
 "day_n12","Body Mass (g)","Day * Humidity","day_n",230,"1, 668",2454.58,7.07127993480799e-226
 "humidity_tmt3","Body Mass (g)","Day * Humidity","humidity_tmt",0,"1, 137",1.26,0.262769510516556
 "day_n:humidity_tmt2","Body Mass (g)","Day * Humidity","day_n:humidity_tmt",4,"1, 668",42.8,1.20440283281869e-10
 "day_n22","Body Mass (g)","Day * Temp","day_n",230,"1, 668",3671.82,1.21689707902081e-273
 "temp_tmt3","Body Mass (g)","Day * Temp","temp_tmt",0,"1, 133",0.03,0.853038427894546
 "day_n:temp_tmt2","Body Mass (g)","Day * Temp","day_n:temp_tmt",25,"1, 668",395.3,1.88562827289396e-69
-"day_n5","Body Condition (g')","Day * VPD","day_n",25,"1, 668",352.51,1.77647032689537e-63
-"VPD_kPa4","Body Condition (g')","Day * VPD","VPD_kPa",0,"1, 139",0.78,0.378271742544215
-"day_n:VPD_kPa3","Body Condition (g')","Day * VPD","day_n:VPD_kPa",13,"1, 668",177.21,4.95063057796248e-36
+"day_n5","Body Condition (g')","Day * VPD","day_n",25,"1, 668",352.55,1.75057120736108e-63
+"VPD_kPa4","Body Condition (g')","Day * VPD","VPD_kPa",0,"1, 139",0.75,0.388628701016742
+"day_n:VPD_kPa3","Body Condition (g')","Day * VPD","day_n:VPD_kPa",13,"1, 668",182,7.44232272013064e-37
 "day_n13","Body Condition (g')","Day * Humidity","day_n",226,"1, 668",2704.67,4.66994452101459e-237
 "humidity_tmt4","Body Condition (g')","Day * Humidity","humidity_tmt",0,"1, 141",1.57,0.211834173611342
 "day_n:humidity_tmt3","Body Condition (g')","Day * Humidity","day_n:humidity_tmt",4,"1, 668",44.22,6.09758466730173e-11

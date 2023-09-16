@@ -1,16 +1,18 @@
 "","response","model","RMSE","Rsq","AICc","Delta_AICc"
 "1","deltaCEWL","Humidity",7.11,0.21,918.19,0
-"2","deltaCEWL","VPD",7.46,0.15,932.2,14.01
-"3","deltaCEWL","Temp",8.24,0.02,955.4,37.21
-"4","Plasma Osmolality (mmol/kg)","Day * Temp",22.73,0.02,3583.06,0
-"5","Plasma Osmolality (mmol/kg)","Day * Humidity",22.83,0.01,3586.7,3.64
-"6","Plasma Osmolality (mmol/kg)","Day * VPD",22.76,0.01,3587.55,4.49
-"7","Hematocrit (%)","Day * Temp",3.35,0.36,2396.25,0
-"8","Hematocrit (%)","Day * Humidity",3.38,0.34,2409.6,13.35
-"9","Hematocrit (%)","Day * VPD",3.38,0.34,2414.08,17.83
-"10","Body Mass (g)","Day * Temp",0.23,0.16,801.14,0
-"11","Body Mass (g)","Day * VPD",0.26,0.12,967.92,166.78
-"12","Body Mass (g)","Day * Humidity",0.28,0.11,1076.19,275.05
-"13","Body Condition (g')","Day * Temp",0.21,0.29,605.72,0
-"14","Body Condition (g')","Day * VPD",0.24,0.19,798.4,192.68
-"15","Body Condition (g')","Day * Humidity",0.26,0.17,912.18,306.46
+"2","deltaCEWL","WVP",7.05,0.21,918.35,0.16
+"3","deltaCEWL","VPD",7.48,0.15,933,14.8
+"4","deltaCEWL","Temp",8.24,0.02,955.4,37.21
+"5","Plasma Osmolality (mmol/kg)","Day * Temp",22.73,0.02,3583.06,0
+"6","Plasma Osmolality (mmol/kg)","Day * Humidity",22.83,0.01,3586.7,3.64
+"7","Plasma Osmolality (mmol/kg)","Day * VPD",22.76,0.01,3587.5,4.44
+"8","Hematocrit (%)","Day * Temp",3.35,0.36,2396.25,0
+"9","Hematocrit (%)","Day * Humidity",3.38,0.34,2409.6,13.35
+"10","Hematocrit (%)","Day * VPD",3.38,0.34,2414.04,17.79
+"11","Body Mass (g)","Day * Temp",0.23,0.16,801.14,0
+"12","Body Mass (g)","Day * VPD",0.26,0.12,964.41,163.27
+"13","Body Mass (g)","Day * Humidity",0.28,0.11,1076.19,275.05
+"14","Body Mass (g)","Day * WVP",0.28,0.13,1091.63,290.49
+"15","Body Condition (g')","Day * Temp",0.21,0.29,605.72,0
+"16","Body Condition (g')","Day * VPD",0.24,0.2,794.45,188.74
+"17","Body Condition (g')","Day * Humidity",0.26,0.17,912.18,306.46

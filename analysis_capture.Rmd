@@ -41,6 +41,8 @@ library("rmdformats") # clean html R markdown format
 
 This data was collected June - August by Master's student Savannah Weaver, advisor Dr. Emily Taylor, and research assistants Tess McIntyre and Taylor Van Rossum. Adult male *Sceloporus occidentalis* were caught across the Cal Poly campus then acclimated to 4 different climate treatments. This R file analyzes the state and variation of hydric physiology at the time of capture.
 
+**Note: most of this analysis is not included in the JEB publication. Only the correlation between CEWL and plasma osmolality is.**
+
 
 # Load Data
 

@@ -1564,9 +1564,16 @@ treatments:</p>
 ##  Max.   :15.063  
 ## </code></pre>
 </div>
+<div id="add-hobo-data" class="section level2">
+<h2>Add HOBO Data</h2>
+<div class="sourceCode" id="cb42"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" tabindex="-1"></a>full_dat4 <span class="ot">&lt;-</span> full_dat3 <span class="sc">%&gt;%</span></span>
+<span id="cb42-2"><a href="#cb42-2" tabindex="-1"></a>  <span class="co"># add VPD values by tmt and tmt-trial groupings</span></span>
+<span id="cb42-3"><a href="#cb42-3" tabindex="-1"></a>  <span class="fu">left_join</span>(<span class="fu">read_rds</span>(<span class="st">&quot;./data/HOBO_tmt_trial_diffs.RDS&quot;</span>), </span>
+<span id="cb42-4"><a href="#cb42-4" tabindex="-1"></a>             <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&#39;tmt&#39;</span>, <span class="st">&#39;trial_number&#39;</span><span class="ot">=</span><span class="st">&#39;trial&#39;</span>))</span></code></pre></div>
+</div>
 <div id="export-1" class="section level2">
 <h2>Export</h2>
-<div class="sourceCode" id="cb42"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" tabindex="-1"></a><span class="fu">write_rds</span>(full_dat3, <span class="st">&quot;./data/analysis_data_experiment.RDS&quot;</span>)</span></code></pre></div>
+<div class="sourceCode" id="cb43"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" tabindex="-1"></a><span class="fu">write_rds</span>(full_dat4, <span class="st">&quot;./data/analysis_data_experiment.RDS&quot;</span>)</span></code></pre></div>
 </div>
 </div>
 </div>
@@ -1611,6 +1618,8 @@ treatments:</p>
        <li><a href="#full-data" id="toc-full-data">Full Data</a>
        <ul>
        <li><a href="#format" id="toc-format">Format</a></li>
+       <li><a href="#add-hobo-data" id="toc-add-hobo-data">Add HOBO
+       Data</a></li>
        <li><a href="#export-1" id="toc-export-1">Export</a></li>
        </ul></li>
        </ul>
